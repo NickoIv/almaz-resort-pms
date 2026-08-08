@@ -1,3 +1,4 @@
+import { chargesSumSql } from './money'
 import { SQL_NOW, SQL_TODAY } from './time'
 
 export type NotificationKey =
@@ -89,7 +90,7 @@ export async function buildDigest(
       .prepare(
         `SELECT u.name AS unit_name, u.type AS unit_type, b.guest_name, b.guest_phone,
                 b.date_from, b.date_to,
-                (b.total_amount - b.prepaid_amount) AS remaining
+                (b.total_amount + ${chargesSumSql('b')} - b.prepaid_amount) AS remaining
          FROM bookings b JOIN units u ON u.id = b.unit_id
          WHERE b.status = 'booked' AND date(b.date_from) = date(${SQL_TODAY})
          ORDER BY u.type, u.name`
@@ -116,7 +117,7 @@ export async function buildDigest(
       .prepare(
         `SELECT u.name AS unit_name, u.type AS unit_type, b.guest_name, b.guest_phone,
                 b.date_from, b.date_to,
-                (b.total_amount - b.prepaid_amount) AS remaining
+                (b.total_amount + ${chargesSumSql('b')} - b.prepaid_amount) AS remaining
          FROM bookings b JOIN units u ON u.id = b.unit_id
          WHERE b.status = 'occupied' AND date(b.date_to) = date(${SQL_TODAY})
          ORDER BY u.type, u.name`
@@ -172,10 +173,10 @@ export async function buildDigest(
       .prepare(
         `SELECT u.name AS unit_name, u.type AS unit_type, b.guest_name, b.guest_phone,
                 b.date_from, b.date_to,
-                (b.total_amount - b.prepaid_amount) AS remaining
+                (b.total_amount + ${chargesSumSql('b')} - b.prepaid_amount) AS remaining
          FROM bookings b JOIN units u ON u.id = b.unit_id
          WHERE b.status <> 'free'
-           AND (b.total_amount - b.prepaid_amount) > 0
+           AND (b.total_amount + ${chargesSumSql('b')} - b.prepaid_amount) > 0
            AND date(b.date_to) >= date(${SQL_TODAY})
          ORDER BY remaining DESC`
       )

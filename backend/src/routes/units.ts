@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { assertUnitTypeAllowed, canSeeMoney, placeholders, resolveTypeFilter } from '../lib/access'
+import { chargesSumSql, remainingOf } from '../lib/money'
 import { SQL_COVERS_NOW, SQL_STARTS_LATER } from '../lib/time'
 import type { AppEnv, BookingStatus, UnitType } from '../types'
 
@@ -22,6 +23,8 @@ type UnitRow = {
   prepaid_amount: number | null
   deposit_amount: number | null
   currency: string | null
+  group_id: number | null
+  charges_total: number | null
   next_booking_id: number | null
   next_date_from: string | null
   next_date_to: string | null
@@ -35,6 +38,7 @@ const UNIT_SELECT = `
     (SELECT COUNT(*) FROM cleaning_checklist cc WHERE cc.unit_id = u.id) AS cleaning_total,
     b.id AS booking_id, b.guest_name, b.guest_phone, b.date_from, b.date_to,
     b.status AS booking_status, b.total_amount, b.prepaid_amount, b.deposit_amount, b.currency,
+    b.group_id, ${chargesSumSql('b')} AS charges_total,
     nb.id AS next_booking_id, nb.date_from AS next_date_from, nb.date_to AS next_date_to,
     nb.guest_name AS next_guest_name
   FROM units u
@@ -66,13 +70,21 @@ function serializeUnit(row: UnitRow, withMoney: boolean) {
         date_from: row.date_from,
         date_to: row.date_to,
         status: row.booking_status,
-        is_paid: (row.total_amount ?? 0) - (row.prepaid_amount ?? 0) <= 0,
+        group_id: row.group_id,
+        is_paid:
+          remainingOf(row.total_amount ?? 0, row.charges_total ?? 0, row.prepaid_amount ?? 0) <= 0,
         ...(withMoney
           ? {
               total_amount: row.total_amount ?? 0,
               prepaid_amount: row.prepaid_amount ?? 0,
+              // Refundable hold — reported alongside the balance, never inside it.
               deposit_amount: row.deposit_amount ?? 0,
-              remaining_amount: (row.total_amount ?? 0) - (row.prepaid_amount ?? 0),
+              charges_amount: row.charges_total ?? 0,
+              remaining_amount: remainingOf(
+                row.total_amount ?? 0,
+                row.charges_total ?? 0,
+                row.prepaid_amount ?? 0
+              ),
               currency: row.currency ?? 'KZT',
             }
           : {}),
@@ -142,6 +154,7 @@ type CalendarBookingRow = {
   prepaid_amount: number
   deposit_amount: number
   currency: string
+  charges_total: number
 }
 
 function daysInMonth(year: number, month: number): number {
@@ -180,9 +193,10 @@ units.get('/:id/calendar', async (c) => {
   const last = isoDay(year, monthIndex, total)
 
   const { results } = await c.env.DB.prepare(
-    `SELECT id, guest_name, guest_phone, date_from, date_to, status,
-            total_amount, prepaid_amount, deposit_amount, currency
-     FROM bookings
+    `SELECT b.id, b.guest_name, b.guest_phone, b.date_from, b.date_to, b.status,
+            b.total_amount, b.prepaid_amount, b.deposit_amount, b.currency,
+            ${chargesSumSql('b')} AS charges_total
+     FROM bookings b
      WHERE unit_id = ? AND status <> 'free'
        AND date(date_from) <= date(?) AND date(date_to) >= date(?)
      ORDER BY date_from`
@@ -221,7 +235,8 @@ units.get('/:id/calendar', async (c) => {
             total_amount: b.total_amount,
             prepaid_amount: b.prepaid_amount,
             deposit_amount: b.deposit_amount,
-            remaining_amount: b.total_amount - b.prepaid_amount,
+            charges_amount: b.charges_total,
+            remaining_amount: remainingOf(b.total_amount, b.charges_total, b.prepaid_amount),
             currency: b.currency,
           }
         : {}),

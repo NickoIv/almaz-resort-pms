@@ -103,6 +103,12 @@ stored as PBKDF2-SHA256 hashes (100k iterations); the token is signed with
 | `PATCH` | `/api/bookings/:id/payment` | admin only |
 | `GET` | `/api/bookings/:id/payments` | admin only |
 | `POST` | `/api/bookings/quick` | admin, waiter — hourly quick-booking, recreation units only |
+| `POST` | `/api/bookings/group` | admin, waiter — one event across several units |
+| `GET` | `/api/bookings/group/:id` | admin only |
+| `PATCH` | `/api/bookings/group/:id/payment` | admin only — one combined instalment |
+| `GET` `POST` `DELETE` | `/api/bookings/:id/charges` | admin only — penalties and extras |
+| `GET` | `/api/guests/:phone` | admin only — stay history, debt, notes |
+| `PUT` | `/api/guests/:phone/notes` | admin only |
 | `GET` `PATCH` | `/api/cleaning` | admin, housekeeper |
 | `GET` | `/api/analytics/summary?from=&to=` | admin only |
 | `GET` `PUT` | `/api/settings` | admin only — notification toggles |
@@ -123,6 +129,40 @@ The status queries switch on `units.type` to apply the right comparison
 
 Bookings are stored as Almaty wall-clock time (UTC+5, no DST). D1's `now` is UTC,
 so every comparison against "now" shifts it first.
+
+## How a booking's money adds up
+
+```
+  total_amount        the unit rate
++ charges             penalties / extras (damage, late checkout) — table `charges`
+= billed
+− prepaid_amount      what the guest has actually paid
+= remaining_amount    what is still owed
+
+  deposit_amount      refundable security hold — NEVER part of the above
+```
+
+`deposit_amount` is deliberately outside the balance: it is money held, not money
+owed, and merging the two makes a room look unpaid when it is not. The UI shows it
+in its own block for the same reason.
+
+`payments` is the ledger — analytics reads it, `prepaid_amount` is the cached sum.
+Any path that takes money writes a `payments` row, including the upfront
+prepayment on a new booking and a direct correction of `prepaid_amount`.
+
+## Group bookings
+
+One event can reserve several units. Each unit still gets its own booking row, so
+availability, calendars and cleaning are untouched; `booking_groups` ties them
+together and the event price is split across the units in whole tenge, with the
+first absorbing any rounding remainder so the parts always add back to the quoted
+total. Creation is all-or-nothing — every unit is validated before anything is
+written, so one clash cannot leave half a group behind.
+
+A combined group payment is stored as **one `payments` row per booking sharing a
+`group_id`**, allocated in proportion to what each booking still owes. That keeps
+the ledger per-booking (so analytics can still join through to a unit type) while
+the UI presents it back as the single payment the guest actually made.
 
 ## Analytics
 

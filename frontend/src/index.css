@@ -300,6 +300,10 @@ button {
   display: inline-block;
 }
 
+/* Each dot carries a soft glow in its own colour — see .dot-* below. The glow
+   is decoration only; every dot always sits beside a text label, so status is
+   never communicated by colour alone. */
+
 .dot-free {
   background: var(--free);
   box-shadow: 0 0 10px rgba(55, 214, 122, 0.75);
@@ -385,10 +389,22 @@ button {
   flex: 1;
 }
 
-.unit-card:hover {
+.unit-card:hover,
+.unit-card:focus-within {
   transform: translateY(-4px);
-  border-color: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.28);
   box-shadow: var(--shadow-lift);
+}
+
+/* The status stripe picks up its colour's glow as the card lifts. */
+.unit-card:hover::before {
+  box-shadow: 0 0 12px 1px var(--stripe);
+}
+
+.unit-card-hit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
 }
 
 /* Status stripe down the left edge of each card. */
@@ -1495,6 +1511,409 @@ button {
   word-break: break-word;
   max-height: 460px;
   overflow-y: auto;
+}
+
+/* ── Search & toolbar ──────────────────────────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 460px;
+  width: 100%;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  font-size: 16px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.search input {
+  width: 100%;
+  padding: 11px 38px 11px 38px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  transition:
+    border-color 0.18s var(--ease),
+    box-shadow 0.18s var(--ease);
+}
+
+.search input::placeholder {
+  color: var(--text-faint);
+}
+
+.search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(139, 124, 255, 0.2);
+}
+
+.search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search-clear {
+  position: absolute;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-dim);
+  cursor: pointer;
+  line-height: 1;
+  font-size: 15px;
+  display: grid;
+  place-items: center;
+  transition: background 0.16s var(--ease);
+}
+
+.search-clear:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--text);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.chip-count {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  color: inherit;
+  opacity: 0.75;
+}
+
+.chip-sm {
+  padding: 5px 11px;
+  font-size: 12px;
+}
+
+.result-line {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-bottom: 12px;
+}
+
+.field-hint {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+
+/* ── Charges & deposit ─────────────────────────────────────────────────────── */
+
+.charge-row {
+  position: relative;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.charge-row span:first-child {
+  color: #ffd9a8;
+}
+
+.charge-remove {
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.16s var(--ease),
+    background 0.16s var(--ease);
+}
+
+.pay-rows:hover .charge-remove {
+  opacity: 1;
+}
+
+.charge-remove:hover {
+  background: rgba(255, 92, 114, 0.2);
+  color: #ffc2ca;
+}
+
+.pay-row.subtotal {
+  padding-top: 9px;
+  border-top: 1px dashed var(--glass-border-soft);
+}
+
+.deposit-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 13px 15px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(79, 195, 247, 0.28);
+  background: rgba(79, 195, 247, 0.09);
+}
+
+.deposit-label {
+  font-size: 13px;
+  color: #b6e6ff;
+}
+
+.deposit-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.deposit-value {
+  margin-left: auto;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tag {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  background: rgba(139, 124, 255, 0.2);
+  border: 1px solid rgba(139, 124, 255, 0.35);
+  color: #d7d0ff;
+}
+
+/* ── Group booking ─────────────────────────────────────────────────────────── */
+
+.group-units {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.pill-current {
+  border-color: var(--accent);
+  background: rgba(139, 124, 255, 0.18);
+  color: #ded8ff;
+}
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 232px;
+  overflow-y: auto;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border-soft);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.picker-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+}
+
+.picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.picker-item {
+  padding: 7px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--glass-border-soft);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    transform 0.16s var(--ease),
+    background 0.16s var(--ease),
+    border-color 0.16s var(--ease);
+}
+
+.picker-item:hover {
+  transform: translateY(-2px);
+  color: var(--text);
+  border-color: var(--glass-border);
+}
+
+.picker-item.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border-color: transparent;
+  color: #fff;
+}
+
+/* Busy right now — still selectable, since the group may be for later dates. */
+.picker-item.busy::after {
+  content: '•';
+  margin-left: 6px;
+  color: var(--occupied);
+}
+
+/* ── Guest history ─────────────────────────────────────────────────────────── */
+
+.guest-head {
+  margin-bottom: 16px;
+}
+
+.guest-name {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.guest-phone {
+  font-size: 13px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.mini-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.mini-stat {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border-soft);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mini-stat-value {
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-stat-label {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 3px;
+}
+
+.notes-area {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+}
+
+.notes-area:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(139, 124, 255, 0.2);
+}
+
+.notes-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.notes-saved {
+  font-size: 12px;
+  color: var(--free);
+}
+
+.stay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stay-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border-soft);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.stay-unit {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.stay-dates {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.stay-money {
+  margin-left: auto;
+  text-align: right;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stay-status {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+/* Respect a reduced-motion preference: keep the colour and shadow cues,
+   drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .unit-card:hover,
+  .unit-card:focus-within,
+  .btn:hover:not(:disabled),
+  .chip:hover,
+  .picker-item:hover,
+  .stat:hover,
+  .check-item:hover:not(:disabled),
+  .nav a:hover,
+  .tab:hover,
+  .cal-day:hover {
+    transform: none;
+  }
 }
 
 @media (max-width: 640px) {

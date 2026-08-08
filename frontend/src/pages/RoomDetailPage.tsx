@@ -3,12 +3,22 @@ import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import BookingModal from '../components/BookingModal'
+import ChargeModal from '../components/ChargeModal'
 import Checklist from '../components/Checklist'
+import GuestHistoryModal from '../components/GuestHistoryModal'
 import MonthCalendar from '../components/MonthCalendar'
 import PaymentModal from '../components/PaymentModal'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
 import { dateRange, money } from '../format'
-import { STATUS_LABELS, type Calendar, type ChecklistItem, type Payment, type Unit } from '../types'
+import {
+  STATUS_LABELS,
+  type Calendar,
+  type Charge,
+  type ChecklistItem,
+  type GroupDetail,
+  type Payment,
+  type Unit,
+} from '../types'
 
 const MONTH_NAMES = [
   'январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
@@ -35,12 +45,16 @@ export default function RoomDetailPage() {
   const [calendar, setCalendar] = useState<Calendar | null>(null)
   const [checklist, setChecklist] = useState<ChecklistItem[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
+  const [charges, setCharges] = useState<Charge[]>([])
+  const [group, setGroup] = useState<GroupDetail | null>(null)
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showBooking, setShowBooking] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
+  const [showCharge, setShowCharge] = useState(false)
+  const [showGuest, setShowGuest] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -55,9 +69,21 @@ export default function RoomDetailPage() {
 
       const bookingId = unitData.current_booking?.id
       if (isAdmin && bookingId) {
-        setPayments(await api<Payment[]>(`/bookings/${bookingId}/payments`).catch(() => []))
+        const [paymentRows, chargeRows] = await Promise.all([
+          api<Payment[]>(`/bookings/${bookingId}/payments`).catch(() => []),
+          api<Charge[]>(`/bookings/${bookingId}/charges`).catch(() => []),
+        ])
+        setPayments(paymentRows)
+        setCharges(chargeRows)
+
+        const groupId = unitData.current_booking?.group_id
+        setGroup(
+          groupId ? await api<GroupDetail>(`/bookings/group/${groupId}`).catch(() => null) : null
+        )
       } else {
         setPayments([])
+        setCharges([])
+        setGroup(null)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка загрузки')
@@ -72,7 +98,9 @@ export default function RoomDetailPage() {
 
   useEffect(() => {
     if (!id) return
-    api<Calendar>(`/units/${id}/calendar?month=${month}`).then(setCalendar).catch(() => setCalendar(null))
+    api<Calendar>(`/units/${id}/calendar?month=${month}`)
+      .then(setCalendar)
+      .catch(() => setCalendar(null))
   }, [id, month])
 
   async function refreshAll() {
@@ -82,16 +110,24 @@ export default function RoomDetailPage() {
     }
   }
 
+  async function removeCharge(chargeId: number) {
+    await api(`/bookings/${unit?.current_booking?.id}/charges/${chargeId}`, { method: 'DELETE' })
+    await refreshAll()
+  }
+
   if (loading) return <Spinner />
   if (error) return <Alert>{error}</Alert>
   if (!unit) return <EmptyState icon="🔍">Номер не найден</EmptyState>
 
   const booking = unit.current_booking ?? unit.next_booking
   const active = unit.current_booking
-  const total = active?.total_amount ?? 0
+  const rate = active?.total_amount ?? 0
+  const chargesTotal = active?.charges_amount ?? 0
   const prepaid = active?.prepaid_amount ?? 0
+  const deposit = active?.deposit_amount ?? 0
   const remaining = active?.remaining_amount ?? 0
-  const paidShare = total > 0 ? Math.min(100, (prepaid / total) * 100) : 0
+  const billed = rate + chargesTotal
+  const paidShare = billed > 0 ? Math.min(100, (prepaid / billed) * 100) : 0
   const doneCount = checklist.filter((item) => item.is_done).length
 
   return (
@@ -110,9 +146,14 @@ export default function RoomDetailPage() {
         </div>
         <div className="page-head-actions">
           {isAdmin && active && (
-            <button className="btn btn-sm" onClick={() => setShowPayment(true)}>
-              Внести оплату
-            </button>
+            <>
+              <button className="btn btn-sm" onClick={() => setShowCharge(true)}>
+                Начислить
+              </button>
+              <button className="btn btn-sm" onClick={() => setShowPayment(true)}>
+                Внести оплату
+              </button>
+            </>
           )}
           {isAdmin && (
             <button className="btn btn-sm btn-primary" onClick={() => setShowBooking(true)}>
@@ -163,7 +204,14 @@ export default function RoomDetailPage() {
 
         <div>
           <section className="panel glass">
-            <div className="panel-title">Гость</div>
+            <div className="panel-title">
+              Гость
+              {isAdmin && booking?.guest_phone && (
+                <button className="btn btn-sm btn-ghost count" onClick={() => setShowGuest(true)}>
+                  История гостя →
+                </button>
+              )}
+            </div>
             {booking ? (
               <div className="info-rows">
                 <div className="info-row">
@@ -175,7 +223,15 @@ export default function RoomDetailPage() {
                   <span>{booking.guest_phone ?? '—'}</span>
                 </div>
                 <div className="info-row">
-                  <span>Даты</span>
+                  <span>Заезд</span>
+                  <span>{booking.date_from?.slice(0, 10) ?? '—'}</span>
+                </div>
+                <div className="info-row">
+                  <span>Выезд</span>
+                  <span>{booking.date_to?.slice(0, 10) ?? '—'}</span>
+                </div>
+                <div className="info-row">
+                  <span>Период</span>
                   <span>{dateRange(booking.date_from, booking.date_to)}</span>
                 </div>
                 <div className="info-row">
@@ -188,6 +244,35 @@ export default function RoomDetailPage() {
             )}
           </section>
 
+          {isAdmin && group && (
+            <section className="panel glass">
+              <div className="panel-title">
+                Групповая бронь
+                <span className="count">{group.bookings.length} объектов</span>
+              </div>
+              <div className="info-rows">
+                <div className="info-row">
+                  <span>Мероприятие</span>
+                  <span>{group.group.name}</span>
+                </div>
+                <div className="info-row">
+                  <span>Организатор</span>
+                  <span>{group.group.guest_name}</span>
+                </div>
+              </div>
+              <div className="group-units">
+                {group.bookings.map((row) => (
+                  <span
+                    key={row.id}
+                    className={`pill ${row.unit_name === unit.name ? 'pill-current' : ''}`}
+                  >
+                    {row.unit_name}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+
           {isAdmin && (
             <section className="panel glass">
               <div className="panel-title">Оплата</div>
@@ -195,17 +280,37 @@ export default function RoomDetailPage() {
                 <>
                   <div className="pay-rows">
                     <div className="pay-row">
-                      <span>Стоимость</span>
-                      <span>{money(total, active.currency)}</span>
+                      <span>Проживание</span>
+                      <span>{money(rate, active.currency)}</span>
                     </div>
+
+                    {charges.map((charge) => (
+                      <div className="pay-row charge-row" key={charge.id}>
+                        <span title={charge.created_by_name ?? undefined}>+ {charge.reason}</span>
+                        <span>{money(charge.amount, active.currency)}</span>
+                        <button
+                          className="charge-remove"
+                          onClick={() => removeCharge(charge.id)}
+                          aria-label="Убрать начисление"
+                          title="Убрать начисление"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+
+                    {chargesTotal !== 0 && (
+                      <div className="pay-row subtotal">
+                        <span>К оплате</span>
+                        <span>{money(billed, active.currency)}</span>
+                      </div>
+                    )}
+
                     <div className="pay-row">
                       <span>Оплачено</span>
                       <span>{money(prepaid, active.currency)}</span>
                     </div>
-                    <div className="pay-row">
-                      <span>Депозит</span>
-                      <span>{money(active.deposit_amount, active.currency)}</span>
-                    </div>
+
                     <div className="pay-row total">
                       <span>Остаток</span>
                       <span className={remaining > 0 ? 'money-due' : ''}>
@@ -213,8 +318,19 @@ export default function RoomDetailPage() {
                       </span>
                     </div>
                   </div>
+
                   <div className="pay-bar">
                     <div className="pay-bar-fill" style={{ width: `${paidShare}%` }} />
+                  </div>
+
+                  {/* A deposit is a refundable hold, not money owed — it is shown
+                      in its own block so it can never be read as part of the debt. */}
+                  <div className="deposit-box">
+                    <div>
+                      <div className="deposit-label">Депозит / залог</div>
+                      <div className="deposit-hint">возвратный, не входит в остаток</div>
+                    </div>
+                    <div className="deposit-value">{money(deposit, active.currency)}</div>
                   </div>
 
                   {payments.length > 0 && (
@@ -225,7 +341,10 @@ export default function RoomDetailPage() {
                       <div className="info-rows">
                         {payments.map((payment) => (
                           <div className="info-row" key={payment.id}>
-                            <span>{payment.paid_at.slice(0, 16).replace('T', ' ')}</span>
+                            <span>
+                              {payment.paid_at.slice(0, 16).replace('T', ' ')}
+                              {payment.group_id && <span className="tag">групповой</span>}
+                            </span>
                             <span>
                               {money(payment.amount, active.currency)} · {payment.method}
                             </span>
@@ -258,6 +377,16 @@ export default function RoomDetailPage() {
           onClose={() => setShowPayment(false)}
           onSaved={refreshAll}
         />
+      )}
+      {showCharge && active && (
+        <ChargeModal
+          bookingId={active.id}
+          onClose={() => setShowCharge(false)}
+          onSaved={refreshAll}
+        />
+      )}
+      {showGuest && booking?.guest_phone && (
+        <GuestHistoryModal phone={booking.guest_phone} onClose={() => setShowGuest(false)} />
       )}
     </>
   )

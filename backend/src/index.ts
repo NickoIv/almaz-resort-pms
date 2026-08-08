@@ -9,6 +9,7 @@ import authRoutes from './routes/auth'
 import unitRoutes from './routes/units'
 import bookingRoutes from './routes/bookings'
 import cleaningRoutes from './routes/cleaning'
+import guestRoutes from './routes/guests'
 import settingsRoutes from './routes/settings'
 import type { AppEnv, Bindings } from './types'
 
@@ -31,12 +32,14 @@ app.use('/api/cleaning', requireAuth)
 app.use('/api/analytics/*', requireAuth)
 app.use('/api/settings/*', requireAuth)
 app.use('/api/settings', requireAuth)
+app.use('/api/guests/*', requireAuth)
 
 app.route('/api/units', unitRoutes)
 app.route('/api/bookings', bookingRoutes)
 app.route('/api/cleaning', cleaningRoutes)
 app.route('/api/analytics', analyticsRoutes)
 app.route('/api/settings', settingsRoutes)
+app.route('/api/guests', guestRoutes)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
