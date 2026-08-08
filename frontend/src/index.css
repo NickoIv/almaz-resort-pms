@@ -177,6 +177,29 @@ button {
   gap: 14px;
 }
 
+.clock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.25;
+  padding-right: 14px;
+  border-right: 1px solid var(--glass-border-soft);
+}
+
+.clock-time {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.clock-zone {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .who {
   text-align: right;
   line-height: 1.3;

@@ -2,30 +2,30 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import RevenueChart from '../components/RevenueChart'
 import { Alert, Spinner } from '../components/ui'
-import { compactMoney, money, monthShort, percent } from '../format'
+import {
+  almatyMonthStart,
+  almatyYear,
+  compactMoney,
+  money,
+  monthShort,
+  percent,
+  todayIso,
+} from '../format'
 import { downloadCsv } from '../csv'
 import { UNIT_TYPE_LABELS, type Analytics } from '../types'
 
-function monthStart(offset = 0): string {
-  const now = new Date()
-  const date = new Date(Date.UTC(now.getFullYear(), now.getMonth() + offset, 1))
-  return date.toISOString().slice(0, 10)
-}
-
-function todayIsoUtc(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
+// All ranges are anchored to the hotel's calendar, not the viewer's device:
+// an admin in Bangkok must see the same "current month" as reception.
 const PRESETS = [
-  { label: 'Текущий месяц', from: () => monthStart(0), to: () => todayIsoUtc() },
-  { label: 'Прошлый месяц', from: () => monthStart(-1), to: () => monthStart(0) },
-  { label: 'Последние 3 мес.', from: () => monthStart(-2), to: () => todayIsoUtc() },
-  { label: 'Год', from: () => `${new Date().getFullYear()}-01-01`, to: () => todayIsoUtc() },
+  { label: 'Текущий месяц', from: () => almatyMonthStart(0), to: () => todayIso() },
+  { label: 'Прошлый месяц', from: () => almatyMonthStart(-1), to: () => almatyMonthStart(0) },
+  { label: 'Последние 3 мес.', from: () => almatyMonthStart(-2), to: () => todayIso() },
+  { label: 'Год', from: () => `${almatyYear()}-01-01`, to: () => todayIso() },
 ]
 
 export default function AnalyticsPage() {
-  const [from, setFrom] = useState(monthStart(0))
-  const [to, setTo] = useState(todayIsoUtc())
+  const [from, setFrom] = useState(almatyMonthStart(0))
+  const [to, setTo] = useState(todayIso())
   const [data, setData] = useState<Analytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

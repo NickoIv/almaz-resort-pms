@@ -1,6 +1,6 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { makeUnit, mockApi, renderApp, signIn, STAFF } from './test-utils'
 
@@ -369,5 +369,67 @@ describe('currency selector', () => {
 
     await waitFor(() => expect(posted).not.toBeNull())
     expect(posted!.currency).toBe('USD')
+  })
+})
+
+describe('Almaty time in the UI', () => {
+  // 18:30 UTC = 23:30 in Almaty (8 Aug), but 01:30 on 9 Aug for a UTC+7
+  // device. Everything below must follow Almaty, not the device.
+  const AT = new Date('2026-08-08T18:30:00Z')
+
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true, now: AT }))
+  afterEach(() => vi.useRealTimers())
+
+  const freeRoom = makeUnit({ id: 6, name: '106', status: 'free' })
+  const augustCalendar = {
+    unit: { id: 6, name: '106', type: 'room' },
+    month: '2026-08',
+    days: Array.from({ length: 31 }, (_, i) => ({
+      date: `2026-08-${String(i + 1).padStart(2, '0')}`,
+      status: 'free', booking_id: null, guest_name: null,
+    })),
+    bookings: [],
+  }
+
+  it('shows the hotel clock in the header', async () => {
+    signIn('admin')
+    mockApi(baseRoutes('admin', [freeRoom]))
+    renderApp(<App />, { route: '/rooms' })
+
+    expect(await screen.findByText('23:30')).toBeInTheDocument()
+    expect(screen.getByText('Алматы')).toBeInTheDocument()
+    // 01:30 would be the UTC+7 device time — it must not appear.
+    expect(screen.queryByText('01:30')).not.toBeInTheDocument()
+  })
+
+  it('highlights the hotel "today" in the calendar, not the device day', async () => {
+    signIn('admin')
+    mockApi({
+      ...baseRoutes('admin', [freeRoom]),
+      'GET /api/units/6': freeRoom,
+      'GET /api/units/6/calendar': augustCalendar,
+    })
+
+    renderApp(<App />, { route: '/rooms/6' })
+    await screen.findByRole('heading', { name: /Номер 106/ })
+
+    const today = document.querySelector('.cal-day.is-today')
+    expect(today).not.toBeNull()
+    expect(today!.textContent).toBe('8')
+  })
+
+  it('defaults a new booking to the hotel date, and checkout to the next day', async () => {
+    signIn('admin')
+    mockApi({
+      ...baseRoutes('admin', [freeRoom]),
+      'GET /api/units/6': freeRoom,
+      'GET /api/units/6/calendar': augustCalendar,
+    })
+
+    renderApp(<App />, { route: '/rooms/6' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Новая бронь' }))
+
+    expect(await screen.findByLabelText('Заезд')).toHaveValue('2026-08-08')
+    expect(screen.getByLabelText('Выезд')).toHaveValue('2026-08-09')
   })
 })

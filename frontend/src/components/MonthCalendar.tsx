@@ -3,9 +3,13 @@ import { todayIso } from '../format'
 
 const DOW = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
 
-/** Monday-based column index for a YYYY-MM-DD string. */
+/**
+ * Monday-based column index for a YYYY-MM-DD string. Computed in UTC so the
+ * grid does not shift a column depending on where the viewer is.
+ */
 function weekdayIndex(iso: string): number {
-  return (new Date(`${iso}T00:00:00`).getDay() + 6) % 7
+  const [year, month, day] = iso.split('-').map(Number)
+  return (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7
 }
 
 export default function MonthCalendar({

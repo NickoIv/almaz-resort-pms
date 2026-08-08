@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import { Alert, EmptyState, Spinner } from '../components/ui'
 import { downloadCsv } from '../csv'
+import { todayIso } from '../format'
 import { ROLE_LABELS, type Role } from '../types'
 
 type AuditEntry = {
@@ -109,7 +110,7 @@ export default function AuditPage() {
 
   function exportCsv() {
     if (!data) return
-    downloadCsv(`almaz-pms-audit-${new Date().toISOString().slice(0, 10)}.csv`, [
+    downloadCsv(`almaz-pms-audit-${todayIso()}.csv`, [
       ['Журнал действий персонала'],
       [],
       ['Когда', 'Сотрудник', 'Роль', 'Действие', 'Объект', 'Гость', 'Код'],

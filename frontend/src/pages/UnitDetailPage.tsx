@@ -9,7 +9,7 @@ import GuestHistoryModal from '../components/GuestHistoryModal'
 import MonthCalendar from '../components/MonthCalendar'
 import PaymentModal from '../components/PaymentModal'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
-import { dateRange, money, timeRange } from '../format'
+import { almatyMonth, dateRange, money, timeRange } from '../format'
 import {
   STATUS_LABELS,
   UNIT_TYPE_LABELS,
@@ -48,7 +48,8 @@ export default function UnitDetailPage() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [charges, setCharges] = useState<Charge[]>([])
   const [group, setGroup] = useState<GroupDetail | null>(null)
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
+  // The calendar opens on the hotel's current month, not the viewer's.
+  const [month, setMonth] = useState(() => almatyMonth())
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

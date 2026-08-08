@@ -1,5 +1,52 @@
 /** Formatting helpers shared across the UI. */
 
+/**
+ * The hotel runs on Almaty time (UTC+5, no DST since Kazakhstan unified its
+ * zones in 2024). Staff open this app from other timezones, so "today" must
+ * mean today *at the hotel* — never the viewer's device date.
+ *
+ * This mirrors `backend/src/lib/time.ts`, which shifts D1's UTC `now` by the
+ * same fixed amount. The offset is hard-coded rather than read from the IANA
+ * database on purpose: if it were auto-updating here but fixed on the server,
+ * the two would silently disagree the day the rule changed. Change both
+ * together.
+ */
+export const ALMATY_UTC_OFFSET_HOURS = 5
+
+/**
+ * "Now" at the hotel, as a Date whose **UTC** fields hold Almaty wall-clock
+ * time. Read it with `getUTCHours`, `toISOString` and friends — the local
+ * getters would re-apply the viewer's offset and undo the shift.
+ */
+export function almatyNow(now: Date = new Date()): Date {
+  return new Date(now.getTime() + ALMATY_UTC_OFFSET_HOURS * 3_600_000)
+}
+
+/** Current time at the hotel as "14:32". */
+export function almatyClock(now: Date = new Date()): string {
+  return almatyNow(now).toISOString().slice(11, 16)
+}
+
+/** The hotel's current month as "2026-08". */
+export function almatyMonth(now: Date = new Date()): string {
+  return almatyNow(now).toISOString().slice(0, 7)
+}
+
+/** The hotel's current year, e.g. 2026. */
+export function almatyYear(now: Date = new Date()): number {
+  return almatyNow(now).getUTCFullYear()
+}
+
+/**
+ * First day of the hotel's current month, shifted by `offset` months.
+ * offset -1 gives last month, 0 gives this month.
+ */
+export function almatyMonthStart(offset = 0, now: Date = new Date()): string {
+  const here = almatyNow(now)
+  const date = new Date(Date.UTC(here.getUTCFullYear(), here.getUTCMonth() + offset, 1))
+  return date.toISOString().slice(0, 10)
+}
+
 /** Falls back to the raw code for anything not listed, so nothing renders blank. */
 const CURRENCY_SYMBOLS: Record<string, string> = {
   KZT: '₸',
@@ -18,7 +65,9 @@ export function shortDate(value: string | null | undefined): string {
   if (!value) return '—'
   const date = new Date(value.slice(0, 10))
   if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+  // A date-only string parses as UTC midnight; rendering it in the viewer's
+  // timezone would show the previous day anywhere west of Greenwich.
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', timeZone: 'UTC' })
 }
 
 export function dateRange(from: string | null | undefined, to: string | null | undefined): string {
@@ -26,10 +75,12 @@ export function dateRange(from: string | null | undefined, to: string | null | u
   return `${shortDate(from)} — ${shortDate(to)}`
 }
 
-/** Today in the local timezone as YYYY-MM-DD. */
-export function todayIso(): string {
-  const now = new Date()
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+/**
+ * Today at the hotel as YYYY-MM-DD — the default for every date field and the
+ * "today" the calendar highlights. Independent of the viewer's timezone.
+ */
+export function todayIso(now: Date = new Date()): string {
+  return almatyNow(now).toISOString().slice(0, 10)
 }
 
 /** "2026-08-08 14:00" -> "14:00" */
@@ -71,8 +122,17 @@ export function compactMoney(value: number): string {
   return String(Math.round(value))
 }
 
+/**
+ * Adds whole days to a YYYY-MM-DD value.
+ *
+ * Pure UTC arithmetic on purpose: the previous version parsed the string as
+ * browser-local midnight and then read it back as UTC, so east of Greenwich
+ * the result landed a day short — in UTC+7, addDaysIso(today, 1) returned
+ * today, making the default checkout date the same as the check-in date.
+ */
 export function addDaysIso(iso: string, days: number): string {
-  const date = new Date(`${iso}T00:00:00`)
-  date.setDate(date.getDate() + days)
-  return date.toISOString().slice(0, 10)
+  const [year, month, day] = iso.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day) + days * 86_400_000)
+    .toISOString()
+    .slice(0, 10)
 }
