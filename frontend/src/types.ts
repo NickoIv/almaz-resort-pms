@@ -257,3 +257,22 @@ export type PaymentAct = {
   by_method: Record<string, number>
   payments: PaymentActRow[]
 }
+
+export type WaitlistStatus = 'open' | 'placed' | 'closed'
+
+export type WaitlistEntry = {
+  id: number
+  guest_name: string
+  guest_phone: string | null
+  unit_type: UnitType
+  unit_id: number | null
+  unit_name: string | null
+  date_from: string
+  date_to: string
+  note: string | null
+  status: WaitlistStatus
+  created_at: string
+  created_by_name: string | null
+  /** Requested dates already in the past. */
+  is_stale?: boolean
+}

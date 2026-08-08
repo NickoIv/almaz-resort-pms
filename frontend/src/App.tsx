@@ -11,6 +11,7 @@ import RoomsPage from './pages/RoomsPage'
 import UnitDetailPage from './pages/UnitDetailPage'
 import SettingsPage from './pages/SettingsPage'
 import StaffPage from './pages/StaffPage'
+import WaitlistPage from './pages/WaitlistPage'
 
 /** Sends a signed-in user to their role's dashboard, everyone else to /login. */
 function RoleHome() {
@@ -86,6 +87,14 @@ export default function App() {
           element={
             <RequireRole roles={['admin']}>
               <AuditPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/waitlist"
+          element={
+            <RequireRole roles={['admin']}>
+              <WaitlistPage />
             </RequireRole>
           }
         />

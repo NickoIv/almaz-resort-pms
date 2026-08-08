@@ -8,6 +8,7 @@ import { writeAudit } from '../lib/audit'
 import { chargesSumSql, remainingOf } from '../lib/money'
 import { cleanName, cleanOptional } from '../lib/text'
 import { CANCEL_REASONS, isCancelReason } from '../lib/cancellation'
+import { findWaitlistMatches } from './waitlist'
 import { addHours, almatyNow, SQL_NOW } from '../lib/time'
 import type { AppEnv, BookingStatus, UnitType } from '../types'
 
@@ -574,7 +575,18 @@ bookings.patch('/:id', canBook, async (c) => {
     ? `booking.update:free:${cancelReason}`
     : `booking.update:${status}`
   await writeAudit(c.env.DB, staff.sub, auditAction, 'bookings', id)
-  return c.json(serializeBooking(updated, canSeeMoney(staff.role)))
+
+  // Freeing dates is the moment the waitlist matters: whoever was turned away
+  // for exactly these dates should be called back. Surfaced with the response
+  // so the UI can prompt without a second round trip.
+  const waitlistMatches = ending
+    ? await findWaitlistMatches(c.env.DB, unit.type, existing.date_from, existing.date_to, existing.unit_id)
+    : []
+
+  return c.json({
+    ...serializeBooking(updated, canSeeMoney(staff.role)),
+    waitlist_matches: waitlistMatches,
+  })
 })
 
 /** PATCH /api/bookings/:id/payment — admin only. */
