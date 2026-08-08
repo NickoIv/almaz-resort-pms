@@ -9,9 +9,10 @@ import GuestHistoryModal from '../components/GuestHistoryModal'
 import MonthCalendar from '../components/MonthCalendar'
 import PaymentModal from '../components/PaymentModal'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
-import { dateRange, money } from '../format'
+import { dateRange, money, timeRange } from '../format'
 import {
   STATUS_LABELS,
+  UNIT_TYPE_LABELS,
   type Calendar,
   type Charge,
   type ChecklistItem,
@@ -36,7 +37,7 @@ function shiftMonth(month: string, delta: number): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
-export default function RoomDetailPage() {
+export default function UnitDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
@@ -117,8 +118,11 @@ export default function RoomDetailPage() {
 
   if (loading) return <Spinner />
   if (error) return <Alert>{error}</Alert>
-  if (!unit) return <EmptyState icon="🔍">Номер не найден</EmptyState>
+  if (!unit) return <EmptyState icon="🔍">Объект не найден</EmptyState>
 
+  // Rooms are sold by night and have a housekeeping checklist; recreation
+  // units are sold by the hour and have neither.
+  const isRoom = unit.type === 'room'
   const booking = unit.current_booking ?? unit.next_booking
   const active = unit.current_booking
   const rate = active?.total_amount ?? 0
@@ -132,15 +136,15 @@ export default function RoomDetailPage() {
 
   return (
     <>
-      <Link className="back-link" to="/rooms">
-        ← Все номера
+      <Link className="back-link" to={isRoom ? '/rooms' : '/restaurant'}>
+        ← {isRoom ? 'Все номера' : 'Зона отдыха'}
       </Link>
 
       <div className="page-head">
         <div>
-          <h1>Номер {unit.name}</h1>
+          <h1>{isRoom ? `Номер ${unit.name}` : unit.name}</h1>
           <div className="page-sub">
-            {unit.category ?? '—'} · до {unit.capacity} чел. ·{' '}
+            {UNIT_TYPE_LABELS[unit.type]} · {unit.category ?? '—'} · до {unit.capacity} чел. ·{' '}
             <StatusDot status={unit.status} /> {STATUS_LABELS[unit.status]}
           </div>
         </div>
@@ -186,20 +190,25 @@ export default function RoomDetailPage() {
             {calendar ? <MonthCalendar days={calendar.days} /> : <Spinner />}
           </section>
 
-          <section className="panel glass">
-            <div className="panel-title">
-              <StatusDot status="cleaning" /> Чек-лист уборки
-              <span className="count">
-                {doneCount} / {checklist.length}
-              </span>
-            </div>
-            <Checklist
-              items={checklist}
-              onChanged={(updated) =>
-                setChecklist((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
-              }
-            />
-          </section>
+          {/* Housekeeping checklists exist for rooms only. */}
+          {isRoom && (
+            <section className="panel glass">
+              <div className="panel-title">
+                <StatusDot status="cleaning" /> Чек-лист уборки
+                <span className="count">
+                  {doneCount} / {checklist.length}
+                </span>
+              </div>
+              <Checklist
+                items={checklist}
+                onChanged={(updated) =>
+                  setChecklist((prev) =>
+                    prev.map((item) => (item.id === updated.id ? updated : item))
+                  )
+                }
+              />
+            </section>
+          )}
         </div>
 
         <div>
@@ -223,16 +232,20 @@ export default function RoomDetailPage() {
                   <span>{booking.guest_phone ?? '—'}</span>
                 </div>
                 <div className="info-row">
-                  <span>Заезд</span>
-                  <span>{booking.date_from?.slice(0, 10) ?? '—'}</span>
+                  <span>{isRoom ? 'Заезд' : 'Начало'}</span>
+                  <span>{booking.date_from?.slice(0, isRoom ? 10 : 16) ?? '—'}</span>
                 </div>
                 <div className="info-row">
-                  <span>Выезд</span>
-                  <span>{booking.date_to?.slice(0, 10) ?? '—'}</span>
+                  <span>{isRoom ? 'Выезд' : 'Окончание'}</span>
+                  <span>{booking.date_to?.slice(0, isRoom ? 10 : 16) ?? '—'}</span>
                 </div>
                 <div className="info-row">
                   <span>Период</span>
-                  <span>{dateRange(booking.date_from, booking.date_to)}</span>
+                  <span>
+                    {isRoom
+                      ? dateRange(booking.date_from, booking.date_to)
+                      : timeRange(booking.date_from, booking.date_to)}
+                  </span>
                 </div>
                 <div className="info-row">
                   <span>Статус</span>
@@ -367,6 +380,7 @@ export default function RoomDetailPage() {
           unitId={unit.id}
           booking={active ?? null}
           canSetPrice={isAdmin}
+          hourly={!isRoom}
           onClose={() => setShowBooking(false)}
           onSaved={refreshAll}
         />

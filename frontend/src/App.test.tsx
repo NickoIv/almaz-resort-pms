@@ -1,0 +1,304 @@
+import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it } from 'vitest'
+import App from './App'
+import { makeUnit, mockApi, renderApp, signIn, STAFF } from './test-utils'
+
+const ROOM_WITH_GUEST = makeUnit({
+  id: 5,
+  name: '105',
+  status: 'occupied',
+  needs_cleaning: true,
+  cleaning_pending: 3,
+  cleaning_total: 8,
+  current_booking: {
+    id: 42,
+    guest_name: 'Асель Жумабаева',
+    guest_phone: '+7 707 314 88 20',
+    date_from: '2026-08-07',
+    date_to: '2026-08-10',
+    status: 'occupied',
+    is_paid: false,
+    total_amount: 240000,
+    prepaid_amount: 120000,
+    deposit_amount: 50000,
+    charges_amount: 50000,
+    remaining_amount: 170000,
+    currency: 'KZT',
+  },
+})
+
+const GAZEBO = makeUnit({
+  id: 20,
+  type: 'gazebo',
+  name: 'Беседка 1',
+  status: 'occupied',
+  current_booking: {
+    id: 77,
+    guest_name: 'Динара Касымова',
+    guest_phone: '+77012223344',
+    date_from: '2026-08-08 13:00',
+    date_to: '2026-08-08 18:00',
+    status: 'occupied',
+    is_paid: false,
+    total_amount: 45000,
+    prepaid_amount: 0,
+    deposit_amount: 0,
+    charges_amount: 0,
+    remaining_amount: 45000,
+    currency: 'KZT',
+  },
+})
+
+const CALENDAR = {
+  unit: { id: 5, name: '105', type: 'room' },
+  month: '2026-08',
+  days: Array.from({ length: 31 }, (_, i) => ({
+    date: `2026-08-${String(i + 1).padStart(2, '0')}`,
+    status: i >= 6 && i <= 9 ? 'occupied' : 'free',
+    booking_id: i >= 6 && i <= 9 ? 42 : null,
+    guest_name: i >= 6 && i <= 9 ? 'Асель Жумабаева' : null,
+  })),
+  bookings: [],
+}
+
+const CHECKLIST = [
+  { id: 1, unit_id: 5, booking_id: 42, item_name: 'Смена постельного белья', is_done: false,
+    updated_at: null, updated_by: null, updated_by_name: null },
+  { id: 2, unit_id: 5, booking_id: 42, item_name: 'Уборка санузла', is_done: true,
+    updated_at: '2026-08-08 09:00', updated_by: 2, updated_by_name: 'Айгуль Сериккызы' },
+]
+
+function baseRoutes(role: 'admin' | 'housekeeper' | 'waiter', units = [ROOM_WITH_GUEST]) {
+  return {
+    'GET /api/auth/me': { user: STAFF[role] },
+    'GET /api/units': units,
+    'GET /api/cleaning': [],
+    'GET /api/cleaning/unit/': CHECKLIST,
+    'GET /api/settings': { notifications: {}, telegram_configured: false },
+    'GET /api/analytics/summary': {},
+  }
+}
+
+describe('§1 clicking a card opens the detail view', () => {
+  it('opens the room detail view when a room card is clicked', async () => {
+    signIn('admin')
+    mockApi({
+      ...baseRoutes('admin'),
+      'GET /api/units/5': ROOM_WITH_GUEST,
+      'GET /api/units/5/calendar': CALENDAR,
+      'GET /api/bookings/42/payments': [],
+      'GET /api/bookings/42/charges': [],
+    })
+
+    renderApp(<App />, { route: '/rooms' })
+
+    const card = await screen.findByRole('button', { name: /105/ })
+    await userEvent.click(card)
+
+    // The detail view is identified by its own heading, not by the card text.
+    expect(await screen.findByRole('heading', { name: /Номер 105/ })).toBeInTheDocument()
+  })
+
+  it('shows the calendar, guest info and cleaning checklist in the detail view', async () => {
+    signIn('admin')
+    mockApi({
+      ...baseRoutes('admin'),
+      'GET /api/units/5': ROOM_WITH_GUEST,
+      'GET /api/units/5/calendar': CALENDAR,
+      'GET /api/bookings/42/payments': [],
+      'GET /api/bookings/42/charges': [],
+    })
+
+    renderApp(<App />, { route: '/rooms/5' })
+
+    expect(await screen.findByRole('heading', { name: /Номер 105/ })).toBeInTheDocument()
+    // Guest info
+    expect(screen.getByText('Асель Жумабаева')).toBeInTheDocument()
+    expect(screen.getByText('+7 707 314 88 20')).toBeInTheDocument()
+    expect(screen.getByText('2026-08-07')).toBeInTheDocument()
+    expect(screen.getByText('2026-08-10')).toBeInTheDocument()
+    // Cleaning checklist
+    expect(screen.getByText('Смена постельного белья')).toBeInTheDocument()
+    // Calendar rendered a full month
+    await waitFor(() => expect(screen.getByText('31')).toBeInTheDocument())
+  })
+
+  it('opens a detail view for a restaurant unit too', async () => {
+    signIn('admin')
+    mockApi({
+      ...baseRoutes('admin', [GAZEBO]),
+      'GET /api/units/20': GAZEBO,
+      'GET /api/units/20/calendar': { ...CALENDAR, unit: { id: 20, name: 'Беседка 1', type: 'gazebo' } },
+      'GET /api/bookings/77/payments': [],
+      'GET /api/bookings/77/charges': [],
+    })
+
+    renderApp(<App />, { route: '/restaurant' })
+
+    // The page opens on the Топчаны tab; gazebos live under their own tab.
+    await userEvent.click(await screen.findByRole('button', { name: /^Беседки/ }))
+
+    const card = await screen.findByRole('button', { name: /Беседка 1/ })
+    await userEvent.click(card)
+
+    expect(await screen.findByRole('heading', { name: /Беседка 1/ })).toBeInTheDocument()
+    expect(screen.getByText('Динара Касымова')).toBeInTheDocument()
+  })
+})
+
+describe('§1/§2 payment breakdown keeps deposit separate', () => {
+  it('shows rate, charges, balance and deposit as distinct values', async () => {
+    signIn('admin')
+    mockApi({
+      ...baseRoutes('admin'),
+      'GET /api/units/5': ROOM_WITH_GUEST,
+      'GET /api/units/5/calendar': CALENDAR,
+      'GET /api/bookings/42/payments': [],
+      'GET /api/bookings/42/charges': [
+        { id: 1, booking_id: 42, reason: 'Поздний выезд', amount: 18000,
+          created_at: '2026-08-08', created_by_name: 'Нурлан Абдразаков' },
+        { id: 2, booking_id: 42, reason: 'Испорченное имущество', amount: 32000,
+          created_at: '2026-08-08', created_by_name: 'Нурлан Абдразаков' },
+      ],
+    })
+
+    renderApp(<App />, { route: '/rooms/5' })
+
+    expect(await screen.findByRole('heading', { name: /Номер 105/ })).toBeInTheDocument()
+
+    // Charges appear as their own line items, not folded into the rate.
+    expect(screen.getByText(/Поздний выезд/)).toBeInTheDocument()
+    expect(screen.getByText(/Испорченное имущество/)).toBeInTheDocument()
+
+    // The deposit is labelled as refundable and sits outside the balance.
+    expect(screen.getByText('Депозит / залог')).toBeInTheDocument()
+    expect(screen.getByText(/не входит в остаток/)).toBeInTheDocument()
+
+    // Balance (170 000) and deposit (50 000) are distinct numbers on screen.
+    // Intl picks a non-breaking space whose exact codepoint varies by ICU
+    // version, so compare with whitespace normalised.
+    const byMoney = (amount: string) =>
+      screen.getByText(
+        (_, el) => el?.textContent?.replace(/\s+/g, ' ').trim() === `${amount} ₸`
+      )
+
+    expect(byMoney('170 000')).toBeInTheDocument()
+    expect(byMoney('50 000')).toBeInTheDocument()
+  })
+})
+
+describe('§2 guest names render in full', () => {
+  it('renders a full Cyrillic name without truncation or escaping', async () => {
+    signIn('admin')
+    mockApi(baseRoutes('admin'))
+    renderApp(<App />, { route: '/rooms' })
+    expect(await screen.findByText('Асель Жумабаева')).toBeInTheDocument()
+  })
+
+  it('renders names containing backslashes and angle brackets verbatim', async () => {
+    signIn('admin')
+    const tricky = makeUnit({
+      id: 9,
+      name: '109',
+      status: 'occupied',
+      current_booking: {
+        id: 1, guest_name: 'Ван\\ <Ли> & Со', guest_phone: null,
+        date_from: '2026-08-07', date_to: '2026-08-09', status: 'occupied', is_paid: true,
+      },
+    })
+    mockApi(baseRoutes('admin', [tricky]))
+    renderApp(<App />, { route: '/rooms' })
+    expect(await screen.findByText('Ван\\ <Ли> & Со')).toBeInTheDocument()
+  })
+})
+
+describe('§7 role-restricted views', () => {
+  it('sends a housekeeper to cleaning and keeps money off the screen', async () => {
+    signIn('housekeeper')
+    mockApi({
+      ...baseRoutes('housekeeper'),
+      'GET /api/cleaning': [{ id: 5, type: 'room', name: '105', category: 'standard', total: 8, pending: 3 }],
+      'GET /api/cleaning/unit/5': CHECKLIST,
+    })
+
+    renderApp(<App />, { route: '/rooms' })
+
+    // Guarded away from the rooms dashboard, landed on cleaning.
+    expect(await screen.findByRole('heading', { name: 'Уборка' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Номера' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Аналитика/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/₸/)).not.toBeInTheDocument()
+  })
+
+  it('sends a waiter to the restaurant and hides rooms and analytics', async () => {
+    signIn('waiter')
+    mockApi(baseRoutes('waiter', [GAZEBO]))
+
+    renderApp(<App />, { route: '/analytics' })
+
+    expect(await screen.findByRole('heading', { name: 'Зона отдыха' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Аналитика' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Номера')).not.toBeInTheDocument()
+  })
+
+  it('shows the admin every section in the nav', async () => {
+    signIn('admin')
+    mockApi(baseRoutes('admin'))
+    renderApp(<App />, { route: '/rooms' })
+
+    expect(await screen.findByRole('link', { name: 'Номера' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Аналитика' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Настройки' })).toBeInTheDocument()
+  })
+})
+
+describe('§5 search and filter', () => {
+  const rooms = [
+    ROOM_WITH_GUEST,
+    makeUnit({ id: 6, name: '106', status: 'free' }),
+    makeUnit({
+      id: 7, name: '107', status: 'booked',
+      current_booking: {
+        id: 8, guest_name: 'Тимур Оспанов', guest_phone: '+77019995544',
+        date_from: '2026-08-20', date_to: '2026-08-23', status: 'booked', is_paid: true,
+      },
+    }),
+  ]
+
+  it('filters by guest name', async () => {
+    signIn('admin')
+    mockApi(baseRoutes('admin', rooms))
+    renderApp(<App />, { route: '/rooms' })
+
+    await screen.findByRole('button', { name: /105/ })
+    await userEvent.type(screen.getByRole('searchbox'), 'Тимур')
+
+    expect(screen.getByRole('button', { name: /107/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /105/ })).not.toBeInTheDocument()
+  })
+
+  it('filters by phone typed without punctuation', async () => {
+    signIn('admin')
+    mockApi(baseRoutes('admin', rooms))
+    renderApp(<App />, { route: '/rooms' })
+
+    await screen.findByRole('button', { name: /105/ })
+    await userEvent.type(screen.getByRole('searchbox'), '77073148820')
+
+    expect(screen.getByRole('button', { name: /105/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /107/ })).not.toBeInTheDocument()
+  })
+
+  it('filters by status', async () => {
+    signIn('admin')
+    mockApi(baseRoutes('admin', rooms))
+    renderApp(<App />, { route: '/rooms' })
+
+    await screen.findByRole('button', { name: /105/ })
+    await userEvent.click(screen.getByRole('button', { name: /^Свободен/ }))
+
+    expect(screen.getByRole('button', { name: /106/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /105/ })).not.toBeInTheDocument()
+  })
+})

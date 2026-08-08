@@ -12,10 +12,11 @@ export default function MonthCalendar({
   days,
   onSelect,
 }: {
-  days: CalendarDay[]
+  days: CalendarDay[] | undefined
   onSelect?: (day: CalendarDay) => void
 }) {
-  if (days.length === 0) return null
+  // Defensive: a malformed or partial response must not take the page down.
+  if (!Array.isArray(days) || days.length === 0) return null
 
   const leadingBlanks = weekdayIndex(days[0].date)
   const today = todayIso()

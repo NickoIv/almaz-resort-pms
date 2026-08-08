@@ -6,8 +6,8 @@ import AnalyticsPage from './pages/AnalyticsPage'
 import CleaningPage from './pages/CleaningPage'
 import LoginPage from './pages/LoginPage'
 import RestaurantPage from './pages/RestaurantPage'
-import RoomDetailPage from './pages/RoomDetailPage'
 import RoomsPage from './pages/RoomsPage'
+import UnitDetailPage from './pages/UnitDetailPage'
 import SettingsPage from './pages/SettingsPage'
 
 /** Sends a signed-in user to their role's dashboard, everyone else to /login. */
@@ -41,7 +41,17 @@ export default function App() {
           path="/rooms/:id"
           element={
             <RequireRole roles={['admin']}>
-              <RoomDetailPage />
+              <UnitDetailPage />
+            </RequireRole>
+          }
+        />
+        {/* Same detail view for recreation units; waiters reach it too, and the
+            API keeps them out of anything that is not restaurant/recreation. */}
+        <Route
+          path="/units/:id"
+          element={
+            <RequireRole roles={['admin', 'waiter']}>
+              <UnitDetailPage />
             </RequireRole>
           }
         />
