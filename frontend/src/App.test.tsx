@@ -615,3 +615,89 @@ describe('§3 housekeeping shift sheet', () => {
     expect(screen.getByRole('button', { name: 'Печать заданий на смену' })).toBeDisabled()
   })
 })
+
+describe('§4 check-out receipt', () => {
+  const BOOKED_ROOM = makeUnit({
+    id: 5, name: '105', status: 'occupied',
+    current_booking: {
+      id: 42, guest_name: 'Асель Жумабаева', guest_phone: '+7 707 314 88 20',
+      date_from: '2026-08-07', date_to: '2026-08-10', status: 'occupied', is_paid: false,
+      total_amount: 240000, prepaid_amount: 120000, deposit_amount: 50000,
+      charges_amount: 50000, remaining_amount: 170000, currency: 'KZT',
+    },
+  })
+  const CHARGES = [
+    { id: 1, booking_id: 42, reason: 'Поздний выезд', amount: 18000,
+      created_at: '2026-08-08', created_by_name: 'Нурлан' },
+    { id: 2, booking_id: 42, reason: 'Испорченное имущество', amount: 32000,
+      created_at: '2026-08-08', created_by_name: 'Нурлан' },
+  ]
+
+  function routes() {
+    return {
+      ...baseRoutes('admin', [BOOKED_ROOM]),
+      'GET /api/units/5': BOOKED_ROOM,
+      'GET /api/units/5/calendar': CALENDAR,
+      'GET /api/bookings/42/payments': [
+        { id: 1, booking_id: 42, amount: 120000, method: 'kaspi',
+          paid_at: '2026-08-07 12:00', group_id: null },
+      ],
+      'GET /api/bookings/42/charges': CHARGES,
+      'GET /api/settings': {
+        notifications: {}, channel: 'whatsapp', whatsapp_configured: false,
+        telegram_configured: false,
+        text: { hotel_name: 'Almaz Resort', hotel_details: 'Алматы, ул. Пример 1' },
+      },
+    }
+  }
+
+  it('itemises the rate, each charge, totals, and keeps the deposit separate', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/5' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Печать чека' }))
+    const receipt = await screen.findByText(/Счёт-акт по брони №42/)
+    const sheet = receipt.closest('.print-sheet')!
+    const q = within(sheet as HTMLElement)
+
+    // Hotel identity comes from settings, not a hard-coded string.
+    expect(q.getByText('Almaz Resort')).toBeInTheDocument()
+    expect(q.getByText('Алматы, ул. Пример 1')).toBeInTheDocument()
+
+    // Guest and stay.
+    expect(q.getByText('Асель Жумабаева')).toBeInTheDocument()
+    expect(q.getByText('+7 707 314 88 20')).toBeInTheDocument()
+
+    // Line items: rate plus each charge by its reason.
+    expect(q.getByText('Проживание')).toBeInTheDocument()
+    expect(q.getByText(/Поздний выезд/)).toBeInTheDocument()
+    expect(q.getByText(/Испорченное имущество/)).toBeInTheDocument()
+
+    // Totals: 240000 + 18000 + 32000 = 290000 billed, 120000 paid, 170000 due.
+    const cash = (amount: string) =>
+      q.getByText((_, el) => el?.textContent?.replace(/\s+/g, ' ').trim() === `${amount} ₸`)
+    expect(cash('290 000')).toBeInTheDocument()
+    expect(cash('170 000')).toBeInTheDocument()
+
+    // The deposit is called out as refundable and sits outside the totals table.
+    const depositNote = sheet.querySelector('.receipt-deposit')!
+    expect(depositNote.textContent).toMatch(/возвратный, не входит в сумму/)
+    // Intl uses a non-breaking space; normalise before matching.
+    expect(depositNote.textContent?.replace(/\s+/g, ' ')).toMatch(/50 000 ₸/)
+  })
+
+  it('is offered only when there is an active booking', async () => {
+    signIn('admin')
+    const emptyRoom = makeUnit({ id: 6, name: '106', status: 'free' })
+    mockApi({
+      ...baseRoutes('admin', [emptyRoom]),
+      'GET /api/units/6': emptyRoom,
+      'GET /api/units/6/calendar': CALENDAR,
+    })
+    renderApp(<App />, { route: '/rooms/6' })
+
+    await screen.findByRole('heading', { name: /Номер 106/ })
+    expect(screen.queryByRole('button', { name: 'Печать чека' })).not.toBeInTheDocument()
+  })
+})

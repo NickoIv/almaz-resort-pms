@@ -8,6 +8,7 @@ import Checklist from '../components/Checklist'
 import GuestHistoryModal from '../components/GuestHistoryModal'
 import MonthCalendar from '../components/MonthCalendar'
 import PaymentModal from '../components/PaymentModal'
+import ReceiptSheet from '../components/ReceiptSheet'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
 import { almatyMonth, dateRange, money, timeRange } from '../format'
 import { CANCEL_REASON_LABELS, type CancelReason } from '../cancellation'
@@ -58,6 +59,7 @@ export default function UnitDetailPage() {
   const [showPayment, setShowPayment] = useState(false)
   const [showCharge, setShowCharge] = useState(false)
   const [showGuest, setShowGuest] = useState(false)
+  const [showReceipt, setShowReceipt] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -153,6 +155,9 @@ export default function UnitDetailPage() {
         <div className="page-head-actions">
           {isAdmin && active && (
             <>
+              <button className="btn btn-sm" onClick={() => setShowReceipt(true)}>
+                Печать чека
+              </button>
               <button className="btn btn-sm" onClick={() => setShowCharge(true)}>
                 Начислить
               </button>
@@ -415,6 +420,15 @@ export default function UnitDetailPage() {
       )}
       {showGuest && booking?.guest_phone && (
         <GuestHistoryModal phone={booking.guest_phone} onClose={() => setShowGuest(false)} />
+      )}
+      {showReceipt && active && (
+        <ReceiptSheet
+          unit={unit}
+          booking={active}
+          charges={charges}
+          payments={payments}
+          onClose={() => setShowReceipt(false)}
+        />
       )}
     </>
   )

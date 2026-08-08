@@ -2040,6 +2040,106 @@ button {
   margin-top: 8px;
 }
 
+/* ── Receipt ───────────────────────────────────────────────────────────────── */
+
+.receipt-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 8px;
+  color: #111;
+}
+
+.receipt-void {
+  font-weight: 400;
+  color: #a33;
+}
+
+.receipt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+
+.receipt-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #777;
+}
+
+.receipt-value {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #111;
+  margin-top: 2px;
+}
+
+.receipt-sub {
+  display: block;
+  font-size: 11px;
+  color: #777;
+}
+
+.receipt-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 14px;
+}
+
+.receipt-table th {
+  text-align: left;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #777;
+  border-bottom: 1.5px solid #111;
+  padding: 0 0 6px;
+}
+
+.receipt-table td {
+  padding: 7px 0;
+  border-bottom: 1px solid #e3e3e3;
+  color: #111;
+  vertical-align: top;
+}
+
+.receipt-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.receipt-table tr.receipt-total td {
+  font-weight: 700;
+  border-bottom: 1.5px solid #111;
+}
+
+/* The deposit sits outside the totals table on purpose: it is a refundable
+   hold, not part of what the guest owes. */
+.receipt-deposit {
+  padding: 10px 12px;
+  border: 1px dashed #999;
+  font-size: 12px;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.receipt-payments {
+  margin-bottom: 18px;
+}
+
+.receipt-sign {
+  display: flex;
+  gap: 26px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: #444;
+  margin-top: 26px;
+  padding-top: 12px;
+  border-top: 1px solid #ccc;
+}
+
 @media print {
   /* Show only the sheet. Hiding by visibility rather than display keeps the
      layout intact, which display:none on ancestors would collapse. */

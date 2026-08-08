@@ -30,6 +30,38 @@ export const NOTIFY_CHANNELS: NotifyChannel[] = ['whatsapp', 'telegram', 'both']
 
 export const DEFAULT_CHANNEL: NotifyChannel = 'whatsapp'
 
+/**
+ * Free-text settings, with the value used when the row is missing.
+ * Kept alongside the toggles so the settings endpoint has one shape.
+ */
+export const TEXT_SETTINGS = {
+  hotel_name: 'Almaz Resort',
+  /** Address / phone / BIN line printed under the name on a receipt. */
+  hotel_details: '',
+  reviews_2gis_url: '',
+  reviews_google_url: '',
+} as const
+
+export type TextSettingKey = keyof typeof TEXT_SETTINGS
+
+export const TEXT_SETTING_KEYS = Object.keys(TEXT_SETTINGS) as TextSettingKey[]
+
+export async function loadTextSettings(
+  db: D1Database
+): Promise<Record<TextSettingKey, string>> {
+  const { results } = await db
+    .prepare('SELECT key, value FROM settings')
+    .all<{ key: string; value: string }>()
+
+  const values = { ...TEXT_SETTINGS } as Record<TextSettingKey, string>
+  for (const row of results) {
+    if (TEXT_SETTING_KEYS.includes(row.key as TextSettingKey)) {
+      values[row.key as TextSettingKey] = row.value
+    }
+  }
+  return values
+}
+
 export async function loadSettings(db: D1Database): Promise<NotificationSettings> {
   const { results } = await db
     .prepare('SELECT key, value FROM settings')

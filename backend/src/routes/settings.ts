@@ -10,6 +10,8 @@ import {
   NOTIFICATION_KEYS,
   NOTIFY_CHANNELS,
   renderPlain,
+  TEXT_SETTING_KEYS,
+  loadTextSettings,
   type NotificationKey,
   type NotifyChannel,
 } from '../lib/notifications'
@@ -25,6 +27,7 @@ async function currentState(env: Bindings) {
   return {
     notifications: await loadSettings(env.DB),
     channel: await loadChannel(env.DB),
+    text: await loadTextSettings(env.DB),
     ...channelStatus(env),
   }
 }
@@ -38,6 +41,7 @@ settings.put('/', async (c) => {
   const body = await readJson<Record<string, unknown>>(c)
 
   const toggleUpdates = NOTIFICATION_KEYS.filter((key) => body[key] !== undefined)
+  const textUpdates = TEXT_SETTING_KEYS.filter((key) => body[key] !== undefined)
   const channel = body.channel as NotifyChannel | undefined
 
   if (channel !== undefined && !NOTIFY_CHANNELS.includes(channel)) {
@@ -46,8 +50,20 @@ settings.put('/', async (c) => {
     })
   }
 
-  if (toggleUpdates.length === 0 && channel === undefined) {
+  if (toggleUpdates.length === 0 && textUpdates.length === 0 && channel === undefined) {
     throw new HTTPException(400, { message: 'Нет ни одной известной настройки' })
+  }
+
+  // URLs are shown to staff as links; only http(s) is accepted so a stored
+  // value can never turn into a javascript: navigation.
+  for (const key of textUpdates) {
+    const value = String(body[key] ?? '')
+    if (key.endsWith('_url') && value !== '' && !/^https?:\/\//i.test(value)) {
+      throw new HTTPException(400, { message: `${key}: ссылка должна начинаться с http:// или https://` })
+    }
+    if (value.length > 500) {
+      throw new HTTPException(400, { message: `${key}: слишком длинное значение` })
+    }
   }
 
   const upsert = (key: string, value: string) =>
@@ -64,6 +80,7 @@ settings.put('/', async (c) => {
     upsert(key, (body[key as NotificationKey] as boolean) ? '1' : '0')
   )
   if (channel !== undefined) statements.push(upsert('notify_channel', channel))
+  for (const key of textUpdates) statements.push(upsert(key, String(body[key] ?? '').trim()))
 
   await c.env.DB.batch(statements)
   await writeAudit(c.env.DB, staff.sub, 'settings.update', 'settings', null)
