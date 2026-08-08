@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth'
 import AlmatyClock from './AlmatyClock'
+import ReviewsLink from './ReviewsLink'
 import { ROLE_LABELS, type Role } from '../types'
 
 type NavItem = { to: string; label: string; roles: Role[] }
@@ -46,6 +47,7 @@ export default function AppShell() {
         </nav>
 
         <div className="topbar-right">
+          <ReviewsLink />
           <AlmatyClock />
           <div className="who">
             <div className="who-name">{user.name}</div>

@@ -18,9 +18,17 @@ type StoredBackups = {
   backups: { key: string; uploaded: string | null; size: number | null }[]
 }
 
+type TextSettings = {
+  hotel_name: string
+  hotel_details: string
+  reviews_2gis_url: string
+  reviews_google_url: string
+}
+
 type SettingsResponse = {
   notifications: Record<NotificationKey, boolean>
   channel: NotifyChannel
+  text: TextSettings
   whatsapp_configured: boolean
   telegram_configured: boolean
 }
@@ -67,6 +75,9 @@ export default function SettingsPage() {
   const [downloading, setDownloading] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [stored, setStored] = useState<StoredBackups | null>(null)
+  // Text fields are edited locally and saved on blur, so every keystroke is
+  // not a PUT.
+  const [text, setText] = useState<TextSettings | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -79,6 +90,7 @@ export default function SettingsPage() {
     ])
       .then(([settings, digest, backups]) => {
         setData(settings)
+        setText(settings.text)
         setPreview(digest)
         setStored(backups)
       })
@@ -93,7 +105,9 @@ export default function SettingsPage() {
     setError(null)
     setNotice(null)
     try {
-      setData(await api<SettingsResponse>('/settings', { method: 'PUT', body }))
+      const next = await api<SettingsResponse>('/settings', { method: 'PUT', body })
+      setData(next)
+      setText(next.text)
       setPreview(await api('/settings/preview'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось сохранить')
@@ -207,6 +221,70 @@ export default function SettingsPage() {
         <div className="field-hint" style={{ marginTop: 10 }}>
           Основной канал — WhatsApp через Green API. Telegram сохранён как резервный: выберите
           «Оба», чтобы дублировать сводку в оба мессенджера.
+        </div>
+      </section>
+
+      <section className="panel glass" style={{ marginBottom: 18 }}>
+        <div className="panel-title">
+          Реквизиты и отзывы
+          <span className="count">название печатается на чеке</span>
+        </div>
+
+        <div className="field-row">
+          <div className="field">
+            <label htmlFor="hotel-name">Название</label>
+            <input
+              id="hotel-name"
+              value={text?.hotel_name ?? ''}
+              onChange={(event) => setText((t) => t && { ...t, hotel_name: event.target.value })}
+              onBlur={() => text && save({ hotel_name: text.hotel_name }, 'hotel_name')}
+              placeholder="Almaz Resort"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="hotel-details">Адрес / телефон / БИН</label>
+            <input
+              id="hotel-details"
+              value={text?.hotel_details ?? ''}
+              onChange={(event) => setText((t) => t && { ...t, hotel_details: event.target.value })}
+              onBlur={() => text && save({ hotel_details: text.hotel_details }, 'hotel_details')}
+              placeholder="Алматы, ул. …"
+            />
+          </div>
+        </div>
+
+        <div className="field-row">
+          <div className="field">
+            <label htmlFor="url-2gis">Ссылка на 2ГИС</label>
+            <input
+              id="url-2gis"
+              type="url"
+              value={text?.reviews_2gis_url ?? ''}
+              onChange={(event) =>
+                setText((t) => t && { ...t, reviews_2gis_url: event.target.value })
+              }
+              onBlur={() => text && save({ reviews_2gis_url: text.reviews_2gis_url }, '2gis')}
+              placeholder="https://2gis.kz/almaty/firm/…"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="url-google">Ссылка на Google</label>
+            <input
+              id="url-google"
+              type="url"
+              value={text?.reviews_google_url ?? ''}
+              onChange={(event) =>
+                setText((t) => t && { ...t, reviews_google_url: event.target.value })
+              }
+              onBlur={() => text && save({ reviews_google_url: text.reviews_google_url }, 'google')}
+              placeholder="https://g.page/…"
+            />
+          </div>
+        </div>
+
+        <div className="field-hint">
+          Ссылки появятся кнопкой «Отзывы» в шапке — персонал сможет быстро открыть профиль и
+          попросить гостя оставить отзыв. Сохраняется при выходе из поля.
         </div>
       </section>
 

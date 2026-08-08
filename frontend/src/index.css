@@ -177,6 +177,47 @@ button {
   gap: 14px;
 }
 
+.reviews {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-right: 14px;
+  border-right: 1px solid var(--glass-border-soft);
+}
+
+.reviews-label {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.reviews-link {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 12px;
+  transition:
+    transform 0.16s var(--ease),
+    color 0.16s var(--ease),
+    background 0.16s var(--ease);
+}
+
+.reviews-link:hover {
+  transform: translateY(-1px);
+  color: var(--text);
+  background: var(--glass-strong);
+}
+
+@media (max-width: 900px) {
+  .reviews {
+    display: none;
+  }
+}
+
 .clock {
   display: flex;
   flex-direction: column;

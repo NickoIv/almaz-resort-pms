@@ -701,3 +701,53 @@ describe('§4 check-out receipt', () => {
     expect(screen.queryByRole('button', { name: 'Печать чека' })).not.toBeInTheDocument()
   })
 })
+
+describe('§10 review profile links', () => {
+  const withUrls = (urls: Partial<Record<string, string>>) => ({
+    notifications: {}, channel: 'whatsapp', whatsapp_configured: false, telegram_configured: false,
+    text: {
+      hotel_name: 'Almaz Resort', hotel_details: '',
+      reviews_2gis_url: '', reviews_google_url: '', ...urls,
+    },
+  })
+
+  it('shows a link for each configured profile', async () => {
+    signIn('admin')
+    mockApi({
+      ...baseRoutes('admin'),
+      'GET /api/settings': withUrls({
+        reviews_2gis_url: 'https://2gis.kz/almaty/firm/123',
+        reviews_google_url: 'https://g.page/almaz',
+      }),
+    })
+    renderApp(<App />, { route: '/rooms' })
+
+    expect(await screen.findByText('Отзывы')).toBeInTheDocument()
+    const twoGis = screen.getByRole('link', { name: '2ГИС' })
+    expect(twoGis).toHaveAttribute('href', 'https://2gis.kz/almaty/firm/123')
+    // Opened without leaking the PMS URL to the review site.
+    expect(twoGis).toHaveAttribute('rel', expect.stringContaining('noreferrer'))
+    expect(screen.getByRole('link', { name: 'Google' })).toHaveAttribute('href', 'https://g.page/almaz')
+  })
+
+  it('shows only the profile that is configured', async () => {
+    signIn('admin')
+    mockApi({
+      ...baseRoutes('admin'),
+      'GET /api/settings': withUrls({ reviews_2gis_url: 'https://2gis.kz/almaty/firm/123' }),
+    })
+    renderApp(<App />, { route: '/rooms' })
+
+    expect(await screen.findByRole('link', { name: '2ГИС' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Google' })).not.toBeInTheDocument()
+  })
+
+  it('stays hidden when neither is set', async () => {
+    signIn('admin')
+    mockApi({ ...baseRoutes('admin'), 'GET /api/settings': withUrls({}) })
+    renderApp(<App />, { route: '/rooms' })
+
+    await screen.findByRole('heading', { name: 'Номера' })
+    expect(screen.queryByText('Отзывы')).not.toBeInTheDocument()
+  })
+})
