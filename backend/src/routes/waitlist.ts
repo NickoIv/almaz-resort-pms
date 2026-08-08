@@ -128,8 +128,8 @@ waitlist.post('/', canAdd, async (c) => {
   }
 
   const created = await c.env.DB.prepare(
-    `INSERT INTO waitlist (guest_name, guest_phone, unit_type, unit_id, date_from, date_to, note, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO waitlist (guest_name, guest_phone, unit_type, unit_id, date_from, date_to, note, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${SQL_NOW})
      RETURNING id`
   )
     .bind(

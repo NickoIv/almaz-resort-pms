@@ -169,8 +169,8 @@ bookings.post('/', canBook, async (c) => {
   const created = await c.env.DB.prepare(
     `INSERT INTO bookings
        (unit_id, guest_name, guest_phone, date_from, date_to, status,
-        total_amount, prepaid_amount, deposit_amount, currency)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        total_amount, prepaid_amount, deposit_amount, currency, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${SQL_NOW})
      RETURNING *`
   )
     .bind(
@@ -193,7 +193,7 @@ bookings.post('/', canBook, async (c) => {
   // there too, or the money is invisible to every revenue report.
   if (prepaid > 0) {
     await c.env.DB.prepare(
-      'INSERT INTO payments (booking_id, amount, method) VALUES (?, ?, ?)'
+      `INSERT INTO payments (booking_id, amount, method, paid_at) VALUES (?, ?, ?, ${SQL_NOW})`
     )
       .bind(created.id, prepaid, String(body.payment_method ?? 'cash'))
       .run()
@@ -236,8 +236,8 @@ bookings.post('/quick', canBook, async (c) => {
 
   const created = await c.env.DB.prepare(
     `INSERT INTO bookings
-       (unit_id, guest_name, guest_phone, date_from, date_to, status, currency)
-     VALUES (?, ?, ?, ?, ?, 'occupied', ?)
+       (unit_id, guest_name, guest_phone, date_from, date_to, status, currency, created_at)
+     VALUES (?, ?, ?, ?, ?, 'occupied', ?, ${SQL_NOW})
      RETURNING *`
   )
     .bind(
@@ -314,8 +314,8 @@ bookings.post('/group', canBook, async (c) => {
   }
 
   const group = await c.env.DB.prepare(
-    `INSERT INTO booking_groups (name, guest_name, guest_phone, note, created_by)
-     VALUES (?, ?, ?, ?, ?) RETURNING *`
+    `INSERT INTO booking_groups (name, guest_name, guest_phone, note, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ${SQL_NOW}) RETURNING *`
   )
     .bind(
       name,
@@ -343,8 +343,8 @@ bookings.post('/group', canBook, async (c) => {
     const row = await c.env.DB.prepare(
       `INSERT INTO bookings
          (unit_id, guest_name, guest_phone, date_from, date_to, status,
-          total_amount, prepaid_amount, deposit_amount, currency, group_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+          total_amount, prepaid_amount, deposit_amount, currency, group_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ${SQL_NOW})
        RETURNING *`
     )
       .bind(
@@ -468,7 +468,8 @@ bookings.patch('/group/:groupId/payment', requireRole('admin'), async (c) => {
     )
     statements.push(
       c.env.DB.prepare(
-        'INSERT INTO payments (booking_id, amount, method, group_id) VALUES (?, ?, ?, ?)'
+        `INSERT INTO payments (booking_id, amount, method, group_id, paid_at)
+         VALUES (?, ?, ?, ?, ${SQL_NOW})`
       ).bind(row.id, part, method, groupId)
     )
   })
@@ -628,7 +629,7 @@ bookings.patch('/:id/payment', requireRole('admin'), async (c) => {
 
   if (paymentAmount > 0) {
     statements.push(
-      c.env.DB.prepare('INSERT INTO payments (booking_id, amount, method) VALUES (?, ?, ?)').bind(
+      c.env.DB.prepare(`INSERT INTO payments (booking_id, amount, method, paid_at) VALUES (?, ?, ?, ${SQL_NOW})`).bind(
         id,
         paymentAmount,
         String(payment?.method ?? 'cash')
@@ -639,7 +640,7 @@ bookings.patch('/:id/payment', requireRole('admin'), async (c) => {
     // Book the difference so the ledger keeps matching `prepaid_amount` — the
     // delta may be negative, which is a refund or a correction.
     statements.push(
-      c.env.DB.prepare('INSERT INTO payments (booking_id, amount, method) VALUES (?, ?, ?)').bind(
+      c.env.DB.prepare(`INSERT INTO payments (booking_id, amount, method, paid_at) VALUES (?, ?, ?, ${SQL_NOW})`).bind(
         id,
         prepaid - existing.prepaid_amount,
         'adjustment'
@@ -710,7 +711,8 @@ bookings.post('/:id/charges', requireRole('admin'), async (c) => {
   }
 
   const created = await c.env.DB.prepare(
-    'INSERT INTO charges (booking_id, reason, amount, created_by) VALUES (?, ?, ?, ?) RETURNING *'
+    `INSERT INTO charges (booking_id, reason, amount, created_by, created_at)
+     VALUES (?, ?, ?, ?, ${SQL_NOW}) RETURNING *`
   )
     .bind(id, reason, amount, staff.sub)
     .first<ChargeRow>()

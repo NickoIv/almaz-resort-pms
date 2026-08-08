@@ -4,6 +4,7 @@ import { assertUnitTypeAllowed } from '../lib/access'
 import { requireRole } from '../lib/auth'
 import { writeAudit } from '../lib/audit'
 import { cleanOptional } from '../lib/text'
+import { SQL_NOW } from '../lib/time'
 import type { AppEnv, UnitType } from '../types'
 
 const photos = new Hono<AppEnv>()
@@ -142,8 +143,8 @@ photos.post('/unit/:unitId', canPhoto, async (c) => {
   const bookingId = bookingIdRaw ? Number(bookingIdRaw) : null
 
   const created = await c.env.DB.prepare(
-    `INSERT INTO unit_photos (unit_id, booking_id, storage_key, content_type, size_bytes, kind, caption, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO unit_photos (unit_id, booking_id, storage_key, content_type, size_bytes, kind, caption, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${SQL_NOW})
      RETURNING id`
   )
     .bind(

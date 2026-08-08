@@ -5,7 +5,7 @@ import { readJson } from '../lib/body'
 import { writeAudit } from '../lib/audit'
 import { chargesSumSql } from '../lib/money'
 import { normalizePhone } from '../lib/phone'
-import { SQL_TODAY } from '../lib/time'
+import { SQL_NOW, SQL_TODAY } from '../lib/time'
 import type { AppEnv, BookingStatus, UnitType } from '../types'
 
 const guests = new Hono<AppEnv>()
@@ -108,7 +108,7 @@ guests.put('/:phone/notes', async (c) => {
 
   await c.env.DB.prepare(
     `INSERT INTO guest_notes (phone, notes, updated_at, updated_by)
-     VALUES (?, ?, datetime('now'), ?)
+     VALUES (?, ?, ${SQL_NOW}, ?)
      ON CONFLICT(phone) DO UPDATE SET
        notes = excluded.notes,
        updated_at = excluded.updated_at,

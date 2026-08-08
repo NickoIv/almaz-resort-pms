@@ -16,6 +16,7 @@ import {
   type NotifyChannel,
 } from '../lib/notifications'
 import { channelStatus, deliverDigest } from '../lib/notify'
+import { SQL_NOW } from '../lib/time'
 import type { AppEnv, Bindings } from '../types'
 
 const settings = new Hono<AppEnv>()
@@ -69,7 +70,7 @@ settings.put('/', async (c) => {
   const upsert = (key: string, value: string) =>
     c.env.DB.prepare(
       `INSERT INTO settings (key, value, updated_at, updated_by)
-       VALUES (?, ?, datetime('now'), ?)
+       VALUES (?, ?, ${SQL_NOW}, ?)
        ON CONFLICT(key) DO UPDATE SET
          value = excluded.value,
          updated_at = excluded.updated_at,

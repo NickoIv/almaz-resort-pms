@@ -192,7 +192,7 @@ cleaning.patch('/:itemId', canClean, async (c) => {
 
   const updated = await c.env.DB.prepare(
     `UPDATE cleaning_checklist
-     SET is_done = ?, updated_at = datetime('now'), updated_by = ?
+     SET is_done = ?, updated_at = ${SQL_NOW}, updated_by = ?
      WHERE id = ?
      RETURNING *`
   )
