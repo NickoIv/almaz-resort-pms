@@ -1,0 +1,13 @@
+name = "almaz-resort-pms-api"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "almaz_resort_pms_db"
+database_id = "1430be6b-5d54-4378-a686-5c7db905f582"
+migrations_dir = "migrations"
