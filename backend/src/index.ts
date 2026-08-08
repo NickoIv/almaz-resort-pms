@@ -5,6 +5,7 @@ import { requireAuth } from './lib/auth'
 import { buildDigest, loadChannel, loadSettings } from './lib/notifications'
 import { deliverDigest } from './lib/notify'
 import analyticsRoutes from './routes/analytics'
+import auditRoutes from './routes/audit'
 import authRoutes from './routes/auth'
 import unitRoutes from './routes/units'
 import bookingRoutes from './routes/bookings'
@@ -33,6 +34,8 @@ app.use('/api/analytics/*', requireAuth)
 app.use('/api/settings/*', requireAuth)
 app.use('/api/settings', requireAuth)
 app.use('/api/guests/*', requireAuth)
+app.use('/api/audit', requireAuth)
+app.use('/api/audit/*', requireAuth)
 
 app.route('/api/units', unitRoutes)
 app.route('/api/bookings', bookingRoutes)
@@ -40,6 +43,7 @@ app.route('/api/cleaning', cleaningRoutes)
 app.route('/api/analytics', analyticsRoutes)
 app.route('/api/settings', settingsRoutes)
 app.route('/api/guests', guestRoutes)
+app.route('/api/audit', auditRoutes)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {

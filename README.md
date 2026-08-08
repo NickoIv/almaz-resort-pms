@@ -52,7 +52,7 @@ housekeeping and analytics.
 | `cleaning_checklist` | Per-unit housekeeping items |
 | `staff_users` | Staff accounts with role and hashed PIN |
 | `payments` | Individual payment records against a booking |
-| `audit_log` | Who changed what and when |
+| `audit_log` | Who changed what and when — surfaced on the admin Journal screen |
 | `settings` | Key/value toggles for the notification digest |
 
 `payments` is the ledger: every change to what a guest has paid writes a row there,
@@ -111,9 +111,11 @@ stored as PBKDF2-SHA256 hashes (100k iterations); the token is signed with
 | `PUT` | `/api/guests/:phone/notes` | admin only |
 | `GET` `PATCH` | `/api/cleaning` | admin, housekeeper |
 | `GET` | `/api/analytics/summary?from=&to=` | admin only |
-| `GET` `PUT` | `/api/settings` | admin only — notification toggles |
+| `GET` | `/api/audit` | admin only — staff action log, filterable and paged |
+| `GET` | `/api/audit/filters` | admin only |
+| `GET` `PUT` | `/api/settings` | admin only — notification toggles and delivery channel |
 | `GET` | `/api/settings/preview` | admin only — the digest as it stands, without sending |
-| `POST` | `/api/settings/test-notification` | admin only — send the digest to Telegram now |
+| `POST` | `/api/settings/test-notification` | admin only — send the digest now, to the chosen channel |
 
 Money amounts are stripped from every response for non-admin roles. The one
 exception is a boolean `is_paid` on the current booking — a waiter has to know
@@ -319,8 +321,11 @@ Work in progress.
 - [x] Rooms module — dashboard grid, monthly calendar, payments, cleaning checklist
 - [x] Restaurant / recreation module — hourly booking, waiter quick-book, tabs per type
 - [x] Analytics dashboard — revenue, occupancy, month-over-month, CSV export
-- [x] Telegram notifications (cron digest + admin settings screen)
+- [x] Notifications: WhatsApp via Green API (cron digest + admin settings screen), Telegram optional
+- [x] Search and status filter, guest history, group bookings, extra charges
+- [x] Audit log screen — who changed which booking, and when
 - [x] Deployed to Cloudflare Workers + Pages
+- [ ] Change the seeded staff PINs before going live
 
 Not done yet: `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` are not set, so no
 notification has actually been delivered — see *Connecting the Telegram bot*.

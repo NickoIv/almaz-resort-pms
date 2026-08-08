@@ -1891,6 +1891,41 @@ button {
   color: var(--text-faint);
 }
 
+/* ── Audit log ─────────────────────────────────────────────────────────────── */
+
+.audit-table td:first-child {
+  display: table-cell;
+}
+
+.audit-when {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.audit-role,
+.audit-guest {
+  display: block;
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.pager-info {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Respect a reduced-motion preference: keep the colour and shadow cues,
    drop the movement. */
 @media (prefers-reduced-motion: reduce) {

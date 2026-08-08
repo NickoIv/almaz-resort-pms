@@ -3,6 +3,7 @@ import { RequireRole, useAuth, HOME_BY_ROLE } from './auth'
 import AppShell from './components/AppShell'
 import { Spinner } from './components/ui'
 import AnalyticsPage from './pages/AnalyticsPage'
+import AuditPage from './pages/AuditPage'
 import CleaningPage from './pages/CleaningPage'
 import LoginPage from './pages/LoginPage'
 import RestaurantPage from './pages/RestaurantPage'
@@ -76,6 +77,14 @@ export default function App() {
           element={
             <RequireRole roles={['admin']}>
               <AnalyticsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/audit"
+          element={
+            <RequireRole roles={['admin']}>
+              <AuditPage />
             </RequireRole>
           }
         />
