@@ -302,3 +302,72 @@ describe('§5 search and filter', () => {
     expect(screen.queryByRole('button', { name: /105/ })).not.toBeInTheDocument()
   })
 })
+describe('currency selector', () => {
+  const freeRoom = makeUnit({ id: 6, name: '106', status: 'free' })
+
+  it('offers KZT, USD and CNY in the booking form, defaulting to KZT', async () => {
+    signIn('admin')
+    mockApi({
+      ...baseRoutes('admin', [freeRoom]),
+      'GET /api/units/6': freeRoom,
+      'GET /api/units/6/calendar': CALENDAR,
+    })
+
+    renderApp(<App />, { route: '/rooms/6' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Новая бронь' }))
+
+    const select = await screen.findByLabelText('Валюта')
+    expect(select).toHaveValue('KZT')
+    expect([...(select as HTMLSelectElement).options].map((o) => o.value)).toEqual([
+      'KZT', 'USD', 'CNY',
+    ])
+  })
+
+  it('sends the chosen currency when creating a booking', async () => {
+    signIn('admin')
+    let posted: Record<string, unknown> | null = null
+    mockApi({
+      ...baseRoutes('admin', [freeRoom]),
+      'GET /api/units/6': freeRoom,
+      'GET /api/units/6/calendar': CALENDAR,
+      'POST /api/bookings': (_url: string, init?: RequestInit) => {
+        posted = JSON.parse(String(init?.body))
+        return { id: 1 }
+      },
+    })
+
+    renderApp(<App />, { route: '/rooms/6' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Новая бронь' }))
+    await userEvent.type(screen.getByLabelText('Гость'), 'Ли Вэй')
+    await userEvent.selectOptions(screen.getByLabelText('Валюта'), 'CNY')
+    await userEvent.type(screen.getByLabelText('Сумма'), '5000')
+    await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
+
+    await waitFor(() => expect(posted).not.toBeNull())
+    expect(posted!.currency).toBe('CNY')
+    expect(posted!.total_amount).toBe(5000)
+  })
+
+  it('sends the chosen currency from the waiter quick-book form', async () => {
+    signIn('waiter')
+    const gazebo = makeUnit({ id: 20, type: 'gazebo', name: 'Беседка 1', status: 'free' })
+    let posted: Record<string, unknown> | null = null
+    mockApi({
+      ...baseRoutes('waiter', [gazebo]),
+      'POST /api/bookings/quick': (_url: string, init?: RequestInit) => {
+        posted = JSON.parse(String(init?.body))
+        return { id: 2 }
+      },
+    })
+
+    renderApp(<App />, { route: '/restaurant' })
+    await userEvent.click(await screen.findByRole('button', { name: /^Беседки/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Занять сейчас' }))
+    await userEvent.type(screen.getByLabelText('Гость'), 'Ван Ли')
+    await userEvent.selectOptions(screen.getByLabelText('Валюта'), 'USD')
+    await userEvent.click(screen.getByRole('button', { name: /Занять на/ }))
+
+    await waitFor(() => expect(posted).not.toBeNull())
+    expect(posted!.currency).toBe('USD')
+  })
+})

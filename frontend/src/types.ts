@@ -173,6 +173,18 @@ export type Analytics = {
   }
 }
 
+export const CURRENCIES = ['KZT', 'USD', 'CNY'] as const
+
+export type Currency = (typeof CURRENCIES)[number]
+
+export const CURRENCY_LABELS: Record<Currency, string> = {
+  KZT: '₸ тенге',
+  USD: '$ доллар',
+  CNY: '¥ юань',
+}
+
+export const DEFAULT_CURRENCY: Currency = 'KZT'
+
 export const UNIT_TYPE_LABELS: Record<UnitType, string> = {
   room: 'Номер',
   sunbed: 'Топчан',

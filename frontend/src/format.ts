@@ -1,10 +1,16 @@
 /** Formatting helpers shared across the UI. */
 
+/** Falls back to the raw code for anything not listed, so nothing renders blank. */
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  KZT: '₸',
+  USD: '$',
+  CNY: '¥',
+}
+
 /** 120000 -> "120 000 ₸" */
 export function money(amount: number | undefined | null, currency = 'KZT'): string {
   const value = Number(amount ?? 0)
-  const symbol = currency === 'KZT' ? '₸' : currency === 'USD' ? '$' : currency
-  return `${value.toLocaleString('ru-RU')} ${symbol}`
+  return `${value.toLocaleString('ru-RU')} ${CURRENCY_SYMBOLS[currency] ?? currency}`
 }
 
 /** "2026-08-08" -> "8 авг" */

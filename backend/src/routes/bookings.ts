@@ -229,10 +229,17 @@ bookings.post('/quick', canBook, async (c) => {
   const created = await c.env.DB.prepare(
     `INSERT INTO bookings
        (unit_id, guest_name, guest_phone, date_from, date_to, status, currency)
-     VALUES (?, ?, ?, ?, ?, 'occupied', 'KZT')
+     VALUES (?, ?, ?, ?, ?, 'occupied', ?)
      RETURNING *`
   )
-    .bind(unitId, guestName, cleanOptional(body.guest_phone, 40), dateFrom, dateTo)
+    .bind(
+      unitId,
+      guestName,
+      cleanOptional(body.guest_phone, 40),
+      dateFrom,
+      dateTo,
+      String(body.currency ?? 'KZT')
+    )
     .first<BookingRow>()
 
   if (!created) throw new HTTPException(500, { message: 'Failed to create booking' })

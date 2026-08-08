@@ -1,7 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { api } from '../api'
 import { Alert, Modal } from './ui'
-import { UNIT_TYPE_LABELS, type Unit } from '../types'
+import {
+  CURRENCIES,
+  CURRENCY_LABELS,
+  DEFAULT_CURRENCY,
+  UNIT_TYPE_LABELS,
+  type Currency,
+  type Unit,
+} from '../types'
 
 const DURATIONS = [1, 2, 3, 4, 6, 8, 12]
 
@@ -21,6 +28,7 @@ export default function QuickBookModal({
   const [guestName, setGuestName] = useState('')
   const [guestPhone, setGuestPhone] = useState('')
   const [hours, setHours] = useState(3)
+  const [currency, setCurrency] = useState<Currency>(DEFAULT_CURRENCY)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -36,6 +44,7 @@ export default function QuickBookModal({
           guest_name: guestName,
           guest_phone: guestPhone || null,
           hours,
+          currency,
         },
       })
       onSaved()
@@ -89,6 +98,21 @@ export default function QuickBookModal({
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="field">
+          <label htmlFor="quick-currency">Валюта</label>
+          <select
+            id="quick-currency"
+            value={currency}
+            onChange={(event) => setCurrency(event.target.value as Currency)}
+          >
+            {CURRENCIES.map((code) => (
+              <option key={code} value={code}>
+                {CURRENCY_LABELS[code]}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="modal-actions">

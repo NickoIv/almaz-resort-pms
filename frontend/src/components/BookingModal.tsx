@@ -2,7 +2,14 @@ import { useState, type FormEvent } from 'react'
 import { api } from '../api'
 import { Alert, Modal } from './ui'
 import { addDaysIso, todayIso } from '../format'
-import type { Booking, UnitStatus } from '../types'
+import {
+  CURRENCIES,
+  CURRENCY_LABELS,
+  DEFAULT_CURRENCY,
+  type Booking,
+  type Currency,
+  type UnitStatus,
+} from '../types'
 
 type Props = {
   unitId: number
@@ -44,6 +51,9 @@ export default function BookingModal({
   const [total, setTotal] = useState(String(booking?.total_amount ?? ''))
   const [prepaid, setPrepaid] = useState(String(booking?.prepaid_amount ?? ''))
   const [deposit, setDeposit] = useState(String(booking?.deposit_amount ?? ''))
+  const [currency, setCurrency] = useState<Currency>(
+    (booking?.currency as Currency) ?? DEFAULT_CURRENCY
+  )
 
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -71,6 +81,7 @@ export default function BookingModal({
               total_amount: Number(total || 0),
               prepaid_amount: Number(prepaid || 0),
               deposit_amount: Number(deposit || 0),
+              currency,
             },
           })
         }
@@ -85,6 +96,7 @@ export default function BookingModal({
                   total_amount: Number(total || 0),
                   prepaid_amount: Number(prepaid || 0),
                   deposit_amount: Number(deposit || 0),
+                  currency,
                 }
               : {}),
           },
@@ -188,16 +200,32 @@ export default function BookingModal({
                 />
               </div>
             </div>
-            <div className="field">
-              <label htmlFor="deposit">Депозит / залог</label>
-              <input
-                id="deposit"
-                type="number"
-                min="0"
-                value={deposit}
-                onChange={(event) => setDeposit(event.target.value)}
-                placeholder="0"
-              />
+            <div className="field-row">
+              <div className="field">
+                <label htmlFor="deposit">Депозит / залог</label>
+                <input
+                  id="deposit"
+                  type="number"
+                  min="0"
+                  value={deposit}
+                  onChange={(event) => setDeposit(event.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="currency">Валюта</label>
+                <select
+                  id="currency"
+                  value={currency}
+                  onChange={(event) => setCurrency(event.target.value as Currency)}
+                >
+                  {CURRENCIES.map((code) => (
+                    <option key={code} value={code}>
+                      {CURRENCY_LABELS[code]}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </>
         )}
