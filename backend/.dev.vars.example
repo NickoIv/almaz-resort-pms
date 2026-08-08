@@ -1,0 +1,18 @@
+# Copy to .dev.vars for local development (.dev.vars is gitignored).
+# In production each of these is set with:  npx wrangler secret put <NAME>
+JWT_SECRET=replace-with-a-long-random-string
+
+# WhatsApp via Green API (green-api.com) — the primary notification channel.
+# Create an instance, scan the QR with the hotel's WhatsApp, then copy:
+GREEN_API_INSTANCE_ID=
+GREEN_API_TOKEN=
+# Recipient: a phone number, or a group id ending in @g.us
+GREEN_API_CHAT_ID=
+# Optional: Green API gives each instance its own host, e.g.
+# https://7103.api.greenapi.com — leave blank to use https://api.green-api.com
+GREEN_API_URL=
+
+# Telegram — optional secondary channel, used when the notification channel
+# setting is "telegram" or "both".
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=

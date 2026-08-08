@@ -8,6 +8,13 @@ export type Bindings = {
   DB: D1Database
   JWT_SECRET: string
   /** Wrangler secrets — absent until `wrangler secret put` has been run. */
+  /** WhatsApp via Green API — the primary notification channel. */
+  GREEN_API_INSTANCE_ID?: string
+  GREEN_API_TOKEN?: string
+  GREEN_API_CHAT_ID?: string
+  /** Optional per-instance host, e.g. https://7103.api.greenapi.com */
+  GREEN_API_URL?: string
+  /** Telegram — kept as an optional secondary channel. */
   TELEGRAM_BOT_TOKEN?: string
   TELEGRAM_CHAT_ID?: string
 }

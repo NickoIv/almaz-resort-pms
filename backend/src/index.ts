@@ -2,8 +2,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { requireAuth } from './lib/auth'
-import { buildDigest, loadSettings } from './lib/notifications'
-import { sendTelegramMessage, TelegramNotConfigured } from './lib/telegram'
+import { buildDigest, loadChannel, loadSettings } from './lib/notifications'
+import { deliverDigest } from './lib/notify'
 import analyticsRoutes from './routes/analytics'
 import authRoutes from './routes/auth'
 import unitRoutes from './routes/units'
@@ -53,8 +53,9 @@ app.notFound((c) => c.json({ error: 'Not found' }, 404))
 
 /**
  * Cron handler — see the `[triggers]` block in wrangler.toml.
- * Builds the digest and posts it to Telegram; stays silent when there is
- * nothing to report, so the group is not pinged for an empty day.
+ * Builds the digest and posts it to whichever channel the admin selected
+ * (WhatsApp by default); stays silent when there is nothing to report, so the
+ * group is not pinged for an empty day.
  */
 async function scheduled(_event: ScheduledController, env: Bindings): Promise<void> {
   try {
@@ -66,17 +67,15 @@ async function scheduled(_event: ScheduledController, env: Bindings): Promise<vo
       return
     }
 
-    await sendTelegramMessage(
-      { botToken: env.TELEGRAM_BOT_TOKEN, chatId: env.TELEGRAM_CHAT_ID },
-      digest.text
-    )
-    console.log(`scheduled: sent digest with ${digest.sections} section(s)`)
+    const channel = await loadChannel(env.DB)
+    const results = await deliverDigest(env, channel, digest)
+
+    for (const result of results) {
+      if (result.sent) console.log(`scheduled: sent via ${result.channel}`)
+      else console.warn(`scheduled: ${result.channel} not sent — ${result.error}`)
+    }
   } catch (error) {
     // Never throw out of a cron run — a failed send must not retry-storm.
-    if (error instanceof TelegramNotConfigured) {
-      console.warn('scheduled: Telegram secrets are not set, skipping')
-      return
-    }
     console.error('scheduled: digest failed', error)
   }
 }

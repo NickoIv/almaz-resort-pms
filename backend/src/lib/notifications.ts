@@ -23,6 +23,13 @@ export const DEFAULT_SETTINGS: NotificationSettings = {
   notify_unpaid: true,
 }
 
+/** Where the digest goes. Telegram is retained as a secondary channel. */
+export type NotifyChannel = 'whatsapp' | 'telegram' | 'both'
+
+export const NOTIFY_CHANNELS: NotifyChannel[] = ['whatsapp', 'telegram', 'both']
+
+export const DEFAULT_CHANNEL: NotifyChannel = 'whatsapp'
+
 export async function loadSettings(db: D1Database): Promise<NotificationSettings> {
   const { results } = await db
     .prepare('SELECT key, value FROM settings')
@@ -37,12 +44,19 @@ export async function loadSettings(db: D1Database): Promise<NotificationSettings
   return settings
 }
 
-/** Telegram sends HTML, so anything guest-supplied has to be escaped. */
+export async function loadChannel(db: D1Database): Promise<NotifyChannel> {
+  const row = await db
+    .prepare("SELECT value FROM settings WHERE key = 'notify_channel'")
+    .first<{ value: string }>()
+
+  return NOTIFY_CHANNELS.includes(row?.value as NotifyChannel)
+    ? (row!.value as NotifyChannel)
+    : DEFAULT_CHANNEL
+}
+
+/** Telegram parses HTML, so anything guest-supplied must be escaped for it. */
 function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function formatMoney(amount: number): string {
@@ -65,13 +79,26 @@ type CleaningLine = {
   pending: number
 }
 
+/**
+ * The digest is built once as structured data and rendered per channel:
+ * Telegram takes HTML, WhatsApp takes its own *bold* markup, and the Settings
+ * preview takes plain text. Building HTML up front would mean un-escaping it
+ * again for the other two — which is how double-escaped text creeps in.
+ */
+export type DigestSection = {
+  icon: string
+  title: string
+  lines: string[]
+  footer?: string
+}
+
 export type Digest = {
-  sections: number
-  text: string
+  date: string
+  sections: DigestSection[]
 }
 
 /**
- * Builds the digest the cron job posts to Telegram.
+ * Builds the digest the scheduled job posts.
  * Returns null when every enabled check came back empty — a quiet day should
  * not produce a message.
  */
@@ -79,8 +106,7 @@ export async function buildDigest(
   db: D1Database,
   settings: NotificationSettings
 ): Promise<Digest | null> {
-  const parts: string[] = []
-  let sections = 0
+  const sections: DigestSection[] = []
 
   const todayRow = await db.prepare(`SELECT ${SQL_TODAY} AS today`).first<{ today: string }>()
   const today = todayRow?.today ?? new Date().toISOString().slice(0, 10)
@@ -98,17 +124,15 @@ export async function buildDigest(
       .all<BookingLine>()
 
     if (results.length > 0) {
-      sections++
-      parts.push(
-        `🛎 <b>Заезды сегодня (${results.length})</b>\n` +
-          results
-            .map(
-              (row) =>
-                `• ${escapeHtml(row.unit_name)} — ${escapeHtml(row.guest_name)}` +
-                (row.guest_phone ? ` (${escapeHtml(row.guest_phone)})` : '')
-            )
-            .join('\n')
-      )
+      sections.push({
+        icon: '🛎',
+        title: `Заезды сегодня (${results.length})`,
+        lines: results.map(
+          (row) =>
+            `${row.unit_name} — ${row.guest_name}` +
+            (row.guest_phone ? ` (${row.guest_phone})` : '')
+        ),
+      })
     }
   }
 
@@ -125,17 +149,15 @@ export async function buildDigest(
       .all<BookingLine>()
 
     if (results.length > 0) {
-      sections++
-      parts.push(
-        `🚪 <b>Выезды сегодня (${results.length})</b>\n` +
-          results
-            .map(
-              (row) =>
-                `• ${escapeHtml(row.unit_name)} — ${escapeHtml(row.guest_name)}` +
-                (row.remaining > 0 ? ` · остаток ${formatMoney(row.remaining)}` : '')
-            )
-            .join('\n')
-      )
+      sections.push({
+        icon: '🚪',
+        title: `Выезды сегодня (${results.length})`,
+        lines: results.map(
+          (row) =>
+            `${row.unit_name} — ${row.guest_name}` +
+            (row.remaining > 0 ? ` · остаток ${formatMoney(row.remaining)}` : '')
+        ),
+      })
     }
   }
 
@@ -158,13 +180,11 @@ export async function buildDigest(
       .all<CleaningLine>()
 
     if (results.length > 0) {
-      sections++
-      parts.push(
-        `🧹 <b>Просрочена уборка (${results.length})</b>\n` +
-          results
-            .map((row) => `• ${escapeHtml(row.name)} — осталось ${row.pending} пунктов`)
-            .join('\n')
-      )
+      sections.push({
+        icon: '🧹',
+        title: `Просрочена уборка (${results.length})`,
+        lines: results.map((row) => `${row.name} — осталось ${row.pending} пунктов`),
+      })
     }
   }
 
@@ -183,26 +203,53 @@ export async function buildDigest(
       .all<BookingLine>()
 
     if (results.length > 0) {
-      sections++
       const total = results.reduce((sum, row) => sum + row.remaining, 0)
-      parts.push(
-        `💰 <b>Не внесена доплата (${results.length})</b>\n` +
-          results
-            .map(
-              (row) =>
-                `• ${escapeHtml(row.unit_name)} — ${escapeHtml(row.guest_name)}: ` +
-                `${formatMoney(row.remaining)}`
-            )
-            .join('\n') +
-          `\n<i>Итого к доплате: ${formatMoney(total)}</i>`
-      )
+      sections.push({
+        icon: '💰',
+        title: `Не внесена доплата (${results.length})`,
+        lines: results.map(
+          (row) => `${row.unit_name} — ${row.guest_name}: ${formatMoney(row.remaining)}`
+        ),
+        footer: `Итого к доплате: ${formatMoney(total)}`,
+      })
     }
   }
 
-  if (sections === 0) return null
+  if (sections.length === 0) return null
+  return { date: today, sections }
+}
 
-  return {
-    sections,
-    text: `<b>Almaz Resort PMS</b> · сводка на ${today}\n\n${parts.join('\n\n')}`,
-  }
+const HEADING = 'Almaz Resort PMS'
+
+/** Telegram: HTML markup, guest-supplied text escaped. */
+export function renderTelegramHtml(digest: Digest): string {
+  const blocks = digest.sections.map((section) => {
+    const lines = section.lines.map((line) => `• ${escapeHtml(line)}`).join('\n')
+    const footer = section.footer ? `\n<i>${escapeHtml(section.footer)}</i>` : ''
+    return `${section.icon} <b>${escapeHtml(section.title)}</b>\n${lines}${footer}`
+  })
+  return `<b>${HEADING}</b> · сводка на ${digest.date}\n\n${blocks.join('\n\n')}`
+}
+
+/**
+ * WhatsApp: *bold* / _italic_, and no markup language — so nothing is escaped
+ * and a guest name goes out exactly as it was stored.
+ */
+export function renderWhatsApp(digest: Digest): string {
+  const blocks = digest.sections.map((section) => {
+    const lines = section.lines.map((line) => `• ${line}`).join('\n')
+    const footer = section.footer ? `\n_${section.footer}_` : ''
+    return `${section.icon} *${section.title}*\n${lines}${footer}`
+  })
+  return `*${HEADING}* · сводка на ${digest.date}\n\n${blocks.join('\n\n')}`
+}
+
+/** Plain text for the admin preview in Settings. */
+export function renderPlain(digest: Digest): string {
+  const blocks = digest.sections.map((section) => {
+    const lines = section.lines.map((line) => `• ${line}`).join('\n')
+    const footer = section.footer ? `\n${section.footer}` : ''
+    return `${section.icon} ${section.title}\n${lines}${footer}`
+  })
+  return `${HEADING} · сводка на ${digest.date}\n\n${blocks.join('\n\n')}`
 }

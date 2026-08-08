@@ -8,8 +8,12 @@ type NotificationKey =
   | 'notify_cleaning'
   | 'notify_unpaid'
 
+type NotifyChannel = 'whatsapp' | 'telegram' | 'both'
+
 type SettingsResponse = {
   notifications: Record<NotificationKey, boolean>
+  channel: NotifyChannel
+  whatsapp_configured: boolean
   telegram_configured: boolean
 }
 
@@ -40,11 +44,17 @@ const TOGGLES: { key: NotificationKey; icon: string; title: string; hint: string
   },
 ]
 
+const CHANNELS: { key: NotifyChannel; label: string; hint: string }[] = [
+  { key: 'whatsapp', label: 'WhatsApp', hint: 'Через Green API' },
+  { key: 'telegram', label: 'Telegram', hint: 'Резервный канал' },
+  { key: 'both', label: 'Оба', hint: 'Дублировать сообщения' },
+]
+
 export default function SettingsPage() {
   const [data, setData] = useState<SettingsResponse | null>(null)
   const [preview, setPreview] = useState<{ empty: boolean; text: string } | null>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState<NotificationKey | null>(null)
+  const [saving, setSaving] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -65,17 +75,12 @@ export default function SettingsPage() {
 
   useEffect(load, [load])
 
-  async function toggle(key: NotificationKey) {
-    if (!data) return
+  async function save(body: Record<string, unknown>, key: string) {
     setSaving(key)
     setError(null)
     setNotice(null)
     try {
-      const next = await api<SettingsResponse>('/settings', {
-        method: 'PUT',
-        body: { [key]: !data.notifications[key] },
-      })
-      setData(next)
+      setData(await api<SettingsResponse>('/settings', { method: 'PUT', body }))
       setPreview(await api('/settings/preview'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось сохранить')
@@ -89,13 +94,18 @@ export default function SettingsPage() {
     setError(null)
     setNotice(null)
     try {
-      const result = await api<{ sent: boolean; sections: number }>('/settings/test-notification', {
-        method: 'POST',
-      })
+      const result = await api<{
+        sent: boolean
+        channel: NotifyChannel
+        sections: number
+        results: { channel: string; sent: boolean; error?: string }[]
+      }>('/settings/test-notification', { method: 'POST' })
+
+      const ok = result.results.filter((r) => r.sent).map((r) => r.channel)
+      const failed = result.results.filter((r) => !r.sent)
       setNotice(
-        result.sections > 0
-          ? `Сообщение отправлено в Telegram (${result.sections} раздела).`
-          : 'Сообщение отправлено: сообщать сейчас не о чем.'
+        `Отправлено: ${ok.join(', ')}.` +
+          (failed.length > 0 ? ` Не удалось: ${failed.map((f) => f.channel).join(', ')}.` : '')
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось отправить')
@@ -106,19 +116,20 @@ export default function SettingsPage() {
 
   if (loading) return <Spinner />
 
+  const channel = data?.channel ?? 'whatsapp'
+  const needsWhatsApp = (channel === 'whatsapp' || channel === 'both') && !data?.whatsapp_configured
+  const needsTelegram = (channel === 'telegram' || channel === 'both') && !data?.telegram_configured
+  const canSend = !needsWhatsApp && !needsTelegram
+
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Настройки</h1>
-          <div className="page-sub">Уведомления в Telegram · сводка в 09:00 и 18:00</div>
+          <div className="page-sub">Уведомления персоналу · сводка в 09:00 и 18:00</div>
         </div>
         <div className="page-head-actions">
-          <button
-            className="btn btn-sm btn-primary"
-            onClick={sendTest}
-            disabled={sending || !data?.telegram_configured}
-          >
+          <button className="btn btn-sm btn-primary" onClick={sendTest} disabled={sending || !canSend}>
             {sending ? 'Отправка…' : 'Отправить тест'}
           </button>
         </div>
@@ -127,20 +138,54 @@ export default function SettingsPage() {
       {error && <Alert>{error}</Alert>}
       {notice && <div className="notice">{notice}</div>}
 
-      {data && !data.telegram_configured && (
+      {needsWhatsApp && (
         <div className="notice notice-warn">
-          Telegram пока не подключён. Задайте секреты на сервере:
-          <code>npx wrangler secret put TELEGRAM_BOT_TOKEN</code> и
-          <code>npx wrangler secret put TELEGRAM_CHAT_ID</code>. До этого рассылка не работает.
+          WhatsApp пока не подключён. Заведите инстанс на green-api.com и задайте секреты на
+          сервере: <code>npx wrangler secret put GREEN_API_INSTANCE_ID</code>,
+          <code>npx wrangler secret put GREEN_API_TOKEN</code> и
+          <code>npx wrangler secret put GREEN_API_CHAT_ID</code> (номер или id группы вида
+          <code>77011112233@c.us</code>). До этого рассылка не работает.
         </div>
       )}
 
+      {needsTelegram && (
+        <div className="notice notice-warn">
+          Telegram выбран как канал, но не подключён — задайте
+          <code>TELEGRAM_BOT_TOKEN</code> и <code>TELEGRAM_CHAT_ID</code>.
+        </div>
+      )}
+
+      <section className="panel glass" style={{ marginBottom: 18 }}>
+        <div className="panel-title">
+          Канал отправки
+          <span className="count">
+            {data?.whatsapp_configured ? 'WhatsApp подключён' : 'WhatsApp не подключён'}
+            {data?.telegram_configured ? ' · Telegram подключён' : ''}
+          </span>
+        </div>
+        <div className="chip-row">
+          {CHANNELS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={`chip ${channel === item.key ? 'active' : ''}`}
+              onClick={() => save({ channel: item.key }, item.key)}
+              disabled={saving === item.key}
+              title={item.hint}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="field-hint" style={{ marginTop: 10 }}>
+          Основной канал — WhatsApp через Green API. Telegram сохранён как резервный: выберите
+          «Оба», чтобы дублировать сводку в оба мессенджера.
+        </div>
+      </section>
+
       <div className="detail-grid">
         <section className="panel glass">
-          <div className="panel-title">
-            Какие уведомления отправлять
-            {data?.telegram_configured && <span className="count">Telegram подключён</span>}
-          </div>
+          <div className="panel-title">Какие уведомления отправлять</div>
 
           <div className="check-list">
             {TOGGLES.map((item) => {
@@ -150,7 +195,7 @@ export default function SettingsPage() {
                   key={item.key}
                   type="button"
                   className={`check-item setting-item ${on ? 'done' : ''}`}
-                  onClick={() => toggle(item.key)}
+                  onClick={() => save({ [item.key]: !on }, item.key)}
                   disabled={saving === item.key}
                 >
                   <span className="setting-icon">{item.icon}</span>
@@ -177,19 +222,11 @@ export default function SettingsPage() {
               Сейчас сообщать не о чем — заездов, выездов, просроченной уборки и долгов нет.
             </div>
           ) : (
-            <pre className="digest-preview">{stripHtml(preview?.text ?? '')}</pre>
+            // The API already returns plain text; no markup to strip.
+            <pre className="digest-preview">{preview?.text ?? ''}</pre>
           )}
         </section>
       </div>
     </>
   )
-}
-
-/** The API returns Telegram-flavoured HTML; the preview shows it as plain text. */
-function stripHtml(value: string): string {
-  return value
-    .replace(/<[^>]+>/g, '')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
 }

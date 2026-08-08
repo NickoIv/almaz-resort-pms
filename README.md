@@ -24,7 +24,7 @@ housekeeping and analytics.
 | Rooms | Status, occupancy calendar, cleaning checklist, payment / prepayment / balance, guest details |
 | Restaurant & recreation area | Sunbeds, gazebos and VIP gazebos — same model, booked by the hour |
 | Roles | Administrator, housekeeper, waiter — each with its own restricted dashboard |
-| Notifications | Check-in / check-out, overdue cleaning, unpaid balance — via a Telegram bot |
+| Notifications | Check-in / check-out, overdue cleaning, unpaid balance — via WhatsApp (Green API), Telegram optional |
 | Analytics | Revenue by rooms and by restaurant, seasonal statistics, top returning guests |
 
 ## Tech stack
@@ -33,7 +33,7 @@ housekeeping and analytics.
 - **Backend** — Cloudflare Workers + Hono (TypeScript)
 - **Database** — Cloudflare D1 (SQLite)
 - **Auth** — own implementation (phone + PIN for staff), roles stored in the database
-- **Notifications** — Telegram Bot API
+- **Notifications** — WhatsApp via Green API, with Telegram as an optional second channel
 - **Hosting** — GitHub + Cloudflare Pages, auto-deploy on push to `main`
 
 ## Repository layout
@@ -163,6 +163,28 @@ A combined group payment is stored as **one `payments` row per booking sharing a
 `group_id`**, allocated in proportion to what each booking still owes. That keeps
 the ledger per-booking (so analytics can still join through to a unit type) while
 the UI presents it back as the single payment the guest actually made.
+
+## Notifications
+
+The scheduled Worker builds one digest (check-ins and check-outs today, overdue
+cleaning, unpaid balances) and delivers it to the channel chosen on the Settings
+screen: **whatsapp** (default), **telegram**, or **both**. The choice lives in
+`settings.notify_channel`; credentials are Wrangler secrets and never touch the
+database.
+
+The digest is built as structured data and rendered per channel — WhatsApp gets
+`*bold*`, Telegram gets HTML with guest text escaped, and the Settings preview
+gets plain text. Rendering once as HTML and un-escaping it for the others is what
+produces double-escaped names, so it is deliberately avoided.
+
+WhatsApp goes through [Green API](https://green-api.com): free tier, no card, and
+no template approval because it drives a real WhatsApp account. Set
+`GREEN_API_INSTANCE_ID`, `GREEN_API_TOKEN` and `GREEN_API_CHAT_ID` (a phone
+number, or a group id ending in `@g.us`); `GREEN_API_URL` is optional and only
+needed if your instance is on a dedicated host.
+
+With `both`, each channel is attempted independently — a Telegram outage cannot
+stop the WhatsApp message.
 
 ## Analytics
 

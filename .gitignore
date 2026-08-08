@@ -13,6 +13,9 @@ build/
 .wrangler/
 .dev.vars
 .dev.vars.*
+# ...but the template listing which secrets are needed must be committed:
+# the README tells you to copy it.
+!.dev.vars.example
 wrangler.toml.bak
 worker-configuration.d.ts
 
