@@ -7,6 +7,9 @@ export type BookingStatus = 'free' | 'booked' | 'occupied'
 export type Bindings = {
   DB: D1Database
   JWT_SECRET: string
+  /** Wrangler secrets — absent until `wrangler secret put` has been run. */
+  TELEGRAM_BOT_TOKEN?: string
+  TELEGRAM_CHAT_ID?: string
 }
 
 /** Payload embedded in the signed JWT handed to staff on login. */

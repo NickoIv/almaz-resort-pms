@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage'
 import RestaurantPage from './pages/RestaurantPage'
 import RoomDetailPage from './pages/RoomDetailPage'
 import RoomsPage from './pages/RoomsPage'
+import SettingsPage from './pages/SettingsPage'
 
 /** Sends a signed-in user to their role's dashboard, everyone else to /login. */
 function RoleHome() {
@@ -65,6 +66,14 @@ export default function App() {
           element={
             <RequireRole roles={['admin']}>
               <AnalyticsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <RequireRole roles={['admin']}>
+              <SettingsPage />
             </RequireRole>
           }
         />

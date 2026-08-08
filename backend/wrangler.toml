@@ -11,3 +11,9 @@ binding = "DB"
 database_name = "almaz_resort_pms_db"
 database_id = "1430be6b-5d54-4378-a686-5c7db905f582"
 migrations_dir = "migrations"
+
+# Cron times are UTC. Almaty is UTC+5, so these fire at 09:00 and 18:00 local:
+# the morning digest before check-ins, the evening one to catch unpaid balances
+# and unfinished cleaning.
+[triggers]
+crons = ["0 4 * * *", "0 13 * * *"]

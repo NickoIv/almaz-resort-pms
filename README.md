@@ -10,6 +10,13 @@ The complex consists of:
 A single web panel gives the administrator and staff full control over bookings, payments,
 housekeeping and analytics.
 
+## Live
+
+| | |
+| --- | --- |
+| **App** | https://almaz-resort-pms.pages.dev |
+| **API** | https://almaz-resort-pms-api.nickru777.workers.dev |
+
 ## Modules
 
 | Module | Description |
@@ -46,6 +53,12 @@ housekeeping and analytics.
 | `staff_users` | Staff accounts with role and hashed PIN |
 | `payments` | Individual payment records against a booking |
 | `audit_log` | Who changed what and when |
+| `settings` | Key/value toggles for the notification digest |
+
+`payments` is the ledger: every change to what a guest has paid writes a row there,
+including the prepayment entered when a booking is created and any manual
+correction (booked as an `adjustment`, which may be negative). `bookings.prepaid_amount`
+is the cached sum. Revenue reporting reads the ledger, so the two must not drift.
 
 ## Getting started
 
@@ -92,6 +105,9 @@ stored as PBKDF2-SHA256 hashes (100k iterations); the token is signed with
 | `POST` | `/api/bookings/quick` | admin, waiter — hourly quick-booking, recreation units only |
 | `GET` `PATCH` | `/api/cleaning` | admin, housekeeper |
 | `GET` | `/api/analytics/summary?from=&to=` | admin only |
+| `GET` `PUT` | `/api/settings` | admin only — notification toggles |
+| `GET` | `/api/settings/preview` | admin only — the digest as it stands, without sending |
+| `POST` | `/api/settings/test-notification` | admin only — send the digest to Telegram now |
 
 Money amounts are stripped from every response for non-admin roles. The one
 exception is a boolean `is_paid` on the current booking — a waiter has to know
@@ -132,6 +148,106 @@ npm run db:migrate:local     # local development database
 npm run db:migrate:remote    # remote Cloudflare D1 database
 ```
 
+## Notifications
+
+A scheduled Worker posts a digest to a Telegram chat twice a day — **09:00 and
+18:00 Almaty time** (`crons = ["0 4 * * *", "0 13 * * *"]` in `wrangler.toml`,
+which is UTC). It reports:
+
+- 🛎 check-ins due today
+- 🚪 check-outs due today, with any outstanding balance
+- 🧹 overdue cleaning — units that are free right now but whose checklist is unfinished
+- 💰 unpaid balances on active and upcoming bookings
+
+Each of the four can be switched off by an admin under **Настройки**. When every
+enabled check comes back empty the job stays silent rather than posting an empty
+message. The settings screen also previews the digest as it stands and can send a
+test message on demand.
+
+### Connecting the Telegram bot
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) and copy the token.
+2. Add the bot to the group that should receive the digest, then get the chat id
+   (for a group it is negative, e.g. `-1001234567890`) — the easiest way is
+   `https://api.telegram.org/bot<TOKEN>/getUpdates` after posting a message in the group.
+3. Store both as Wrangler secrets — **never in code or in the database**:
+
+```bash
+cd backend
+npx wrangler secret put TELEGRAM_BOT_TOKEN
+npx wrangler secret put TELEGRAM_CHAT_ID
+```
+
+4. Open **Настройки** in the app and press **Отправить тест**.
+
+Until both secrets are set the cron job logs a warning and skips, and the test
+button returns a clear "Telegram не настроен" message.
+
+## Deployment
+
+Both halves live in the Cloudflare account that owns the D1 database.
+
+### One-time setup
+
+```bash
+# 1. Database
+cd backend
+npx wrangler d1 create almaz_resort_pms_db      # copy database_id into wrangler.toml
+npx wrangler d1 migrations apply DB --remote
+
+# 2. Worker secrets
+npx wrangler secret put JWT_SECRET              # a long random string
+npx wrangler secret put TELEGRAM_BOT_TOKEN      # optional, for notifications
+npx wrangler secret put TELEGRAM_CHAT_ID        # optional, for notifications
+
+# 3. Worker
+npx wrangler deploy
+
+# 4. Pages project
+cd ../frontend
+npx wrangler pages project create almaz-resort-pms --production-branch main
+```
+
+### Deploying by hand
+
+```bash
+cd backend  && npx wrangler deploy
+cd frontend && VITE_API_URL=https://almaz-resort-pms-api.nickru777.workers.dev npm run build
+npx wrangler pages deploy dist --project-name almaz-resort-pms --branch main
+```
+
+`VITE_API_URL` is baked in at build time; without it the app calls a same-origin
+`/api`, which only works behind the local dev proxy.
+
+### Automatic deployment on push to `main`
+
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) typechecks, lints and
+builds on every push, then deploys the Worker (applying D1 migrations first) and
+Pages. It needs two repository **secrets** and one **variable**:
+
+| Name | Kind | Value |
+| --- | --- | --- |
+| `CLOUDFLARE_API_TOKEN` | secret | Token with *Workers Scripts: Edit*, *Cloudflare Pages: Edit*, *D1: Edit* |
+| `CLOUDFLARE_ACCOUNT_ID` | secret | The Cloudflare account id (already set) |
+| `VITE_API_URL` | variable | Public Worker URL (already set) |
+
+Create the token at **Cloudflare dashboard → My Profile → API Tokens → Create
+Token**, then add it with:
+
+```bash
+gh secret set CLOUDFLARE_API_TOKEN
+```
+
+Until that token exists the workflow still builds and typechecks, but **skips**
+the deploy steps rather than failing.
+
+> The Pages project was created through Wrangler, so it is a direct-upload project
+> and the deploy runs through the workflow above. To use Cloudflare's own Git
+> integration instead, connect the repo under **Workers & Pages → almaz-resort-pms
+> → Settings → Builds**, set the build command to `npm run build`, the output
+> directory to `dist`, the root directory to `frontend`, and add `VITE_API_URL` as
+> a build environment variable.
+
 ## Status
 
 Work in progress.
@@ -141,4 +257,8 @@ Work in progress.
 - [x] Rooms module — dashboard grid, monthly calendar, payments, cleaning checklist
 - [x] Restaurant / recreation module — hourly booking, waiter quick-book, tabs per type
 - [x] Analytics dashboard — revenue, occupancy, month-over-month, CSV export
-- [ ] Telegram notifications and deployment
+- [x] Telegram notifications (cron digest + admin settings screen)
+- [x] Deployed to Cloudflare Workers + Pages
+
+Not done yet: `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` are not set, so no
+notification has actually been delivered — see *Connecting the Telegram bot*.

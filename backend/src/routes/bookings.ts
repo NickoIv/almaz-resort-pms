@@ -172,6 +172,16 @@ bookings.post('/', canBook, async (c) => {
 
   if (!created) throw new HTTPException(500, { message: 'Failed to create booking' })
 
+  // `payments` is the ledger analytics reads; an upfront prepayment has to land
+  // there too, or the money is invisible to every revenue report.
+  if (prepaid > 0) {
+    await c.env.DB.prepare(
+      'INSERT INTO payments (booking_id, amount, method) VALUES (?, ?, ?)'
+    )
+      .bind(created.id, prepaid, String(body.payment_method ?? 'cash'))
+      .run()
+  }
+
   await writeAudit(c.env.DB, staff.sub, 'booking.create', 'bookings', created.id)
   return c.json(serializeBooking(created, money), 201)
 })
@@ -315,6 +325,7 @@ bookings.patch('/:id/payment', requireRole('admin'), async (c) => {
       'UPDATE bookings SET total_amount = ?, prepaid_amount = ?, deposit_amount = ?, currency = ? WHERE id = ?'
     ).bind(total, prepaid, deposit, currency, id),
   ]
+
   if (paymentAmount > 0) {
     statements.push(
       c.env.DB.prepare('INSERT INTO payments (booking_id, amount, method) VALUES (?, ?, ?)').bind(
@@ -323,7 +334,19 @@ bookings.patch('/:id/payment', requireRole('admin'), async (c) => {
         String(payment?.method ?? 'cash')
       )
     )
+  } else if (prepaid !== existing.prepaid_amount) {
+    // The admin corrected the figure outright rather than adding an instalment.
+    // Book the difference so the ledger keeps matching `prepaid_amount` — the
+    // delta may be negative, which is a refund or a correction.
+    statements.push(
+      c.env.DB.prepare('INSERT INTO payments (booking_id, amount, method) VALUES (?, ?, ?)').bind(
+        id,
+        prepaid - existing.prepaid_amount,
+        'adjustment'
+      )
+    )
   }
+
   await c.env.DB.batch(statements)
 
   const updated = await c.env.DB.prepare('SELECT * FROM bookings WHERE id = ?')
