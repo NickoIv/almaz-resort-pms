@@ -51,7 +51,7 @@ export default function AuditPage() {
 
   function exportCsv() {
     if (!data) return
-    downloadCsv(`almaz-pms-audit-${todayIso()}.csv`, [
+    downloadCsv(`taura-pms-audit-${todayIso()}.csv`, [
       ['Журнал действий персонала'],
       [],
       ['Когда', 'Сотрудник', 'Роль', 'Действие', 'Объект', 'Гость', 'Код'],

@@ -1,6 +1,12 @@
-# Almaz Resort PMS
+# Taura PMS
 
-Booking and management system (PMS) for a hotel and restaurant recreation area in **Almaty, Kazakhstan**.
+Booking and management system (PMS) for **Taura**, a hotel and restaurant recreation area at
+ул. Алма-Арасан, 4а, **Almaty, Kazakhstan**.
+
+> The Cloudflare project, Worker, repository and backup format identifier still carry the
+> original `almaz-resort-pms` name. Those are infrastructure identifiers, not the business
+> name — renaming them would mint new URLs and invalidate every existing backup file, so
+> they are deliberately left alone.
 
 The complex consists of:
 

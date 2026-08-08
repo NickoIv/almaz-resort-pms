@@ -49,7 +49,7 @@ export default function AnalyticsPage() {
     const mom = data.month_over_month
 
     const rows: (string | number | null)[][] = [
-      ['Almaz Resort PMS — аналитика'],
+      ['Taura PMS — аналитика'],
       ['Период', data.range.from, data.range.to],
       [],
       ['Показатель', 'Значение'],
@@ -94,7 +94,7 @@ export default function AnalyticsPage() {
       ['Изменение', percent(mom.change, 1)],
     ]
 
-    downloadCsv(`almaz-pms-analytics-${data.range.from}_${data.range.to}.csv`, rows)
+    downloadCsv(`taura-pms-analytics-${data.range.from}_${data.range.to}.csv`, rows)
   }
 
   /**
@@ -132,7 +132,7 @@ export default function AnalyticsPage() {
         ...Object.entries(act.by_method).map(([method, sum]) => [method, sum]),
       ]
 
-      downloadCsv(`almaz-pms-payments-${act.range.from}_${act.range.to}.csv`, rows)
+      downloadCsv(`taura-pms-payments-${act.range.from}_${act.range.to}.csv`, rows)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось сформировать акт')
     } finally {

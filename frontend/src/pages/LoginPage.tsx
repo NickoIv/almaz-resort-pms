@@ -33,7 +33,7 @@ export default function LoginPage() {
     <div className="login-wrap">
       <form className="login-card glass" onSubmit={handleSubmit}>
         <div className="login-logo">◈</div>
-        <h1>Almaz Resort PMS</h1>
+        <h1>Taura PMS</h1>
         <div className="page-sub">Вход для персонала</div>
 
         {error && <Alert>{error}</Alert>}

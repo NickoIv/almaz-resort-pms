@@ -52,7 +52,7 @@ export default function RestoreModal({
     try {
       const parsed = JSON.parse(await chosen.text())
       if (parsed?.format !== 'almaz-resort-pms-backup') {
-        setError('Это не резервная копия Almaz Resort PMS')
+        setError('Это не резервная копия Taura PMS')
         return
       }
       setFile(parsed)

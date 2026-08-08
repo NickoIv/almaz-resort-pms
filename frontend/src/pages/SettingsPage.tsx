@@ -146,7 +146,7 @@ export default function SettingsPage() {
     setError(null)
     setNotice(null)
     try {
-      await downloadAuthed('/backup/export', 'almaz-pms-backup.json')
+      await downloadAuthed('/backup/export', 'taura-pms-backup.json')
       setNotice('Резервная копия скачана. Храните её вне этого компьютера.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось скачать копию')
@@ -238,7 +238,7 @@ export default function SettingsPage() {
               value={text?.hotel_name ?? ''}
               onChange={(event) => setText((t) => t && { ...t, hotel_name: event.target.value })}
               onBlur={() => text && save({ hotel_name: text.hotel_name }, 'hotel_name')}
-              placeholder="Almaz Resort"
+              placeholder="Taura"
             />
           </div>
           <div className="field">

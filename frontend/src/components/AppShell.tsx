@@ -62,7 +62,7 @@ export default function AppShell() {
         <div className="brand">
           <span className="brand-mark">◈</span>
           <span>
-            Almaz Resort
+            Taura
             <span className="brand-sub"> · PMS</span>
           </span>
         </div>

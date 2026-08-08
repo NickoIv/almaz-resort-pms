@@ -646,7 +646,7 @@ describe('§4 check-out receipt', () => {
       'GET /api/settings': {
         notifications: {}, channel: 'whatsapp', whatsapp_configured: false,
         telegram_configured: false,
-        text: { hotel_name: 'Almaz Resort', hotel_details: 'Алматы, ул. Пример 1' },
+        text: { hotel_name: 'Taura', hotel_details: 'Алматы, ул. Пример 1' },
       },
     }
   }
@@ -662,7 +662,7 @@ describe('§4 check-out receipt', () => {
     const q = within(sheet as HTMLElement)
 
     // Hotel identity comes from settings, not a hard-coded string.
-    expect(q.getByText('Almaz Resort')).toBeInTheDocument()
+    expect(q.getByText('Taura')).toBeInTheDocument()
     expect(q.getByText('Алматы, ул. Пример 1')).toBeInTheDocument()
 
     // Guest and stay.
@@ -706,7 +706,7 @@ describe('§10 review profile links', () => {
   const withUrls = (urls: Partial<Record<string, string>>) => ({
     notifications: {}, channel: 'whatsapp', whatsapp_configured: false, telegram_configured: false,
     text: {
-      hotel_name: 'Almaz Resort', hotel_details: '',
+      hotel_name: 'Taura', hotel_details: '',
       reviews_2gis_url: '', reviews_google_url: '', ...urls,
     },
   })

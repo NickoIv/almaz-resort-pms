@@ -31,7 +31,10 @@ export default function ReceiptSheet({
   payments: Payment[]
   onClose: () => void
 }) {
-  const [hotel, setHotel] = useState<TextSettings>({ hotel_name: 'Almaz Resort', hotel_details: '' })
+  const [hotel, setHotel] = useState<TextSettings>({
+    hotel_name: 'Taura',
+    hotel_details: 'ул. Алма-Арасан, 4а, Алматы',
+  })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {

@@ -139,7 +139,7 @@ export async function exportAll(db: D1Database, appVersion = 'unknown'): Promise
 
 /** A filename that sorts chronologically and is safe on every filesystem. */
 export function backupFilename(date = new Date()): string {
-  return `almaz-pms-backup-${date.toISOString().replace(/[:.]/g, '-').slice(0, 19)}Z.json`
+  return `taura-pms-backup-${date.toISOString().replace(/[:.]/g, '-').slice(0, 19)}Z.json`
 }
 
 /* ── Restore ──────────────────────────────────────────────────────────────── */
@@ -181,7 +181,7 @@ export function assertValidBackup(file: unknown): asserts file is BackupFile {
   }
   if (candidate.format !== BACKUP_FORMAT) {
     throw new RestoreError(
-      `Это не резервная копия Almaz Resort PMS (format: ${String(candidate.format)})`
+      `Это не резервная копия Taura PMS (format: ${String(candidate.format)})`
     )
   }
   if (candidate.format_version !== BACKUP_FORMAT_VERSION) {

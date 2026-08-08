@@ -35,10 +35,11 @@ export const DEFAULT_CHANNEL: NotifyChannel = 'whatsapp'
  * Kept alongside the toggles so the settings endpoint has one shape.
  */
 export const TEXT_SETTINGS = {
-  hotel_name: 'Almaz Resort',
+  hotel_name: 'Taura',
   /** Address / phone / BIN line printed under the name on a receipt. */
-  hotel_details: '',
-  reviews_2gis_url: '',
+  hotel_details: 'ул. Алма-Арасан, 4а, Алматы',
+  reviews_2gis_url:
+    'https://2gis.kz/almaty/geo/9429940001542859/76.908229,43.126376',
   reviews_google_url: '',
 } as const
 
@@ -251,7 +252,7 @@ export async function buildDigest(
   return { date: today, sections }
 }
 
-const HEADING = 'Almaz Resort PMS'
+const HEADING = 'Taura PMS'
 
 /** Telegram: HTML markup, guest-supplied text escaped. */
 export function renderTelegramHtml(digest: Digest): string {
