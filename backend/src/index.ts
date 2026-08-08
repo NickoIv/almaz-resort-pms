@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { requireAuth } from './lib/auth'
+import { backupFilename, exportAll } from './lib/backup'
+import { backupStore, DAILY_PREFIX, pruneDaily } from './lib/backup-store'
 import { buildDigest, loadChannel, loadSettings } from './lib/notifications'
 import { deliverDigest } from './lib/notify'
 import analyticsRoutes from './routes/analytics'
@@ -68,7 +70,49 @@ app.notFound((c) => c.json({ error: 'Not found' }, 404))
  * (WhatsApp by default); stays silent when there is nothing to report, so the
  * group is not pinged for an empty day.
  */
-async function scheduled(_event: ScheduledController, env: Bindings): Promise<void> {
+/** Cron expression for the daily backup — see `[triggers]` in wrangler.toml. */
+const BACKUP_CRON = '15 4 * * *'
+
+/**
+ * Writes a dated snapshot to the backup store and prunes older ones.
+ * Runs on its own cron so a failing digest cannot take the backup down with it.
+ */
+async function runDailyBackup(env: Bindings): Promise<void> {
+  const store = backupStore(env)
+  if (!store) {
+    console.warn('daily backup: no BACKUPS binding, skipping')
+    return
+  }
+
+  const file = await exportAll(env.DB, env.APP_VERSION ?? 'unknown')
+  const body = JSON.stringify(file)
+
+  // KV caps a value at 25 MiB; warn well before that becomes a surprise.
+  const megabytes = body.length / 1_048_576
+  if (store.kind === 'kv' && megabytes > 20) {
+    console.error(`daily backup: ${megabytes.toFixed(1)} MiB is near KV's 25 MiB limit — move to R2`)
+  }
+
+  const key = `${DAILY_PREFIX}${backupFilename()}`
+  await store.put(key, body)
+
+  const pruned = await pruneDaily(store)
+  console.log(
+    `daily backup: wrote ${key} (${Math.round(body.length / 1024)} KiB, ${store.kind})` +
+      (pruned.length > 0 ? `, pruned ${pruned.length}` : '')
+  )
+}
+
+async function scheduled(event: ScheduledController, env: Bindings): Promise<void> {
+  if (event.cron === BACKUP_CRON) {
+    try {
+      await runDailyBackup(env)
+    } catch (error) {
+      console.error('daily backup failed', error)
+    }
+    return
+  }
+
   try {
     const settings = await loadSettings(env.DB)
     const digest = await buildDigest(env.DB, settings)

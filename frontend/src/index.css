@@ -1914,6 +1914,40 @@ button {
   color: var(--text-faint);
 }
 
+/* ── Restore preview ───────────────────────────────────────────────────────── */
+
+.restore-preview {
+  margin-bottom: 16px;
+  padding: 13px 15px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border-soft);
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 12.5px;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.restore-preview .info-row {
+  padding: 2px 0;
+}
+
+.field input[type='file'] {
+  padding: 9px 12px;
+  font-size: 13px;
+}
+
+.field input[type='file']::file-selector-button {
+  margin-right: 12px;
+  padding: 6px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
 /* ── Staff management ──────────────────────────────────────────────────────── */
 
 .staff-list {

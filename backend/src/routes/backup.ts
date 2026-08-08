@@ -1,7 +1,10 @@
 import { Hono } from 'hono'
+import { HTTPException } from 'hono/http-exception'
 import { requireRole } from '../lib/auth'
+import { readJson } from '../lib/body'
 import { writeAudit } from '../lib/audit'
-import { backupFilename, exportAll } from '../lib/backup'
+import { backupFilename, exportAll, RestoreError, restoreAll } from '../lib/backup'
+import { backupStore, DAILY_PREFIX, RETENTION } from '../lib/backup-store'
 import type { AppEnv } from '../types'
 
 const backup = new Hono<AppEnv>()
@@ -26,6 +29,81 @@ backup.get('/export', async (c) => {
       // A snapshot of live data must never sit in a cache.
       'Cache-Control': 'no-store',
     },
+  })
+})
+
+/** GET /api/backup/stored — the daily snapshots currently kept. */
+backup.get('/stored', async (c) => {
+  const store = backupStore(c.env)
+  if (!store) return c.json({ configured: false, kind: null, backups: [] })
+
+  const backups = await store.list(DAILY_PREFIX)
+  return c.json({
+    configured: true,
+    kind: store.kind,
+    retention: RETENTION,
+    backups: backups.sort((a, b) => b.key.localeCompare(a.key)),
+  })
+})
+
+/** The admin has to type this exactly; a stray click cannot wipe the database. */
+const CONFIRMATION = 'ВОССТАНОВИТЬ'
+
+/**
+ * POST /api/backup/restore — replace the database from an uploaded file.
+ *
+ * Destructive, so it needs the typed confirmation, and it takes a snapshot of
+ * the current state first: the whole point of this feature is that D1 has no
+ * undo, and a restore is itself something you might want to undo.
+ */
+backup.post('/restore', async (c) => {
+  const staff = c.get('staff')
+  const body = await readJson<{ confirm: string; backup: unknown }>(c)
+
+  if (body.confirm !== CONFIRMATION) {
+    throw new HTTPException(400, {
+      message: `Для подтверждения введите ${CONFIRMATION}`,
+    })
+  }
+  if (!body.backup) {
+    throw new HTTPException(400, { message: 'Не приложен файл резервной копии' })
+  }
+
+  // Safety net before anything destructive happens.
+  let snapshotKey: string | null = null
+  try {
+    const store = backupStore(c.env)
+    if (store) {
+      const current = await exportAll(c.env.DB, c.env.APP_VERSION ?? 'unknown')
+      snapshotKey = `pre-restore/${backupFilename()}`
+      await store.put(snapshotKey, JSON.stringify(current))
+    }
+  } catch (error) {
+    console.error('pre-restore snapshot failed', error)
+    snapshotKey = null
+  }
+
+  let report
+  try {
+    report = await restoreAll(c.env.DB, body.backup, staff.sub)
+  } catch (error) {
+    if (error instanceof RestoreError) {
+      throw new HTTPException(400, { message: error.message })
+    }
+    // The batch is atomic, so a failure here left the database as it was.
+    throw new HTTPException(500, {
+      message: `Восстановление не выполнено, данные не изменены: ${
+        error instanceof Error ? error.message : 'неизвестная ошибка'
+      }`,
+    })
+  }
+
+  await writeAudit(c.env.DB, staff.sub, 'backup.restore', 'settings', null)
+
+  return c.json({
+    ok: true,
+    pre_restore_snapshot: snapshotKey,
+    ...report,
   })
 })
 

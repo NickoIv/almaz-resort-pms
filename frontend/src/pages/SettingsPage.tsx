@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, downloadAuthed } from '../api'
+import RestoreModal from '../components/RestoreModal'
 import { Alert, Spinner } from '../components/ui'
 
 type NotificationKey =
@@ -9,6 +10,13 @@ type NotificationKey =
   | 'notify_unpaid'
 
 type NotifyChannel = 'whatsapp' | 'telegram' | 'both'
+
+type StoredBackups = {
+  configured: boolean
+  kind: 'kv' | 'r2' | null
+  retention?: number
+  backups: { key: string; uploaded: string | null; size: number | null }[]
+}
 
 type SettingsResponse = {
   notifications: Record<NotificationKey, boolean>
@@ -57,6 +65,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [restoring, setRestoring] = useState(false)
+  const [stored, setStored] = useState<StoredBackups | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -65,10 +75,12 @@ export default function SettingsPage() {
     Promise.all([
       api<SettingsResponse>('/settings'),
       api<{ empty: boolean; sections: number; text: string }>('/settings/preview'),
+      api<StoredBackups>('/backup/stored').catch(() => null),
     ])
-      .then(([settings, digest]) => {
+      .then(([settings, digest, backups]) => {
         setData(settings)
         setPreview(digest)
+        setStored(backups)
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
@@ -209,7 +221,24 @@ export default function SettingsPage() {
           <button className="btn btn-sm" onClick={downloadBackup} disabled={downloading}>
             {downloading ? 'Готовим файл…' : 'Скачать резервную копию'}
           </button>
+          <button className="btn btn-sm btn-danger" onClick={() => setRestoring(true)}>
+            Восстановить из копии
+          </button>
         </div>
+
+        {stored && (
+          <div className="field-hint" style={{ marginTop: 14 }}>
+            {stored.configured ? (
+              <>
+                Автоматические копии ({stored.kind === 'kv' ? 'Workers KV' : 'R2'}): хранится{' '}
+                {stored.backups.length} из {stored.retention}, ежедневно в 09:15.
+                {stored.backups[0] && <> Последняя: {stored.backups[0].key.split('/').pop()}.</>}
+              </>
+            ) : (
+              <>Автоматические копии не настроены — хранилище не подключено.</>
+            )}
+          </div>
+        )}
       </section>
 
       <div className="detail-grid">
@@ -256,6 +285,10 @@ export default function SettingsPage() {
           )}
         </section>
       </div>
+
+      {restoring && (
+        <RestoreModal onClose={() => setRestoring(false)} onRestored={load} />
+      )}
     </>
   )
 }

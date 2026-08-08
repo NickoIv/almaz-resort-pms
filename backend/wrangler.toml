@@ -6,14 +6,32 @@ compatibility_flags = ["nodejs_compat"]
 [observability]
 enabled = true
 
+[vars]
+APP_VERSION = "2026.08"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "almaz_resort_pms_db"
 database_id = "1430be6b-5d54-4378-a686-5c7db905f582"
 migrations_dir = "migrations"
 
+# Daily backups. KV is used because it works on the free plan with no card;
+# R2 must be switched on in the Cloudflare dashboard first.
+[[kv_namespaces]]
+binding = "BACKUPS"
+id = "4b98c535f0814302b915778342ee57be"
+
+# To move backups to R2 instead: enable R2 in the dashboard, run
+#   npx wrangler r2 bucket create almaz-resort-pms-backups
+# then uncomment the block below. The code prefers R2 whenever it is bound,
+# so nothing else needs to change.
+# [[r2_buckets]]
+# binding = "BACKUPS_R2"
+# bucket_name = "almaz-resort-pms-backups"
+
 # Cron times are UTC. Almaty is UTC+5, so these fire at 09:00 and 18:00 local:
 # the morning digest before check-ins, the evening one to catch unpaid balances
-# and unfinished cleaning.
+# and unfinished cleaning. The third takes the daily backup at 09:15 local,
+# just after the morning digest.
 [triggers]
-crons = ["0 4 * * *", "0 13 * * *"]
+crons = ["0 4 * * *", "0 13 * * *", "15 4 * * *"]

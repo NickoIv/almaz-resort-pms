@@ -166,6 +166,111 @@ A combined group payment is stored as **one `payments` row per booking sharing a
 the ledger per-booking (so analytics can still join through to a unit type) while
 the UI presents it back as the single payment the guest actually made.
 
+## Backups and restore
+
+Cloudflare D1 has no undo and no point-in-time recovery on the free plan. A
+deleted booking is gone unless there is a snapshot, so this project keeps two:
+
+| | |
+| --- | --- |
+| **Manual** | Настройки → «Скачать резервную копию» — one JSON file with every table |
+| **Automatic** | A cron trigger at 09:15 Almaty writes a dated snapshot and keeps the last 7 |
+
+Automatic snapshots go to **Workers KV** (binding `BACKUPS`), chosen because it
+works on the free plan with no card. R2 is supported too and takes priority
+whenever it is bound — enable R2 in the dashboard, run
+`npx wrangler r2 bucket create almaz-resort-pms-backups`, then uncomment the
+`[[r2_buckets]]` block in `wrangler.toml`. Nothing else changes; KV's 25 MiB
+per-value ceiling is the reason to move once the database grows (the job logs a
+warning past 20 MiB).
+
+### What the file contains
+
+Every table, parents first, plus `format_version` for the file's own shape and
+`schema_version` — the newest applied migration — for the database layout that
+produced it.
+
+**`staff_users` carries no PIN hashes.** A backup should not double as a
+credential store. On restore that means:
+
+- a staff row whose `id` already exists keeps its current PIN, and takes the
+  backup's name, phone and role
+- a row that is new is created **disabled**, with an unusable PIN — set one from
+  the Персонал page
+- staff who exist now but are absent from the backup are **left alone**; they
+  may have been added after it was taken
+- the admin performing the restore is never disabled by it
+
+Without those rules a restore from an older file would lock everyone out.
+
+### Restoring through the UI
+
+Настройки → «Восстановить из копии», choose the file, type `ВОССТАНОВИТЬ`. The
+file is summarised before the button unlocks so you can see what you are about
+to replace. The current state is snapshotted to `pre-restore/` first — a restore
+is itself something you may want to undo.
+
+Atomicity: D1 exposes no interactive transaction, so the whole restore is issued
+as a single `db.batch()`, which D1 runs as one implicit transaction. It either
+lands completely or leaves the database untouched. That is also why a backup
+above 50 000 rows is refused rather than split across batches — splitting would
+silently lose the guarantee. Use the CLI path below for a database that large.
+
+### Disaster recovery from the CLI
+
+For when the app itself will not start — a bad deploy, a wiped database, or a
+backup too large for the UI path. Everything below runs from `backend/`.
+
+**1. List what is stored**
+
+```bash
+npx wrangler kv key list --binding BACKUPS --remote --prefix daily/
+# with R2 instead:
+npx wrangler r2 object list almaz-resort-pms-backups --prefix daily/
+```
+
+**2. Pull one down**
+
+```bash
+npx wrangler kv key get --binding BACKUPS --remote   "daily/almaz-pms-backup-2026-08-08T04-15-00Z.json" > backup.json
+
+# with R2 instead:
+npx wrangler r2 object get almaz-resort-pms-backups/daily/<name>.json --file backup.json
+```
+
+**3. Rebuild the schema if the database is gone**
+
+```bash
+npx wrangler d1 migrations apply DB --remote
+```
+
+**4. Turn the JSON into SQL and load it**
+
+`scripts/backup-to-sql.mjs` converts a backup file into an idempotent SQL
+script — deletes then inserts, in dependency order, wrapped in a transaction:
+
+```bash
+node scripts/backup-to-sql.mjs backup.json > restore.sql
+npx wrangler d1 execute DB --remote --file restore.sql
+```
+
+PIN hashes are not in the file, so staff rows are written with
+`ON CONFLICT(id) DO UPDATE` that leaves `pin_code_hash` alone. If the
+`staff_users` table itself was lost, every account comes back disabled with no
+usable PIN — recover admin access with:
+
+```bash
+# Generate a hash for a PIN you choose, then set it directly.
+node scripts/hash-pin.mjs 4821
+npx wrangler d1 execute DB --remote --command   "UPDATE staff_users SET pin_code_hash = '<paste hash>', is_active = 1 WHERE phone = '+7...'"
+```
+
+**5. Confirm**
+
+```bash
+npx wrangler d1 execute DB --remote --command   "SELECT (SELECT COUNT(*) FROM units) AS units, (SELECT COUNT(*) FROM bookings) AS bookings;"
+```
+
 ## Notifications
 
 The scheduled Worker builds one digest (check-ins and check-outs today, overdue
@@ -187,6 +292,53 @@ needed if your instance is on a dedicated host.
 
 With `both`, each channel is attempted independently — a Telegram outage cannot
 stop the WhatsApp message.
+
+The digest reports:
+
+- 🛎 check-ins due today
+- 🚪 check-outs due today, with any outstanding balance
+- 🧹 overdue cleaning — units free right now whose checklist is unfinished
+- 💰 unpaid balances on active and upcoming bookings
+
+Each of the four can be switched off by an admin under **Настройки**. When every
+enabled check comes back empty the job stays silent rather than posting an empty
+message. The settings screen previews the digest as it stands and can send a test
+message on demand.
+
+Schedule: **09:00 and 18:00 Almaty time** — `crons = ["0 4 * * *", "0 13 * * *"]`
+in `wrangler.toml`, which is UTC. The third entry, `15 4 * * *`, is the daily
+backup.
+
+### Connecting WhatsApp (Green API)
+
+1. Create an instance at [green-api.com](https://green-api.com) and scan the QR
+   with the phone that should send the messages.
+2. Copy the instance id and token; decide the recipient — a phone number, or a
+   group id ending in `@g.us`.
+3. Store them as Wrangler secrets — **never in code or in the database**:
+
+```bash
+cd backend
+npx wrangler secret put GREEN_API_INSTANCE_ID
+npx wrangler secret put GREEN_API_TOKEN
+npx wrangler secret put GREEN_API_CHAT_ID
+# only if your instance is on a dedicated host:
+npx wrangler secret put GREEN_API_URL
+```
+
+4. Open **Настройки** and press **Отправить тест**.
+
+### Connecting Telegram (optional second channel)
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) and copy the token.
+2. Add it to the group, then read the chat id (negative for a group) from
+   `https://api.telegram.org/bot<TOKEN>/getUpdates` after posting there.
+3. `npx wrangler secret put TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+4. Switch the channel to **Telegram** or **Оба** under Настройки.
+
+Until a channel's secrets are set the cron job logs a warning and skips it, and
+the test button returns a clear "не настроен" message.
+
 
 ## Analytics
 
@@ -211,41 +363,6 @@ cd backend
 npm run db:migrate:local     # local development database
 npm run db:migrate:remote    # remote Cloudflare D1 database
 ```
-
-## Notifications
-
-A scheduled Worker posts a digest to a Telegram chat twice a day — **09:00 and
-18:00 Almaty time** (`crons = ["0 4 * * *", "0 13 * * *"]` in `wrangler.toml`,
-which is UTC). It reports:
-
-- 🛎 check-ins due today
-- 🚪 check-outs due today, with any outstanding balance
-- 🧹 overdue cleaning — units that are free right now but whose checklist is unfinished
-- 💰 unpaid balances on active and upcoming bookings
-
-Each of the four can be switched off by an admin under **Настройки**. When every
-enabled check comes back empty the job stays silent rather than posting an empty
-message. The settings screen also previews the digest as it stands and can send a
-test message on demand.
-
-### Connecting the Telegram bot
-
-1. Create a bot with [@BotFather](https://t.me/BotFather) and copy the token.
-2. Add the bot to the group that should receive the digest, then get the chat id
-   (for a group it is negative, e.g. `-1001234567890`) — the easiest way is
-   `https://api.telegram.org/bot<TOKEN>/getUpdates` after posting a message in the group.
-3. Store both as Wrangler secrets — **never in code or in the database**:
-
-```bash
-cd backend
-npx wrangler secret put TELEGRAM_BOT_TOKEN
-npx wrangler secret put TELEGRAM_CHAT_ID
-```
-
-4. Open **Настройки** in the app and press **Отправить тест**.
-
-Until both secrets are set the cron job logs a warning and skips, and the test
-button returns a clear "Telegram не настроен" message.
 
 ## Deployment
 
