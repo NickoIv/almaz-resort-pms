@@ -2,14 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import BookingModal from '../components/BookingModal'
 import GroupBookingModal from '../components/GroupBookingModal'
 import OccupancyForecast from '../components/OccupancyForecast'
+import RoomTimeline from '../components/RoomTimeline'
 import UnitCard from '../components/UnitCard'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
 import { matchesQuery } from '../search'
 import type { Unit, UnitStatus } from '../types'
 
 type StatusFilter = UnitStatus | 'all' | 'cleaning'
+
+type View = 'cards' | 'timeline'
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'Все' },
@@ -30,6 +34,9 @@ export default function RoomsPage() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [showGroup, setShowGroup] = useState(false)
+  const [view, setView] = useState<View>('cards')
+  // Set when an empty timeline cell is clicked: which room, and which day.
+  const [newBooking, setNewBooking] = useState<{ unitId: number; date: string } | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -78,6 +85,20 @@ export default function RoomsPage() {
           </div>
         </div>
         <div className="page-head-actions">
+          <div className="view-switch" role="group" aria-label="Вид">
+            <button
+              className={`view-btn ${view === 'cards' ? 'active' : ''}`}
+              onClick={() => setView('cards')}
+            >
+              Карточки
+            </button>
+            <button
+              className={`view-btn ${view === 'timeline' ? 'active' : ''}`}
+              onClick={() => setView('timeline')}
+            >
+              Таймлайн
+            </button>
+          </div>
           {isAdmin && (
             <button className="btn btn-sm btn-primary" onClick={() => setShowGroup(true)}>
               Групповая бронь
@@ -89,81 +110,108 @@ export default function RoomsPage() {
         </div>
       </div>
 
-      <div className="toolbar">
-        <div className="search">
-          <span className="search-icon">⌕</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Поиск: гость, телефон, дата заезда…"
-            aria-label="Поиск по гостю, телефону или дате заезда"
-          />
-          {query && (
-            <button className="search-clear" onClick={() => setQuery('')} aria-label="Очистить">
-              ×
-            </button>
-          )}
-        </div>
-
-        <div className="chip-row">
-          {STATUS_FILTERS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={`chip ${status === item.key ? 'active' : ''}`}
-              onClick={() => setStatus(item.key)}
-            >
-              {item.key !== 'all' && (
-                <StatusDot status={item.key === 'cleaning' ? 'cleaning' : item.key} />
-              )}
-              {item.label}
-              <span className="chip-count">{counts[item.key]}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {isAdmin && <OccupancyForecast />}
-
-      {error && <Alert>{error}</Alert>}
-
-      {loading ? (
-        <Spinner />
-      ) : units.length === 0 ? (
-        <EmptyState icon="🏨">Номера не найдены</EmptyState>
-      ) : visible.length === 0 ? (
-        <EmptyState icon="🔍">
-          Ничего не найдено
-          <div style={{ marginTop: 12 }}>
-            <button
-              className="btn btn-sm"
-              onClick={() => {
-                setQuery('')
-                setStatus('all')
-              }}
-            >
-              Сбросить фильтры
-            </button>
-          </div>
-        </EmptyState>
+      {view === 'timeline' ? (
+        <RoomTimeline
+          onOpenRoom={(unitId) => navigate(`/rooms/${unitId}`)}
+          onNewBooking={(unitId, date) => setNewBooking({ unitId, date })}
+        />
       ) : (
         <>
-          {filtered && (
-            <div className="result-line">
-              Показано {visible.length} из {units.length}
+          <div className="toolbar">
+            <div className="search">
+              <span className="search-icon">⌕</span>
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Поиск: гость, телефон, дата заезда…"
+                aria-label="Поиск по гостю, телефону или дате заезда"
+              />
+              {query && (
+                <button className="search-clear" onClick={() => setQuery('')} aria-label="Очистить">
+                  ×
+                </button>
+              )}
             </div>
-          )}
-          <div className="unit-grid">
-            {visible.map((unit) => (
-              <UnitCard key={unit.id} unit={unit} onOpen={(u) => navigate(`/rooms/${u.id}`)} />
-            ))}
+
+            <div className="chip-row">
+              {STATUS_FILTERS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={`chip ${status === item.key ? 'active' : ''}`}
+                  onClick={() => setStatus(item.key)}
+                >
+                  {item.key !== 'all' && (
+                    <StatusDot status={item.key === 'cleaning' ? 'cleaning' : item.key} />
+                  )}
+                  {item.label}
+                  <span className="chip-count">{counts[item.key]}</span>
+                </button>
+              ))}
+            </div>
           </div>
+
+          {isAdmin && <OccupancyForecast />}
+
+          {error && <Alert>{error}</Alert>}
+
+          {loading ? (
+            <Spinner />
+          ) : units.length === 0 ? (
+            <EmptyState icon="🏨">Номера не найдены</EmptyState>
+          ) : visible.length === 0 ? (
+            <EmptyState icon="🔍">
+              Ничего не найдено
+              <div style={{ marginTop: 12 }}>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => {
+                    setQuery('')
+                    setStatus('all')
+                  }}
+                >
+                  Сбросить фильтры
+                </button>
+              </div>
+            </EmptyState>
+          ) : (
+            <>
+              {filtered && (
+                <div className="result-line">
+                  Показано {visible.length} из {units.length}
+                </div>
+              )}
+              <div className="unit-grid">
+                {visible.map((unit) => (
+                  <UnitCard key={unit.id} unit={unit} onOpen={(u) => navigate(`/rooms/${u.id}`)} />
+                ))}
+              </div>
+            </>
+          )}
         </>
       )}
 
       {showGroup && (
         <GroupBookingModal onClose={() => setShowGroup(false)} onSaved={load} />
+      )}
+
+      {/* Opened from an empty timeline cell, pre-filled with that room and day.
+          It is the same form the card view uses — the timeline adds a way in,
+          not a second booking path. */}
+      {newBooking && (
+        <BookingModal
+          unitId={newBooking.unitId}
+          unitType="room"
+          booking={null}
+          canSetPrice={isAdmin}
+          initialFrom={newBooking.date}
+          onClose={() => setNewBooking(null)}
+          onSaved={() => {
+            setNewBooking(null)
+            load()
+          }}
+        />
       )}
     </>
   )

@@ -23,6 +23,11 @@ type Props = {
   canSetPrice: boolean
   /** Recreation units are sold by the hour, so the form switches to date+time. */
   hourly?: boolean
+  /**
+   * Pre-fills the start date. The timeline opens this form on whichever day
+   * was clicked, which is the whole point of clicking an empty cell.
+   */
+  initialFrom?: string
   onClose: () => void
   onSaved: () => void
 }
@@ -44,11 +49,13 @@ export default function BookingModal({
   booking,
   canSetPrice,
   hourly = false,
+  initialFrom,
   onClose,
   onSaved,
 }: Props) {
-  const defaultFrom = hourly ? `${todayIso()}T12:00` : todayIso()
-  const defaultTo = hourly ? `${todayIso()}T16:00` : addDaysIso(todayIso(), 1)
+  const start = initialFrom ?? todayIso()
+  const defaultFrom = hourly ? `${start}T12:00` : start
+  const defaultTo = hourly ? `${start}T16:00` : addDaysIso(start, 1)
 
   const [guestName, setGuestName] = useState(booking?.guest_name ?? '')
   const [guestPhone, setGuestPhone] = useState(booking?.guest_phone ?? '')

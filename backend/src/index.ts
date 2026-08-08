@@ -10,6 +10,7 @@ import analyticsRoutes from './routes/analytics'
 import auditRoutes from './routes/audit'
 import authRoutes from './routes/auth'
 import backupRoutes from './routes/backup'
+import roomRoutes from './routes/rooms'
 import unitRoutes from './routes/units'
 import bookingRoutes from './routes/bookings'
 import cleaningRoutes from './routes/cleaning'
@@ -46,9 +47,11 @@ app.use('/api/staff', requireAuth)
 app.use('/api/staff/*', requireAuth)
 app.use('/api/backup/*', requireAuth)
 app.use('/api/photos/*', requireAuth)
+app.use('/api/rooms/*', requireAuth)
 app.use('/api/waitlist', requireAuth)
 app.use('/api/waitlist/*', requireAuth)
 
+app.route('/api/rooms', roomRoutes)
 app.route('/api/units', unitRoutes)
 app.route('/api/bookings', bookingRoutes)
 app.route('/api/cleaning', cleaningRoutes)

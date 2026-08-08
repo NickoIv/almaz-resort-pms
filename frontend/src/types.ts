@@ -276,3 +276,29 @@ export type WaitlistEntry = {
   /** Requested dates already in the past. */
   is_stale?: boolean
 }
+
+/** One bar on the room timeline. Dates are the booking's true range. */
+export type TimelineBooking = {
+  id: number
+  guest_name: string | null
+  status: UnitStatus
+  date_from: string
+  date_to: string
+}
+
+export type TimelineRoom = {
+  unit_id: number
+  unit_name: string
+  category: string | null
+  capacity: number
+  bookings: TimelineBooking[]
+}
+
+export type RoomTimeline = {
+  from: string
+  days: number
+  /** The server's cap, so the UI never offers a window it would clamp. */
+  max_days: number
+  dates: string[]
+  rooms: TimelineRoom[]
+}
