@@ -51,7 +51,9 @@ export default function AnalyticsPage() {
       ['Период', data.range.from, data.range.to],
       [],
       ['Показатель', 'Значение'],
-      ['Общая выручка', data.totals.revenue],
+      ['Получено (оплачено)', data.totals.revenue],
+      ['Начислено по броням', data.totals.accrued],
+      ['Не оплачено', data.totals.outstanding],
       ['Выручка — номера', data.by_category.rooms],
       ['Выручка — зона отдыха', data.by_category.restaurant],
       ['Загрузка номеров', percent(data.occupancy.rate, 1)],
@@ -133,10 +135,31 @@ export default function AnalyticsPage() {
         <>
           <div className="stat-row">
             <div className="stat glass">
-              <div className="stat-label">Общая выручка</div>
+              <div className="stat-label">Получено</div>
               <div className="stat-value">{money(data.totals.revenue)}</div>
               <div className="stat-foot">
                 {data.totals.payments} платежей · {data.totals.bookings} броней
+              </div>
+            </div>
+
+            {/* Collected money on its own reads as "0 ₸ despite active bookings"
+                whenever guests have booked but not yet paid. These two make the
+                difference explicit. */}
+            <div className="stat glass">
+              <div className="stat-label">Начислено по броням</div>
+              <div className="stat-value">{money(data.totals.accrued)}</div>
+              <div className="stat-foot">стоимость броней за период, включая начисления</div>
+            </div>
+
+            <div className="stat glass">
+              <div className="stat-label">Не оплачено</div>
+              <div className={`stat-value ${data.totals.outstanding > 0 ? 'money-due' : ''}`}>
+                {money(data.totals.outstanding)}
+              </div>
+              <div className="stat-foot">
+                {data.totals.accrued > 0
+                  ? `${percent(data.totals.revenue / data.totals.accrued)} собрано`
+                  : 'нет броней за период'}
               </div>
             </div>
 

@@ -6,6 +6,7 @@ import { readJson } from '../lib/body'
 import { resetChecklist } from '../lib/cleaning'
 import { writeAudit } from '../lib/audit'
 import { chargesSumSql, remainingOf } from '../lib/money'
+import { cleanName, cleanOptional } from '../lib/text'
 import { addHours, almatyNow } from '../lib/time'
 import type { AppEnv, BookingStatus, UnitType } from '../types'
 
@@ -128,7 +129,7 @@ bookings.post('/', canBook, async (c) => {
   const body = await readJson(c)
 
   const unitId = Number(body.unit_id)
-  const guestName = String(body.guest_name ?? '').trim()
+  const guestName = cleanName(body.guest_name)
   const dateFrom = String(body.date_from ?? '').trim()
   const dateTo = String(body.date_to ?? '').trim()
 
@@ -167,7 +168,7 @@ bookings.post('/', canBook, async (c) => {
     .bind(
       unitId,
       guestName,
-      body.guest_phone ? String(body.guest_phone) : null,
+      cleanOptional(body.guest_phone, 40),
       dateFrom,
       dateTo,
       status,
@@ -204,7 +205,7 @@ bookings.post('/quick', canBook, async (c) => {
   const body = await readJson(c)
 
   const unitId = Number(body.unit_id)
-  const guestName = String(body.guest_name ?? '').trim()
+  const guestName = cleanName(body.guest_name)
   const hours = Number(body.hours ?? 0)
 
   if (!Number.isInteger(unitId) || !guestName) {
@@ -231,7 +232,7 @@ bookings.post('/quick', canBook, async (c) => {
      VALUES (?, ?, ?, ?, ?, 'occupied', 'KZT')
      RETURNING *`
   )
-    .bind(unitId, guestName, body.guest_phone ? String(body.guest_phone) : null, dateFrom, dateTo)
+    .bind(unitId, guestName, cleanOptional(body.guest_phone, 40), dateFrom, dateTo)
     .first<BookingRow>()
 
   if (!created) throw new HTTPException(500, { message: 'Failed to create booking' })
@@ -253,8 +254,8 @@ bookings.post('/group', canBook, async (c) => {
   const body = await readJson(c)
 
   const unitIds = Array.isArray(body.unit_ids) ? body.unit_ids.map(Number) : []
-  const name = String(body.name ?? '').trim()
-  const guestName = String(body.guest_name ?? '').trim()
+  const name = cleanName(body.name)
+  const guestName = cleanName(body.guest_name)
   const dateFrom = String(body.date_from ?? '').trim()
   const dateTo = String(body.date_to ?? '').trim()
 
@@ -304,7 +305,7 @@ bookings.post('/group', canBook, async (c) => {
     .bind(
       name,
       guestName,
-      body.guest_phone ? String(body.guest_phone) : null,
+      cleanOptional(body.guest_phone, 40),
       body.note ? String(body.note) : null,
       staff.sub
     )
@@ -334,7 +335,7 @@ bookings.post('/group', canBook, async (c) => {
       .bind(
         unit.id,
         guestName,
-        body.guest_phone ? String(body.guest_phone) : null,
+        cleanOptional(body.guest_phone, 40),
         dateFrom,
         dateTo,
         status,
@@ -488,13 +489,10 @@ bookings.patch('/:id', canBook, async (c) => {
 
   const body = await readJson(c)
 
-  const guestName = body.guest_name === undefined ? existing.guest_name : String(body.guest_name)
+  const guestName =
+    body.guest_name === undefined ? existing.guest_name : cleanName(body.guest_name)
   const guestPhone =
-    body.guest_phone === undefined
-      ? existing.guest_phone
-      : body.guest_phone === null
-        ? null
-        : String(body.guest_phone)
+    body.guest_phone === undefined ? existing.guest_phone : cleanOptional(body.guest_phone, 40)
   const dateFrom = body.date_from === undefined ? existing.date_from : String(body.date_from)
   const dateTo = body.date_to === undefined ? existing.date_to : String(body.date_to)
   const status = (body.status === undefined ? existing.status : body.status) as BookingStatus

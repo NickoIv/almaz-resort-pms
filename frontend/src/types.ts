@@ -145,7 +145,17 @@ export type Payment = {
 
 export type Analytics = {
   range: { from: string; to: string }
-  totals: { revenue: number; bookings: number; payments: number }
+  totals: {
+    /** Money actually collected. */
+    revenue: number
+    /** What the bookings in range are worth, paid or not. */
+    accrued: number
+    /** Still owed across those bookings. */
+    outstanding: number
+    bookings: number
+    paid_bookings: number
+    payments: number
+  }
   by_type: {
     type: UnitType
     category: 'rooms' | 'restaurant'

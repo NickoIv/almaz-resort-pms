@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { requireRole } from '../lib/auth'
+import { chargesSumSql } from '../lib/money'
 import { SQL_TODAY } from '../lib/time'
 import type { AppEnv, UnitType } from '../types'
 
@@ -86,6 +87,24 @@ analytics.get('/summary', async (c) => {
   }
   const totalRevenue = byCategory.rooms + byCategory.restaurant
 
+  // ── Accrued value and outstanding debt ───────────────────────────────────
+  //
+  // `revenue` above is money actually collected. That is the correct figure for
+  // revenue, but on its own it reads as "0 ₸ despite active bookings" whenever
+  // guests have booked and not yet paid. These two numbers make the difference
+  // explicit: what the bookings in this range are worth, and what is still owed.
+  const accruedRow = await c.env.DB.prepare(
+    `SELECT
+       COALESCE(SUM(b.total_amount + ${chargesSumSql('b')}), 0) AS accrued,
+       COALESCE(SUM(MAX(0, b.total_amount + ${chargesSumSql('b')} - b.prepaid_amount)), 0) AS outstanding,
+       COUNT(*) AS bookings
+     FROM bookings b
+     WHERE b.status <> 'free'
+       AND date(b.date_from) <= date(?) AND date(b.date_to) >= date(?)`
+  )
+    .bind(to, from)
+    .first<{ accrued: number; outstanding: number; bookings: number }>()
+
   // ── Room occupancy ───────────────────────────────────────────────────────
   // Nights sold = the part of each stay that falls inside the range.
   //
@@ -158,8 +177,14 @@ analytics.get('/summary', async (c) => {
   return c.json({
     range: { from, to },
     totals: {
+      /** Money actually collected — rows in `payments`. */
       revenue: totalRevenue,
-      bookings: byType.reduce((sum, r) => sum + r.bookings, 0),
+      /** What the bookings in this range are worth, paid or not. */
+      accrued: accruedRow?.accrued ?? 0,
+      /** Still owed across those bookings (deposits excluded). */
+      outstanding: accruedRow?.outstanding ?? 0,
+      bookings: accruedRow?.bookings ?? 0,
+      paid_bookings: byType.reduce((sum, r) => sum + r.bookings, 0),
       payments: byType.reduce((sum, r) => sum + r.payments, 0),
     },
     by_type: byType,
