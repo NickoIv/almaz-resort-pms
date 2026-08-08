@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
+import CleaningSheet from '../components/CleaningSheet'
 import Checklist from '../components/Checklist'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
 import { elapsedLabel } from '../format'
@@ -12,6 +13,7 @@ import type { ChecklistItem, CleaningOverview, CleaningUnit } from '../types'
 export default function CleaningPage() {
   const [units, setUnits] = useState<CleaningUnit[]>([])
   const [slaMinutes, setSlaMinutes] = useState(60)
+  const [showSheet, setShowSheet] = useState(false)
   const [selected, setSelected] = useState<CleaningUnit | null>(null)
   const [items, setItems] = useState<ChecklistItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -58,6 +60,13 @@ export default function CleaningPage() {
           </div>
         </div>
         <div className="page-head-actions">
+          <button
+            className="btn btn-sm btn-primary"
+            onClick={() => setShowSheet(true)}
+            disabled={units.length === 0}
+          >
+            Печать заданий на смену
+          </button>
           <button className="btn btn-sm" onClick={load}>
             Обновить
           </button>
@@ -130,6 +139,8 @@ export default function CleaningPage() {
           </section>
         </div>
       )}
+
+      {showSheet && <CleaningSheet onClose={() => setShowSheet(false)} />}
     </>
   )
 }

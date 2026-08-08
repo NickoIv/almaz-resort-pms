@@ -80,6 +80,72 @@ cleaning.get('/', canClean, async (c) => {
   })
 })
 
+/**
+ * GET /api/cleaning/sheet — every outstanding unit with its items, in one call.
+ * Backs the printable shift sheet; fetching each unit separately would be a
+ * request per room for something printed as a single page.
+ */
+cleaning.get('/sheet', canClean, async (c) => {
+  const staff = c.get('staff')
+  const types = allowedUnitTypes(staff.role)
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT u.id AS unit_id, u.name AS unit_name, u.type AS unit_type, u.category,
+            cc.id AS item_id, cc.item_name, cc.is_done, cc.created_at
+     FROM units u
+     JOIN cleaning_checklist cc ON cc.unit_id = u.id
+     WHERE u.type IN (${placeholders(types.length)})
+       AND EXISTS (
+         SELECT 1 FROM cleaning_checklist p WHERE p.unit_id = u.id AND p.is_done = 0
+       )
+     ORDER BY u.type, u.name, cc.id`
+  )
+    .bind(...types)
+    .all<{
+      unit_id: number
+      unit_name: string
+      unit_type: UnitType
+      category: string | null
+      item_id: number
+      item_name: string
+      is_done: number
+      created_at: string | null
+    }>()
+
+  // Flat rows in, one entry per unit out — the sheet prints unit by unit.
+  const byUnit = new Map<number, {
+    id: number
+    name: string
+    type: UnitType
+    category: string | null
+    waiting_since: string | null
+    items: { id: number; item_name: string; is_done: boolean }[]
+  }>()
+
+  for (const row of results) {
+    let unit = byUnit.get(row.unit_id)
+    if (!unit) {
+      unit = {
+        id: row.unit_id,
+        name: row.unit_name,
+        type: row.unit_type,
+        category: row.category,
+        waiting_since: row.created_at,
+        items: [],
+      }
+      byUnit.set(row.unit_id, unit)
+    }
+    unit.items.push({ id: row.item_id, item_name: row.item_name, is_done: row.is_done === 1 })
+  }
+
+  const nowRow = await c.env.DB.prepare(`SELECT ${SQL_NOW} AS now`).first<{ now: string }>()
+
+  return c.json({
+    generated_at: nowRow?.now ?? '',
+    units: [...byUnit.values()],
+  })
+})
+
 /** GET /api/cleaning/unit/:unitId — the checklist for one unit. */
 cleaning.get('/unit/:unitId', canClean, async (c) => {
   const staff = c.get('staff')

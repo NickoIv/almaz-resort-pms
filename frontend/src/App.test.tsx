@@ -558,3 +558,60 @@ describe('§2 cleaning SLA', () => {
     expect(screen.getByText(/1 дольше 60 мин/)).toBeInTheDocument()
   })
 })
+
+describe('§3 housekeeping shift sheet', () => {
+  const OVERVIEW = {
+    sla_minutes: 60,
+    units: [{ id: 5, type: 'room', name: '105', category: 'standard', total: 3, pending: 2,
+              waiting_since: '2026-08-08 09:00', waiting_minutes: 20, is_overdue: false }],
+  }
+  const SHEET = {
+    generated_at: '2026-08-08 10:30',
+    units: [
+      { id: 5, name: '105', type: 'room', category: 'standard', waiting_since: '2026-08-08 09:00',
+        items: [
+          { id: 1, item_name: 'Смена постельного белья', is_done: false },
+          { id: 2, item_name: 'Уборка санузла', is_done: true },
+        ] },
+      { id: 6, name: '106', type: 'room', category: 'comfort', waiting_since: '2026-08-08 09:30',
+        items: [{ id: 3, item_name: 'Пылесос и полы', is_done: false }] },
+    ],
+  }
+
+  it('renders every unit and its checklist on the printable sheet', async () => {
+    signIn('housekeeper')
+    mockApi({
+      ...baseRoutes('housekeeper'),
+      'GET /api/cleaning': OVERVIEW,
+      'GET /api/cleaning/sheet': SHEET,
+      'GET /api/cleaning/unit/5': CHECKLIST,
+    })
+
+    renderApp(<App />, { route: '/cleaning' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Печать заданий на смену' }))
+
+    expect(await screen.findByText('Задания на смену — уборка')).toBeInTheDocument()
+    expect(screen.getByText(/объектов: 2/)).toBeInTheDocument()
+
+    const sheet = document.querySelector('.print-sheet')!
+    expect(within(sheet as HTMLElement).getByText('Смена постельного белья')).toBeInTheDocument()
+    expect(within(sheet as HTMLElement).getByText('Пылесос и полы')).toBeInTheDocument()
+
+    // Already-done items stay visible but struck through, so a partly cleaned
+    // unit is not started from scratch.
+    const doneItem = within(sheet as HTMLElement).getByText('Уборка санузла').closest('li')!
+    expect(doneItem).toHaveClass('is-done')
+
+    // Each unit gets a signature line.
+    expect(sheet.querySelectorAll('.sheet-sign')).toHaveLength(2)
+  })
+
+  it('is offered only when something needs cleaning', async () => {
+    signIn('housekeeper')
+    mockApi({ ...baseRoutes('housekeeper'), 'GET /api/cleaning': { sla_minutes: 60, units: [] } })
+    renderApp(<App />, { route: '/cleaning' })
+
+    await screen.findByRole('heading', { name: 'Уборка' })
+    expect(screen.getByRole('button', { name: 'Печать заданий на смену' })).toBeDisabled()
+  })
+})
