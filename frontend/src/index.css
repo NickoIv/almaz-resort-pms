@@ -1914,6 +1914,78 @@ button {
   color: var(--text-faint);
 }
 
+/* ── Occupancy forecast ────────────────────────────────────────────────────── */
+
+.forecast {
+  margin-bottom: 20px;
+}
+
+.forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(38px, 1fr));
+  gap: 6px;
+}
+
+.forecast-day {
+  text-align: center;
+}
+
+.forecast-bar {
+  position: relative;
+  height: 68px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border-soft);
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* Fill grows from the bottom with how full the day is, so a tall column
+   reads as "busy" at a glance. */
+.forecast-bar-fill {
+  position: absolute;
+  inset: auto 0 0 0;
+  background: linear-gradient(180deg, rgba(139, 124, 255, 0.55), rgba(77, 124, 255, 0.75));
+  transition: height 0.35s var(--ease);
+}
+
+.forecast-free {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* No rooms left: flagged by colour and by the zero already in the column. */
+.forecast-day.is-full .forecast-bar {
+  border-color: rgba(255, 92, 114, 0.5);
+}
+
+.forecast-day.is-full .forecast-bar-fill {
+  background: linear-gradient(180deg, rgba(255, 92, 114, 0.5), rgba(255, 92, 114, 0.8));
+}
+
+.forecast-day.is-today .forecast-bar {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(139, 124, 255, 0.45);
+}
+
+.forecast-date {
+  font-size: 12px;
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.forecast-dow {
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+
 /* ── Weekday breakdown ─────────────────────────────────────────────────────── */
 
 .weekday-table td:first-child {

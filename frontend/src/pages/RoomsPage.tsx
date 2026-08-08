@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import GroupBookingModal from '../components/GroupBookingModal'
+import OccupancyForecast from '../components/OccupancyForecast'
 import UnitCard from '../components/UnitCard'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
 import { matchesQuery } from '../search'
@@ -122,6 +123,8 @@ export default function RoomsPage() {
           ))}
         </div>
       </div>
+
+      {isAdmin && <OccupancyForecast />}
 
       {error && <Alert>{error}</Alert>}
 

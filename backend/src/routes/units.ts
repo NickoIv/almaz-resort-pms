@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { assertUnitTypeAllowed, canSeeMoney, placeholders, resolveTypeFilter } from '../lib/access'
 import { chargesSumSql, remainingOf } from '../lib/money'
-import { SQL_COVERS_NOW, SQL_STARTS_LATER } from '../lib/time'
+import { SQL_COVERS_NOW, SQL_STARTS_LATER, SQL_TODAY } from '../lib/time'
 import type { AppEnv, BookingStatus, UnitType } from '../types'
 
 type UnitRow = {
@@ -128,6 +128,58 @@ units.get('/', async (c) => {
 
   const withMoney = canSeeMoney(staff.role)
   return c.json(results.map((row) => serializeUnit(row, withMoney)))
+})
+
+/**
+ * GET /api/units/forecast?days=14&type=room — free vs taken per day ahead.
+ *
+ * For answering a phone call: "do you have anything on Friday?". Counts what
+ * is already booked, nothing predictive. A night is occupied when a booking
+ * covers it, with checkout day free again — the same rule the room calendar
+ * uses, so the two can never disagree.
+ */
+units.get('/forecast', async (c) => {
+  const staff = c.get('staff')
+  const types = resolveTypeFilter(staff.role, c.req.query('type') ?? 'room')
+
+  const requested = Number(c.req.query('days') ?? 14)
+  const days = Math.min(Math.max(Number.isFinite(requested) ? requested : 14, 1), 60)
+
+  const totalRow = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS count FROM units WHERE type IN (${placeholders(types.length)})`
+  )
+    .bind(...types)
+    .first<{ count: number }>()
+  const total = totalRow?.count ?? 0
+
+  const { results } = await c.env.DB.prepare(
+    `WITH RECURSIVE span(d) AS (
+       SELECT ${SQL_TODAY}
+       UNION ALL
+       SELECT date(d, '+1 day') FROM span WHERE d < date(${SQL_TODAY}, '+' || ? || ' days')
+     )
+     SELECT d AS date,
+            (SELECT COUNT(*)
+             FROM bookings b JOIN units u ON u.id = b.unit_id
+             WHERE u.type IN (${placeholders(types.length)})
+               AND b.status <> 'free'
+               AND date(b.date_from) <= d AND date(b.date_to) > d
+            ) AS taken
+     FROM span
+     ORDER BY d`
+  )
+    .bind(days - 1, ...types)
+    .all<{ date: string; taken: number }>()
+
+  return c.json({
+    total_units: total,
+    days: results.map((row) => ({
+      date: row.date,
+      taken: row.taken,
+      free: Math.max(0, total - row.taken),
+      occupancy_rate: total > 0 ? row.taken / total : 0,
+    })),
+  })
 })
 
 /** GET /api/units/:id */
