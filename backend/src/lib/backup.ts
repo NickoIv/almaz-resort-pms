@@ -153,7 +153,12 @@ export type RestoreReport = {
   statements: number
 }
 
-function assertValidBackup(file: unknown): asserts file is BackupFile {
+/**
+ * Checks a file is a backup this build can restore.
+ * Exported so the route can reject a bad upload *before* doing any work —
+ * otherwise a fumbled file would still cost a pre-restore snapshot.
+ */
+export function assertValidBackup(file: unknown): asserts file is BackupFile {
   const candidate = file as Partial<BackupFile> | null
   if (!candidate || typeof candidate !== 'object') {
     throw new RestoreError('Файл повреждён или не является JSON-объектом')

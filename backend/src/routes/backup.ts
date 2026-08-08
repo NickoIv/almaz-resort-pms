@@ -3,8 +3,21 @@ import { HTTPException } from 'hono/http-exception'
 import { requireRole } from '../lib/auth'
 import { readJson } from '../lib/body'
 import { writeAudit } from '../lib/audit'
-import { backupFilename, exportAll, RestoreError, restoreAll } from '../lib/backup'
-import { backupStore, DAILY_PREFIX, RETENTION } from '../lib/backup-store'
+import {
+  assertValidBackup,
+  backupFilename,
+  exportAll,
+  RestoreError,
+  restoreAll,
+} from '../lib/backup'
+import {
+  backupStore,
+  DAILY_PREFIX,
+  PRE_RESTORE_PREFIX,
+  PRE_RESTORE_RETENTION,
+  prunePrefix,
+  RETENTION,
+} from '../lib/backup-store'
 import type { AppEnv } from '../types'
 
 const backup = new Hono<AppEnv>()
@@ -69,14 +82,26 @@ backup.post('/restore', async (c) => {
     throw new HTTPException(400, { message: 'Не приложен файл резервной копии' })
   }
 
+  // Validate before doing any work: a file that is going to be rejected should
+  // not cost a snapshot write.
+  try {
+    assertValidBackup(body.backup)
+  } catch (error) {
+    throw new HTTPException(400, {
+      message: error instanceof RestoreError ? error.message : 'Файл резервной копии повреждён',
+    })
+  }
+
   // Safety net before anything destructive happens.
   let snapshotKey: string | null = null
   try {
     const store = backupStore(c.env)
     if (store) {
       const current = await exportAll(c.env.DB, c.env.APP_VERSION ?? 'unknown')
-      snapshotKey = `pre-restore/${backupFilename()}`
+      snapshotKey = `${PRE_RESTORE_PREFIX}${backupFilename()}`
       await store.put(snapshotKey, JSON.stringify(current))
+      // Keep only the last few — restores are rare, but nothing else prunes these.
+      await prunePrefix(store, PRE_RESTORE_PREFIX, PRE_RESTORE_RETENTION)
     }
   } catch (error) {
     console.error('pre-restore snapshot failed', error)

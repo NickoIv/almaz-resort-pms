@@ -86,19 +86,37 @@ export function backupStore(env: Bindings): BackupStore | null {
 
 export const DAILY_PREFIX = 'daily/'
 
+/** Snapshots taken automatically just before a restore overwrites everything. */
+export const PRE_RESTORE_PREFIX = 'pre-restore/'
+
 /** How many daily snapshots to keep. */
 export const RETENTION = 7
 
 /**
- * Deletes the oldest daily snapshots beyond the retention window.
+ * Pre-restore snapshots are a safety net for the last few restores, not an
+ * archive — without a cap they would accumulate forever, since restores are
+ * rare but nothing else ever cleans them up.
+ */
+export const PRE_RESTORE_RETENTION = 3
+
+/**
+ * Deletes the oldest snapshots under a prefix beyond the retention window.
  * Keys are timestamped and sort chronologically, so lexical order is
  * chronological order — no need to read metadata to decide what is oldest.
  */
-export async function pruneDaily(store: BackupStore, keep = RETENTION): Promise<string[]> {
-  const existing = await store.list(DAILY_PREFIX)
+export async function prunePrefix(
+  store: BackupStore,
+  prefix: string,
+  keep: number
+): Promise<string[]> {
+  const existing = await store.list(prefix)
   const sorted = existing.map((item) => item.key).sort()
   const doomed = sorted.slice(0, Math.max(0, sorted.length - keep))
 
   for (const key of doomed) await store.delete(key)
   return doomed
+}
+
+export function pruneDaily(store: BackupStore, keep = RETENTION): Promise<string[]> {
+  return prunePrefix(store, DAILY_PREFIX, keep)
 }
