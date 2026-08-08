@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout 250 node --input-type=module -e ' *)"
+    ]
+  }
+}

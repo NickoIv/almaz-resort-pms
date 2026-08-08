@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import RevenueChart from '../components/RevenueChart'
+import WeekdayBreakdown from '../components/WeekdayBreakdown'
 import { Alert, Spinner } from '../components/ui'
 import {
   almatyMonthStart,
@@ -70,6 +71,17 @@ export default function AnalyticsPage() {
         row.revenue,
         row.bookings,
         row.payments,
+      ]),
+      [],
+      ['По дням недели'],
+      ['День', 'Выручка', 'Платежей', 'Дней в периоде', 'Продано ночей', 'Загрузка'],
+      ...data.weekdays.map((row) => [
+        ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][row.dow],
+        row.revenue,
+        row.payments,
+        row.days,
+        row.nights_sold,
+        percent(row.occupancy_rate, 1),
       ]),
       [],
       ['Помесячно'],
@@ -259,6 +271,14 @@ export default function AnalyticsPage() {
               )}
             </div>
             <RevenueChart months={data.months} />
+          </section>
+
+          <section className="panel glass">
+            <div className="panel-title">
+              По дням недели
+              <span className="count">выручка и загрузка за период</span>
+            </div>
+            <WeekdayBreakdown weekdays={data.weekdays} />
           </section>
 
           <section className="panel glass">

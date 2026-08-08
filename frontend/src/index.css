@@ -1914,6 +1914,57 @@ button {
   color: var(--text-faint);
 }
 
+/* ── Weekday breakdown ─────────────────────────────────────────────────────── */
+
+.weekday-table td:first-child {
+  display: table-cell;
+  white-space: nowrap;
+}
+
+.weekday-name {
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.weekday-count {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.weekday-table .bar {
+  display: block;
+  height: 8px;
+  min-width: 90px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.35s var(--ease);
+}
+
+/* Two measures on different scales, so each bar is sized against its own
+   column's best day rather than a shared axis. */
+.bar-revenue {
+  background: var(--series-rooms);
+}
+
+.bar-occupancy {
+  background: var(--series-restaurant);
+}
+
+.weekday-table tr.is-weakest td {
+  background: rgba(255, 92, 114, 0.08);
+}
+
+.weekday-table tr.is-weakest td:first-child {
+  box-shadow: inset 2px 0 0 var(--occupied);
+}
+
 /* ── Printable sheets ──────────────────────────────────────────────────────────
    The overlay is a normal dark panel on screen. For print it becomes plain
    black-on-white A4: the app's glass and gradients would waste toner and read

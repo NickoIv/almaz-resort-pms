@@ -184,6 +184,16 @@ export type Analytics = {
   }[]
   by_category: { rooms: number; restaurant: number }
   occupancy: { nights_sold: number; nights_available: number; rate: number; rooms: number }
+  /** dow 0 = Monday … 6 = Sunday. */
+  weekdays: {
+    dow: number
+    revenue: number
+    payments: number
+    days: number
+    nights_sold: number
+    nights_available: number
+    occupancy_rate: number
+  }[]
   months: { month: string; rooms: number; restaurant: number; revenue: number }[]
   month_over_month: {
     current: { month: string; revenue: number }

@@ -135,6 +135,72 @@ analytics.get('/summary', async (c) => {
   const nightsAvailable = (roomCount?.count ?? 0) * daySpan(from, to)
   const occupancyRate = nightsAvailable > 0 ? nightsSold / nightsAvailable : 0
 
+  // ── By day of week ───────────────────────────────────────────────────────
+  //
+  // Two different measurements, deliberately kept in one table so a weak
+  // weekday can be seen as both "little money came in" and "rooms sat empty".
+  //
+  // Revenue groups payments by the day they were received. Occupancy expands
+  // the range into individual dates and counts rooms held on each, then
+  // averages per weekday — the only way to say "Tuesdays run at 40%".
+  //
+  // strftime('%w') is 0=Sunday; the +6 %7 shifts it to 0=Monday so the week
+  // reads Mon–Sun as it does on every Russian calendar.
+  const { results: weekdayRevenue } = await c.env.DB.prepare(
+    `SELECT ((CAST(strftime('%w', p.paid_at) AS INTEGER) + 6) % 7) AS dow,
+            SUM(p.amount) AS revenue,
+            COUNT(p.id) AS payments
+     FROM payments p
+     WHERE date(p.paid_at) BETWEEN date(?) AND date(?)
+     GROUP BY dow`
+  )
+    .bind(from, to)
+    .all<{ dow: number; revenue: number; payments: number }>()
+
+  // A recursive date series keeps this honest for partial weeks: three Mondays
+  // and two Tuesdays in a range must divide by three and two respectively.
+  const { results: weekdayOccupancy } = await c.env.DB.prepare(
+    `WITH RECURSIVE span(d) AS (
+       SELECT date(?)
+       UNION ALL
+       SELECT date(d, '+1 day') FROM span WHERE d < date(?)
+     )
+     SELECT ((CAST(strftime('%w', d) AS INTEGER) + 6) % 7) AS dow,
+            COUNT(*) AS days,
+            COALESCE(SUM((
+              SELECT COUNT(*)
+              FROM bookings b JOIN units u ON u.id = b.unit_id
+              WHERE u.type = 'room'
+                AND date(b.date_from) <= d AND date(b.date_to) > d
+            )), 0) AS nights_sold
+     FROM span
+     GROUP BY dow`
+  )
+    .bind(from, to)
+    .all<{ dow: number; days: number; nights_sold: number }>()
+
+  const revenueByDow = new Map(weekdayRevenue.map((row) => [row.dow, row]))
+  const occupancyByDow = new Map(weekdayOccupancy.map((row) => [row.dow, row]))
+  const roomTotal = await c.env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM units WHERE type = 'room'"
+  ).first<{ count: number }>()
+  const rooms = roomTotal?.count ?? 0
+
+  const weekdays = Array.from({ length: 7 }, (_, dow) => {
+    const revenue = revenueByDow.get(dow)
+    const occupancy = occupancyByDow.get(dow)
+    const available = (occupancy?.days ?? 0) * rooms
+    return {
+      dow,
+      revenue: revenue?.revenue ?? 0,
+      payments: revenue?.payments ?? 0,
+      days: occupancy?.days ?? 0,
+      nights_sold: occupancy?.nights_sold ?? 0,
+      nights_available: available,
+      occupancy_rate: available > 0 ? (occupancy?.nights_sold ?? 0) / available : 0,
+    }
+  })
+
   // ── Monthly series for the chart (last 6 months up to `to`) ──────────────
   const seriesStart = `${shiftMonth(to.slice(0, 7), -5)}-01`
   const { results: monthRows } = await c.env.DB.prepare(
@@ -195,6 +261,7 @@ analytics.get('/summary', async (c) => {
       rate: occupancyRate,
       rooms: roomCount?.count ?? 0,
     },
+    weekdays,
     months,
     month_over_month: {
       current: { month: current.month, revenue: current.revenue },
