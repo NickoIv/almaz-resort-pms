@@ -11,6 +11,7 @@ const NAV: NavItem[] = [
   { to: '/restaurant', label: 'Зона отдыха', roles: ['admin', 'waiter'] },
   { to: '/analytics', label: 'Аналитика', roles: ['admin'] },
   { to: '/audit', label: 'Журнал', roles: ['admin'] },
+  { to: '/staff', label: 'Персонал', roles: ['admin'] },
   { to: '/settings', label: 'Настройки', roles: ['admin'] },
 ]
 

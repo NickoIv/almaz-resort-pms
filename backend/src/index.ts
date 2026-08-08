@@ -12,6 +12,7 @@ import bookingRoutes from './routes/bookings'
 import cleaningRoutes from './routes/cleaning'
 import guestRoutes from './routes/guests'
 import settingsRoutes from './routes/settings'
+import staffRoutes from './routes/staff'
 import type { AppEnv, Bindings } from './types'
 
 const app = new Hono<AppEnv>()
@@ -36,6 +37,8 @@ app.use('/api/settings', requireAuth)
 app.use('/api/guests/*', requireAuth)
 app.use('/api/audit', requireAuth)
 app.use('/api/audit/*', requireAuth)
+app.use('/api/staff', requireAuth)
+app.use('/api/staff/*', requireAuth)
 
 app.route('/api/units', unitRoutes)
 app.route('/api/bookings', bookingRoutes)
@@ -44,6 +47,7 @@ app.route('/api/analytics', analyticsRoutes)
 app.route('/api/settings', settingsRoutes)
 app.route('/api/guests', guestRoutes)
 app.route('/api/audit', auditRoutes)
+app.route('/api/staff', staffRoutes)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {

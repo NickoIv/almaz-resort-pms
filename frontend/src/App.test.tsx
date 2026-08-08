@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -431,5 +431,87 @@ describe('Almaty time in the UI', () => {
 
     expect(await screen.findByLabelText('Заезд')).toHaveValue('2026-08-08')
     expect(screen.getByLabelText('Выезд')).toHaveValue('2026-08-09')
+  })
+})
+
+describe('staff management page', () => {
+  const STAFF_LIST = [
+    { id: 1, name: 'Нурлан Абдразаков', phone: '+77011112233', role: 'admin', is_active: true },
+    { id: 2, name: 'Айгуль Сериккызы', phone: '+77022223344', role: 'housekeeper', is_active: true },
+    { id: 3, name: 'Ержан Тулеуов', phone: '+77033334455', role: 'waiter', is_active: false },
+  ]
+
+  it('lists staff grouped by role with their active state', async () => {
+    signIn('admin')
+    mockApi({ ...baseRoutes('admin'), 'GET /api/staff': STAFF_LIST })
+    renderApp(<App />, { route: '/staff' })
+
+    expect(await screen.findByRole('heading', { name: 'Персонал' })).toBeInTheDocument()
+
+    // Wait for the list itself — the heading renders while it is still loading.
+    expect(await screen.findByText('+77022223344')).toBeInTheDocument()
+    // The admin's name also appears in the header, hence getAllByText.
+    expect(screen.getAllByText('Нурлан Абдразаков').length).toBeGreaterThan(0)
+    // The disabled waiter is still listed, flagged rather than hidden.
+    expect(screen.getByText('Ержан Тулеуов')).toBeInTheDocument()
+    expect(screen.getByText('отключён')).toBeInTheDocument()
+  })
+
+  it('never renders a PIN or hash', async () => {
+    signIn('admin')
+    mockApi({ ...baseRoutes('admin'), 'GET /api/staff': STAFF_LIST })
+    renderApp(<App />, { route: '/staff' })
+    await screen.findByText('+77022223344')
+
+    expect(document.body.textContent).not.toMatch(/pbkdf2|1234|2345|3456/)
+  })
+
+  it('will not let an admin disable their own account', async () => {
+    signIn('admin') // STAFF.admin.id === 1
+    mockApi({ ...baseRoutes('admin'), 'GET /api/staff': STAFF_LIST })
+    renderApp(<App />, { route: '/staff' })
+    await screen.findByText('+77011112233')
+
+    const selfRow = screen.getByText('это вы').closest('.staff-row')!
+    const disableButton = within(selfRow as HTMLElement).getByRole('button', { name: 'Отключить' })
+    expect(disableButton).toBeDisabled()
+  })
+
+  it('creates a staff member through the form', async () => {
+    signIn('admin')
+    let posted: Record<string, unknown> | null = null
+    mockApi({
+      ...baseRoutes('admin'),
+      'GET /api/staff': STAFF_LIST,
+      'POST /api/staff': (_url: string, init?: RequestInit) => {
+        posted = JSON.parse(String(init?.body))
+        return { id: 9 }
+      },
+    })
+    renderApp(<App />, { route: '/staff' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Добавить сотрудника' }))
+    await userEvent.type(screen.getByLabelText('Имя'), 'Гульнара Ким')
+    await userEvent.type(screen.getByLabelText('Телефон'), '+77005554030')
+    await userEvent.selectOptions(screen.getByLabelText('Роль'), 'waiter')
+    await userEvent.type(screen.getByLabelText('PIN'), '4821')
+    await userEvent.click(screen.getByRole('button', { name: 'Добавить' }))
+
+    await waitFor(() => expect(posted).not.toBeNull())
+    expect(posted).toMatchObject({
+      name: 'Гульнара Ким',
+      phone: '+77005554030',
+      role: 'waiter',
+      pin: '4821',
+    })
+  })
+
+  it('keeps the staff page away from non-admins', async () => {
+    signIn('waiter')
+    mockApi(baseRoutes('waiter', [GAZEBO]))
+    renderApp(<App />, { route: '/staff' })
+
+    expect(await screen.findByRole('heading', { name: 'Зона отдыха' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Персонал' })).not.toBeInTheDocument()
   })
 })

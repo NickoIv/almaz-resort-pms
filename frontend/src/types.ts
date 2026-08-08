@@ -11,6 +11,11 @@ export type StaffUser = {
   role: Role
 }
 
+/** As returned by /api/staff — never includes the PIN hash. */
+export type StaffMember = StaffUser & {
+  is_active: boolean
+}
+
 export type Booking = {
   id: number
   unit_id?: number

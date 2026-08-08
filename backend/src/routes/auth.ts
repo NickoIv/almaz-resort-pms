@@ -5,6 +5,7 @@ import { requireAuth, TOKEN_TTL_SECONDS } from '../lib/auth'
 import { readJson } from '../lib/body'
 import { verifyPin } from '../lib/pin'
 import { writeAudit } from '../lib/audit'
+import { normalizePhone } from '../lib/phone'
 import type { AppEnv, Role } from '../types'
 
 type StaffRow = {
@@ -13,11 +14,7 @@ type StaffRow = {
   phone: string
   role: Role
   pin_code_hash: string
-}
-
-/** Strips spaces, dashes and brackets so "+7 (777) 111-22-33" matches "+77771112233". */
-function normalizePhone(phone: string): string {
-  return phone.replace(/[\s()-]/g, '')
+  is_active: number
 }
 
 const auth = new Hono<AppEnv>()
@@ -32,7 +29,7 @@ auth.post('/login', async (c) => {
   }
 
   const staff = await c.env.DB.prepare(
-    'SELECT id, name, phone, role, pin_code_hash FROM staff_users WHERE phone = ?'
+    'SELECT id, name, phone, role, pin_code_hash, is_active FROM staff_users WHERE phone = ?'
   )
     .bind(phone)
     .first<StaffRow>()
@@ -41,6 +38,15 @@ auth.post('/login', async (c) => {
   // endpoint cannot be used to enumerate staff phone numbers.
   if (!staff || !(await verifyPin(pin, staff.pin_code_hash))) {
     throw new HTTPException(401, { message: 'Invalid phone or PIN' })
+  }
+
+  // Only told to someone who already proved they hold the right PIN, so this
+  // still cannot be used to probe which phone numbers exist.
+  if (staff.is_active !== 1) {
+    await writeAudit(c.env.DB, staff.id, 'login.disabled', 'staff_users', staff.id)
+    throw new HTTPException(403, {
+      message: 'Учётная запись отключена. Обратитесь к администратору.',
+    })
   }
 
   const payload = {

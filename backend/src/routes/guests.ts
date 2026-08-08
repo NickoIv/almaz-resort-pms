@@ -4,6 +4,7 @@ import { requireRole } from '../lib/auth'
 import { readJson } from '../lib/body'
 import { writeAudit } from '../lib/audit'
 import { chargesSumSql } from '../lib/money'
+import { normalizePhone } from '../lib/phone'
 import { SQL_TODAY } from '../lib/time'
 import type { AppEnv, BookingStatus, UnitType } from '../types'
 
@@ -12,10 +13,6 @@ const guests = new Hono<AppEnv>()
 // Guest history exposes money, so it stays admin-only like the rest of it.
 guests.use('*', requireRole('admin'))
 
-/** Strips formatting so "+7 (701) 111-22-33" matches "+77011112233". */
-function normalizePhone(phone: string): string {
-  return phone.replace(/[\s()-]/g, '')
-}
 
 type StayRow = {
   booking_id: number
