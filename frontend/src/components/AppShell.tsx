@@ -8,6 +8,7 @@ const NAV: NavItem[] = [
   { to: '/rooms', label: 'Номера', roles: ['admin'] },
   { to: '/cleaning', label: 'Уборка', roles: ['admin', 'housekeeper'] },
   { to: '/restaurant', label: 'Зона отдыха', roles: ['admin', 'waiter'] },
+  { to: '/analytics', label: 'Аналитика', roles: ['admin'] },
 ]
 
 export default function AppShell() {

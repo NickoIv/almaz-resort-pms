@@ -89,9 +89,38 @@ stored as PBKDF2-SHA256 hashes (100k iterations); the token is signed with
 | `GET` `POST` `PATCH` | `/api/bookings` | admin, waiter (waiter restricted to restaurant units) |
 | `PATCH` | `/api/bookings/:id/payment` | admin only |
 | `GET` | `/api/bookings/:id/payments` | admin only |
+| `POST` | `/api/bookings/quick` | admin, waiter — hourly quick-booking, recreation units only |
 | `GET` `PATCH` | `/api/cleaning` | admin, housekeeper |
+| `GET` | `/api/analytics/summary?from=&to=` | admin only |
 
-Money fields are stripped from every response for non-admin roles.
+Money amounts are stripped from every response for non-admin roles. The one
+exception is a boolean `is_paid` on the current booking — a waiter has to know
+whether a guest still owes, without seeing the figures.
+
+## Booking units by night vs by hour
+
+Rooms are sold by night: a stay stored as `2026-08-08` → `2026-08-11` occupies the
+whole of the 9th and 10th. Recreation units are sold by the hour and store a full
+timestamp (`2026-08-08 14:00`), so a gazebo is only busy between those times.
+The status queries switch on `units.type` to apply the right comparison
+(`backend/src/lib/time.ts`).
+
+Bookings are stored as Almaty wall-clock time (UTC+5, no DST). D1's `now` is UTC,
+so every comparison against "now" shifts it first.
+
+## Analytics
+
+`GET /api/analytics/summary` reports **collected** revenue — the sum of rows in
+`payments` — rather than quoted booking totals, so an unpaid booking is not
+counted as income. It returns revenue by unit type and by category (rooms vs
+recreation), room occupancy for the range, a six-month series for the chart, and
+the month-over-month change.
+
+Occupancy counts room-nights from **all** bookings regardless of status, because a
+guest who has checked out is set back to `free`; filtering that away would report
+~0% for any past period. `bookings.status` has no separate `cancelled` state, so a
+cancelled booking currently counts toward occupancy — worth adding when the status
+enum is next revisited.
 
 ## Database migrations
 
@@ -110,5 +139,6 @@ Work in progress.
 - [x] Project scaffolding, D1 schema and seed data
 - [x] Staff authentication (phone + PIN → JWT) and role-based access control
 - [x] Rooms module — dashboard grid, monthly calendar, payments, cleaning checklist
-- [ ] Restaurant / recreation module and analytics
+- [x] Restaurant / recreation module — hourly booking, waiter quick-book, tabs per type
+- [x] Analytics dashboard — revenue, occupancy, month-over-month, CSV export
 - [ ] Telegram notifications and deployment

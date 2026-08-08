@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
+import { useAuth } from '../auth'
+import BookingModal from '../components/BookingModal'
+import QuickBookModal from '../components/QuickBookModal'
 import UnitCard from '../components/UnitCard'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
 import type { Unit, UnitType } from '../types'
@@ -11,15 +14,20 @@ const TABS: { type: UnitType; label: string }[] = [
 ]
 
 /**
- * Restaurant / recreation area. The full module (hourly booking, quick-book
- * for waiters, tabs per unit type) is built in the next step; this view already
- * shows live status so waiters have a working dashboard after login.
+ * Restaurant / recreation area. Same units and bookings API as the rooms
+ * module, but sold by the hour: cards show a clock range, and waiters get a
+ * one-tap quick-booking flow.
  */
 export default function RestaurantPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
+
   const [units, setUnits] = useState<Unit[]>([])
   const [tab, setTab] = useState<UnitType>('sunbed')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [quickUnit, setQuickUnit] = useState<Unit | null>(null)
+  const [editUnit, setEditUnit] = useState<Unit | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -32,13 +40,20 @@ export default function RestaurantPage() {
   useEffect(load, [load])
 
   const visible = units.filter((unit) => unit.type === tab)
+  const busy = visible.filter((unit) => unit.status !== 'free').length
+
+  function countFor(type: UnitType) {
+    return units.filter((unit) => unit.type === type).length
+  }
 
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Зона отдыха</h1>
-          <div className="page-sub">{units.length} объектов</div>
+          <div className="page-sub">
+            {units.length} объектов · {busy} занято в текущей категории
+          </div>
         </div>
         <div className="page-head-actions">
           <button className="btn btn-sm" onClick={load}>
@@ -47,19 +62,17 @@ export default function RestaurantPage() {
         </div>
       </div>
 
-      <nav className="nav" style={{ marginBottom: 20, marginLeft: 0 }}>
+      <nav className="tabs">
         {TABS.map((item) => (
-          <a
+          <button
             key={item.type}
-            href="#"
-            className={tab === item.type ? 'active' : undefined}
-            onClick={(event) => {
-              event.preventDefault()
-              setTab(item.type)
-            }}
+            type="button"
+            className={`tab ${tab === item.type ? 'active' : ''}`}
+            onClick={() => setTab(item.type)}
           >
             {item.label}
-          </a>
+            <span className="tab-count">{countFor(item.type)}</span>
+          </button>
         ))}
       </nav>
 
@@ -84,9 +97,38 @@ export default function RestaurantPage() {
       ) : (
         <div className="unit-grid">
           {visible.map((unit) => (
-            <UnitCard key={unit.id} unit={unit} onOpen={() => undefined} />
+            <UnitCard
+              key={unit.id}
+              unit={unit}
+              onOpen={(selected) => (isAdmin ? setEditUnit(selected) : setQuickUnit(selected))}
+              action={
+                unit.status === 'free' ? (
+                  <button
+                    className="btn btn-sm btn-primary card-action"
+                    onClick={() => setQuickUnit(unit)}
+                  >
+                    Занять сейчас
+                  </button>
+                ) : null
+              }
+            />
           ))}
         </div>
+      )}
+
+      {quickUnit && (
+        <QuickBookModal unit={quickUnit} onClose={() => setQuickUnit(null)} onSaved={load} />
+      )}
+
+      {editUnit && (
+        <BookingModal
+          unitId={editUnit.id}
+          booking={editUnit.current_booking}
+          canSetPrice={isAdmin}
+          hourly
+          onClose={() => setEditUnit(null)}
+          onSaved={load}
+        />
       )}
     </>
   )

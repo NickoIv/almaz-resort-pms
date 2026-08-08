@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireRole, useAuth, HOME_BY_ROLE } from './auth'
 import AppShell from './components/AppShell'
 import { Spinner } from './components/ui'
+import AnalyticsPage from './pages/AnalyticsPage'
 import CleaningPage from './pages/CleaningPage'
 import LoginPage from './pages/LoginPage'
 import RestaurantPage from './pages/RestaurantPage'
@@ -56,6 +57,14 @@ export default function App() {
           element={
             <RequireRole roles={['admin', 'waiter']}>
               <RestaurantPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <RequireRole roles={['admin']}>
+              <AnalyticsPage />
             </RequireRole>
           }
         />

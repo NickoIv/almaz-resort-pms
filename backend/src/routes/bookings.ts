@@ -5,6 +5,7 @@ import { requireRole } from '../lib/auth'
 import { readJson } from '../lib/body'
 import { resetChecklist } from '../lib/cleaning'
 import { writeAudit } from '../lib/audit'
+import { addHours, almatyNow } from '../lib/time'
 import type { AppEnv, BookingStatus, UnitType } from '../types'
 
 type BookingRow = {
@@ -34,6 +35,7 @@ function serializeBooking(row: BookingRow, withMoney: boolean) {
     date_to: row.date_to,
     status: row.status,
     created_at: row.created_at,
+    is_paid: row.total_amount - row.prepaid_amount <= 0,
     ...(withMoney
       ? {
           total_amount: row.total_amount,
@@ -172,6 +174,52 @@ bookings.post('/', canBook, async (c) => {
 
   await writeAudit(c.env.DB, staff.sub, 'booking.create', 'bookings', created.id)
   return c.json(serializeBooking(created, money), 201)
+})
+
+/**
+ * POST /api/bookings/quick — a waiter seats a guest on the spot.
+ * Only a guest name and a duration in hours; the server fills in the times.
+ * Restaurant/recreation units only — rooms are booked by night.
+ */
+bookings.post('/quick', canBook, async (c) => {
+  const staff = c.get('staff')
+  const body = await readJson(c)
+
+  const unitId = Number(body.unit_id)
+  const guestName = String(body.guest_name ?? '').trim()
+  const hours = Number(body.hours ?? 0)
+
+  if (!Number.isInteger(unitId) || !guestName) {
+    throw new HTTPException(400, { message: 'unit_id and guest_name are required' })
+  }
+  if (!Number.isFinite(hours) || hours <= 0 || hours > 24) {
+    throw new HTTPException(400, { message: 'hours must be between 1 and 24' })
+  }
+
+  const unit = await loadUnit(c.env.DB, unitId)
+  assertUnitTypeAllowed(staff.role, unit.type)
+  if (unit.type === 'room') {
+    throw new HTTPException(400, { message: 'Быстрое бронирование доступно только для зоны отдыха' })
+  }
+
+  const dateFrom = almatyNow()
+  const dateTo = addHours(dateFrom, hours)
+
+  await assertNoOverlap(c.env.DB, unitId, dateFrom, dateTo, null)
+
+  const created = await c.env.DB.prepare(
+    `INSERT INTO bookings
+       (unit_id, guest_name, guest_phone, date_from, date_to, status, currency)
+     VALUES (?, ?, ?, ?, ?, 'occupied', 'KZT')
+     RETURNING *`
+  )
+    .bind(unitId, guestName, body.guest_phone ? String(body.guest_phone) : null, dateFrom, dateTo)
+    .first<BookingRow>()
+
+  if (!created) throw new HTTPException(500, { message: 'Failed to create booking' })
+
+  await writeAudit(c.env.DB, staff.sub, 'booking.quick', 'bookings', created.id)
+  return c.json(serializeBooking(created, canSeeMoney(staff.role)), 201)
 })
 
 /** PATCH /api/bookings/:id — dates, guest details, status. */

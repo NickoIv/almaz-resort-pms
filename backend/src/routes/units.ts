@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { assertUnitTypeAllowed, canSeeMoney, placeholders, resolveTypeFilter } from '../lib/access'
+import { SQL_COVERS_NOW, SQL_STARTS_LATER } from '../lib/time'
 import type { AppEnv, BookingStatus, UnitType } from '../types'
 
 type UnitRow = {
@@ -39,20 +40,23 @@ const UNIT_SELECT = `
   FROM units u
   LEFT JOIN bookings b ON b.id = (
     SELECT id FROM bookings
-    WHERE unit_id = u.id AND status <> 'free'
-      AND date(date_from) <= date('now') AND date(date_to) >= date('now')
+    WHERE unit_id = u.id AND status <> 'free' AND ${SQL_COVERS_NOW}
     ORDER BY (status = 'occupied') DESC, date_from DESC
     LIMIT 1
   )
   LEFT JOIN bookings nb ON nb.id = (
     SELECT id FROM bookings
-    WHERE unit_id = u.id AND status <> 'free' AND date(date_from) > date('now')
+    WHERE unit_id = u.id AND status <> 'free' AND ${SQL_STARTS_LATER}
     ORDER BY date_from ASC
     LIMIT 1
   )
 `
 
-/** Shapes a row for the client, hiding money from non-admin roles. */
+/**
+ * Shapes a row for the client, hiding money from non-admin roles.
+ * `is_paid` is the one exception: a waiter has to know whether a guest still
+ * owes anything, so the flag is shared even though the amounts are not.
+ */
 function serializeUnit(row: UnitRow, withMoney: boolean) {
   const current = row.booking_id
     ? {
@@ -62,6 +66,7 @@ function serializeUnit(row: UnitRow, withMoney: boolean) {
         date_from: row.date_from,
         date_to: row.date_to,
         status: row.booking_status,
+        is_paid: (row.total_amount ?? 0) - (row.prepaid_amount ?? 0) <= 0,
         ...(withMoney
           ? {
               total_amount: row.total_amount ?? 0,

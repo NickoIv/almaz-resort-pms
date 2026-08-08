@@ -8,16 +8,38 @@ type Props = {
   unitId: number
   booking: Booking | null
   canSetPrice: boolean
+  /** Recreation units are sold by the hour, so the form switches to date+time. */
+  hourly?: boolean
   onClose: () => void
   onSaved: () => void
 }
 
+/** `2026-08-08 14:00` <-> the `datetime-local` input's `2026-08-08T14:00`. */
+function toInput(value: string | null | undefined, hourly: boolean, fallback: string): string {
+  if (!value) return fallback
+  return hourly ? value.slice(0, 16).replace(' ', 'T') : value.slice(0, 10)
+}
+
+function toApi(value: string, hourly: boolean): string {
+  return hourly ? value.replace('T', ' ').slice(0, 16) : value.slice(0, 10)
+}
+
 /** Create or edit a booking. Money fields only appear for the admin. */
-export default function BookingModal({ unitId, booking, canSetPrice, onClose, onSaved }: Props) {
+export default function BookingModal({
+  unitId,
+  booking,
+  canSetPrice,
+  hourly = false,
+  onClose,
+  onSaved,
+}: Props) {
+  const defaultFrom = hourly ? `${todayIso()}T12:00` : todayIso()
+  const defaultTo = hourly ? `${todayIso()}T16:00` : addDaysIso(todayIso(), 1)
+
   const [guestName, setGuestName] = useState(booking?.guest_name ?? '')
   const [guestPhone, setGuestPhone] = useState(booking?.guest_phone ?? '')
-  const [dateFrom, setDateFrom] = useState(booking?.date_from?.slice(0, 10) ?? todayIso())
-  const [dateTo, setDateTo] = useState(booking?.date_to?.slice(0, 10) ?? addDaysIso(todayIso(), 1))
+  const [dateFrom, setDateFrom] = useState(toInput(booking?.date_from, hourly, defaultFrom))
+  const [dateTo, setDateTo] = useState(toInput(booking?.date_to, hourly, defaultTo))
   const [status, setStatus] = useState<UnitStatus>(booking?.status ?? 'booked')
   const [total, setTotal] = useState(String(booking?.total_amount ?? ''))
   const [prepaid, setPrepaid] = useState(String(booking?.prepaid_amount ?? ''))
@@ -34,8 +56,8 @@ export default function BookingModal({ unitId, booking, canSetPrice, onClose, on
       const payload: Record<string, unknown> = {
         guest_name: guestName,
         guest_phone: guestPhone || null,
-        date_from: dateFrom,
-        date_to: dateTo,
+        date_from: toApi(dateFrom, hourly),
+        date_to: toApi(dateTo, hourly),
         status,
       }
 
@@ -106,20 +128,20 @@ export default function BookingModal({ unitId, booking, canSetPrice, onClose, on
 
         <div className="field-row">
           <div className="field">
-            <label htmlFor="from">Заезд</label>
+            <label htmlFor="from">{hourly ? 'Начало' : 'Заезд'}</label>
             <input
               id="from"
-              type="date"
+              type={hourly ? 'datetime-local' : 'date'}
               value={dateFrom}
               onChange={(event) => setDateFrom(event.target.value)}
               required
             />
           </div>
           <div className="field">
-            <label htmlFor="to">Выезд</label>
+            <label htmlFor="to">{hourly ? 'Окончание' : 'Выезд'}</label>
             <input
               id="to"
-              type="date"
+              type={hourly ? 'datetime-local' : 'date'}
               value={dateTo}
               onChange={(event) => setDateTo(event.target.value)}
               required
