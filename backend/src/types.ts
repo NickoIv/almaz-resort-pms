@@ -25,6 +25,11 @@ export type Bindings = {
    */
   BACKUPS?: KVNamespace
   BACKUPS_R2?: R2Bucket
+  /**
+   * Internal photo documentation. A separate namespace from BACKUPS on
+   * purpose: photos must never crowd out the daily database snapshots.
+   */
+  PHOTOS?: KVNamespace
   /** Set at deploy time so a backup file records which build produced it. */
   APP_VERSION?: string
 }

@@ -8,6 +8,7 @@ import Checklist from '../components/Checklist'
 import GuestHistoryModal from '../components/GuestHistoryModal'
 import MonthCalendar from '../components/MonthCalendar'
 import PaymentModal from '../components/PaymentModal'
+import PhotoGallery from '../components/PhotoGallery'
 import ReceiptSheet from '../components/ReceiptSheet'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
 import { almatyMonth, dateRange, money, timeRange } from '../format'
@@ -196,6 +197,8 @@ export default function UnitDetailPage() {
             </div>
             {calendar ? <MonthCalendar days={calendar.days} /> : <Spinner />}
           </section>
+
+          <PhotoGallery unitId={unit.id} bookingId={active?.id ?? null} />
 
           {/* Housekeeping checklists exist for rooms only. */}
           {isRoom && (

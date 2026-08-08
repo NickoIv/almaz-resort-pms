@@ -59,6 +59,22 @@ export const BACKUP_TABLES = [
   },
   { name: 'settings', columns: ['key', 'value', 'updated_at', 'updated_by'] },
   {
+    name: 'waitlist',
+    columns: [
+      'id', 'guest_name', 'guest_phone', 'unit_type', 'unit_id', 'date_from', 'date_to',
+      'note', 'status', 'created_at', 'created_by', 'closed_at', 'closed_by',
+    ],
+  },
+  // Metadata only — the image bytes live in the PHOTOS namespace and would
+  // blow past the backup file's size ceiling if inlined.
+  {
+    name: 'unit_photos',
+    columns: [
+      'id', 'unit_id', 'booking_id', 'storage_key', 'content_type', 'size_bytes',
+      'kind', 'caption', 'created_at', 'created_by',
+    ],
+  },
+  {
     name: 'audit_log',
     columns: ['id', 'staff_user_id', 'action', 'entity', 'entity_id', 'created_at'],
   },

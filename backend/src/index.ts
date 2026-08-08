@@ -15,6 +15,7 @@ import bookingRoutes from './routes/bookings'
 import cleaningRoutes from './routes/cleaning'
 import guestRoutes from './routes/guests'
 import settingsRoutes from './routes/settings'
+import photoRoutes from './routes/photos'
 import staffRoutes from './routes/staff'
 import waitlistRoutes from './routes/waitlist'
 import type { AppEnv, Bindings } from './types'
@@ -44,6 +45,7 @@ app.use('/api/audit/*', requireAuth)
 app.use('/api/staff', requireAuth)
 app.use('/api/staff/*', requireAuth)
 app.use('/api/backup/*', requireAuth)
+app.use('/api/photos/*', requireAuth)
 app.use('/api/waitlist', requireAuth)
 app.use('/api/waitlist/*', requireAuth)
 
@@ -57,6 +59,7 @@ app.route('/api/audit', auditRoutes)
 app.route('/api/staff', staffRoutes)
 app.route('/api/backup', backupRoutes)
 app.route('/api/waitlist', waitlistRoutes)
+app.route('/api/photos', photoRoutes)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {

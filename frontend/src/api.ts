@@ -28,7 +28,7 @@ export class ApiError extends Error {
 
 type RequestOptions = {
   method?: string
-  body?: unknown
+  body?: unknown | FormData
 }
 
 /**
@@ -65,13 +65,19 @@ export async function downloadAuthed(path: string, fallbackName: string): Promis
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const token = getToken()
+  // FormData sets its own multipart boundary; forcing a JSON content-type on it
+  // would make the body unparseable on the other end.
+  const isForm = options.body instanceof FormData
+
   const response = await fetch(`${BASE}/api${path}`, {
     method: options.method ?? 'GET',
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.body !== undefined && !isForm ? { 'Content-Type': 'application/json' } : {}),
     },
-    ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+    ...(options.body !== undefined
+      ? { body: isForm ? (options.body as FormData) : JSON.stringify(options.body) }
+      : {}),
   })
 
   if (response.status === 204) return undefined as T
@@ -87,4 +93,22 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   }
 
   return payload as T
+}
+/**
+ * Fetches a protected binary endpoint and returns an object URL for it.
+ *
+ * Images need the bearer token, which an <img src> cannot carry — and serving
+ * them from a public URL instead would make internal documentation shareable
+ * by anyone who copied the link. Callers must revoke the URL when done.
+ */
+export async function authedBlobUrl(path: string): Promise<string> {
+  const token = getToken()
+  const response = await fetch(`${BASE}/api${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!response.ok) {
+    if (response.status === 401) setToken(null)
+    throw new ApiError(`Не удалось загрузить файл (${response.status})`, response.status)
+  }
+  return URL.createObjectURL(await response.blob())
 }

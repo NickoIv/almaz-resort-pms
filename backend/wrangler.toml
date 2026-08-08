@@ -21,6 +21,12 @@ migrations_dir = "migrations"
 binding = "BACKUPS"
 id = "4b98c535f0814302b915778342ee57be"
 
+# Internal photo documentation. Separate from BACKUPS so images can never
+# crowd out the daily database snapshots.
+[[kv_namespaces]]
+binding = "PHOTOS"
+id = "66d93884ca5e40bbb8b005117008d24a"
+
 # To move backups to R2 instead: enable R2 in the dashboard, run
 #   npx wrangler r2 bucket create almaz-resort-pms-backups
 # then uncomment the block below. The code prefers R2 whenever it is bound,
