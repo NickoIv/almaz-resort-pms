@@ -140,6 +140,16 @@ export type CleaningUnit = {
   category: string | null
   total: number
   pending: number
+  /** Almaty wall-clock time the unit started needing cleaning. */
+  waiting_since: string | null
+  waiting_minutes: number
+  is_overdue: boolean
+}
+
+export type CleaningOverview = {
+  /** Threshold in minutes; sent by the API so the UI keeps no copy of it. */
+  sla_minutes: number
+  units: CleaningUnit[]
 }
 
 export type Payment = {

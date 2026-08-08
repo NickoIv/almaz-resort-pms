@@ -3,7 +3,8 @@ import { HTTPException } from 'hono/http-exception'
 import { assertUnitTypeAllowed, allowedUnitTypes, placeholders } from '../lib/access'
 import { requireRole } from '../lib/auth'
 import { readJson } from '../lib/body'
-import { resetChecklist } from '../lib/cleaning'
+import { CLEANING_SLA_MINUTES, resetChecklist } from '../lib/cleaning'
+import { SQL_NOW } from '../lib/time'
 import { writeAudit } from '../lib/audit'
 import type { AppEnv, UnitType } from '../types'
 
@@ -44,18 +45,39 @@ cleaning.get('/', canClean, async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT u.id, u.type, u.name, u.category,
             COUNT(cc.id) AS total,
-            SUM(CASE WHEN cc.is_done = 0 THEN 1 ELSE 0 END) AS pending
+            SUM(CASE WHEN cc.is_done = 0 THEN 1 ELSE 0 END) AS pending,
+            MIN(cc.created_at) AS waiting_since,
+            CAST(
+              (julianday(${SQL_NOW}) - julianday(MIN(cc.created_at))) * 24 * 60 AS INTEGER
+            ) AS waiting_minutes
      FROM units u
      JOIN cleaning_checklist cc ON cc.unit_id = u.id
      WHERE u.type IN (${placeholders(types.length)})
      GROUP BY u.id
      HAVING pending > 0
-     ORDER BY u.type, u.name`
+     ORDER BY waiting_minutes DESC, u.type, u.name`
   )
     .bind(...types)
-    .all<{ id: number; type: UnitType; name: string; category: string | null; total: number; pending: number }>()
+    .all<{
+      id: number
+      type: UnitType
+      name: string
+      category: string | null
+      total: number
+      pending: number
+      waiting_since: string | null
+      waiting_minutes: number | null
+    }>()
 
-  return c.json(results)
+  // The threshold travels with the data so the UI never hard-codes its own copy.
+  return c.json({
+    sla_minutes: CLEANING_SLA_MINUTES,
+    units: results.map((row) => ({
+      ...row,
+      waiting_minutes: row.waiting_minutes ?? 0,
+      is_overdue: (row.waiting_minutes ?? 0) > CLEANING_SLA_MINUTES,
+    })),
+  })
 })
 
 /** GET /api/cleaning/unit/:unitId — the checklist for one unit. */

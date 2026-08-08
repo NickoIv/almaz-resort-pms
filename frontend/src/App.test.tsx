@@ -73,7 +73,7 @@ function baseRoutes(role: 'admin' | 'housekeeper' | 'waiter', units = [ROOM_WITH
   return {
     'GET /api/auth/me': { user: STAFF[role] },
     'GET /api/units': units,
-    'GET /api/cleaning': [],
+    'GET /api/cleaning': { sla_minutes: 60, units: [] },
     'GET /api/cleaning/unit/': CHECKLIST,
     'GET /api/settings': { notifications: {}, telegram_configured: false },
     'GET /api/analytics/summary': {},
@@ -218,7 +218,11 @@ describe('§7 role-restricted views', () => {
     signIn('housekeeper')
     mockApi({
       ...baseRoutes('housekeeper'),
-      'GET /api/cleaning': [{ id: 5, type: 'room', name: '105', category: 'standard', total: 8, pending: 3 }],
+      'GET /api/cleaning': {
+        sla_minutes: 60,
+        units: [{ id: 5, type: 'room', name: '105', category: 'standard', total: 8, pending: 3,
+                  waiting_since: '2026-08-08 09:00', waiting_minutes: 20, is_overdue: false }],
+      },
       'GET /api/cleaning/unit/5': CHECKLIST,
     })
 
@@ -513,5 +517,44 @@ describe('staff management page', () => {
 
     expect(await screen.findByRole('heading', { name: 'Зона отдыха' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Персонал' })).not.toBeInTheDocument()
+  })
+})
+
+describe('§2 cleaning SLA', () => {
+  it('shows elapsed time and flags a unit past the threshold', async () => {
+    signIn('housekeeper')
+    mockApi({
+      ...baseRoutes('housekeeper'),
+      'GET /api/cleaning': {
+        sla_minutes: 60,
+        units: [
+          { id: 5, type: 'room', name: '105', category: 'standard', total: 8, pending: 3,
+            waiting_since: '2026-08-08 07:00', waiting_minutes: 95, is_overdue: true },
+          { id: 6, type: 'room', name: '106', category: 'standard', total: 8, pending: 1,
+            waiting_since: '2026-08-08 09:40', waiting_minutes: 12, is_overdue: false },
+        ],
+      },
+      'GET /api/cleaning/unit/5': CHECKLIST,
+    })
+
+    renderApp(<App />, { route: '/cleaning' })
+    await screen.findByRole('heading', { name: 'Уборка' })
+
+    // 95 minutes reads as hours and minutes, 12 stays in minutes.
+    expect(await screen.findByText(/ждёт 1 ч 35 мин/)).toBeInTheDocument()
+    expect(screen.getByText(/ждёт 12 мин/)).toBeInTheDocument()
+
+    // The overdue one is marked structurally, not by colour alone.
+    // Scope to the card's own name element — the selected unit's name also
+    // appears in the checklist panel title.
+    const cardNamed = (name: string) =>
+      [...document.querySelectorAll('.unit-card')].find(
+        (card) => card.querySelector('.unit-name')?.textContent === name
+      )!
+    expect(cardNamed('105')).toHaveClass('is-overdue')
+    expect(cardNamed('106')).not.toHaveClass('is-overdue')
+
+    // And the header counts them using the threshold the API supplied.
+    expect(screen.getByText(/1 дольше 60 мин/)).toBeInTheDocument()
   })
 })

@@ -1914,6 +1914,34 @@ button {
   color: var(--text-faint);
 }
 
+/* ── Cleaning SLA ──────────────────────────────────────────────────────────── */
+
+.sla {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.sla-over {
+  color: #ffc2ca;
+  font-weight: 500;
+}
+
+.sla-warn {
+  color: var(--occupied);
+}
+
+/* A unit past the SLA is called out by border, glow and stripe together —
+   never colour alone, since the elapsed time is spelled out beside it. */
+.unit-card.is-overdue {
+  border-color: rgba(255, 92, 114, 0.55);
+  box-shadow: 0 0 0 1px rgba(255, 92, 114, 0.28), var(--shadow);
+  --stripe: var(--occupied);
+}
+
+.unit-card.is-overdue::before {
+  background: var(--occupied);
+}
+
 /* ── Cancellation reason ───────────────────────────────────────────────────── */
 
 .cancel-block {

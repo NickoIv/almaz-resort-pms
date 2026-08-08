@@ -136,3 +136,11 @@ export function addDaysIso(iso: string, days: number): string {
     .toISOString()
     .slice(0, 10)
 }
+/** 95 -> "1 ч 35 мин"; under an hour stays in minutes. */
+export function elapsedLabel(minutes: number): string {
+  const safe = Math.max(0, Math.round(minutes))
+  if (safe < 60) return `${safe} мин`
+  const hours = Math.floor(safe / 60)
+  const rest = safe % 60
+  return rest === 0 ? `${hours} ч` : `${hours} ч ${rest} мин`
+}

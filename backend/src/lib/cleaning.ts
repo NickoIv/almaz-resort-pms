@@ -1,4 +1,11 @@
+import { SQL_NOW } from './time'
 import type { UnitType } from '../types'
+
+/**
+ * How long a unit may sit unclean before the Cleaning page flags it red.
+ * Change this one number to retune the SLA.
+ */
+export const CLEANING_SLA_MINUTES = 60
 
 /** Checklist a housekeeper works through after a guest leaves. */
 export const ROOM_CHECKLIST_TEMPLATE = [
@@ -40,7 +47,8 @@ export async function resetChecklist(
     ...items.map((item) =>
       db
         .prepare(
-          'INSERT INTO cleaning_checklist (unit_id, booking_id, item_name, is_done) VALUES (?, ?, ?, 0)'
+          `INSERT INTO cleaning_checklist (unit_id, booking_id, item_name, is_done, created_at)
+           VALUES (?, ?, ?, 0, ${SQL_NOW})`
         )
         .bind(unitId, bookingId, item)
     ),

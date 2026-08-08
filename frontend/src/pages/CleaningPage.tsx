@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import Checklist from '../components/Checklist'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
-import type { ChecklistItem, CleaningUnit } from '../types'
+import { elapsedLabel } from '../format'
+import type { ChecklistItem, CleaningOverview, CleaningUnit } from '../types'
 
 /**
  * "What needs cleaning today" — the housekeeper's whole app.
@@ -10,6 +11,7 @@ import type { ChecklistItem, CleaningUnit } from '../types'
  */
 export default function CleaningPage() {
   const [units, setUnits] = useState<CleaningUnit[]>([])
+  const [slaMinutes, setSlaMinutes] = useState(60)
   const [selected, setSelected] = useState<CleaningUnit | null>(null)
   const [items, setItems] = useState<ChecklistItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -17,10 +19,13 @@ export default function CleaningPage() {
 
   const load = useCallback(() => {
     setLoading(true)
-    api<CleaningUnit[]>('/cleaning')
+    api<CleaningOverview>('/cleaning')
       .then((data) => {
-        setUnits(data)
-        setSelected((current) => data.find((unit) => unit.id === current?.id) ?? data[0] ?? null)
+        setUnits(data.units)
+        setSlaMinutes(data.sla_minutes)
+        setSelected(
+          (current) => data.units.find((unit) => unit.id === current?.id) ?? data.units[0] ?? null
+        )
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
@@ -38,6 +43,7 @@ export default function CleaningPage() {
 
   const doneCount = items.filter((item) => item.is_done).length
   const allDone = items.length > 0 && doneCount === items.length
+  const overdue = units.filter((unit) => unit.is_overdue).length
 
   return (
     <>
@@ -46,6 +52,9 @@ export default function CleaningPage() {
           <h1>Уборка</h1>
           <div className="page-sub">
             {units.length > 0 ? `${units.length} объектов ждут уборки` : 'Всё убрано'}
+            {overdue > 0 && (
+              <span className="sla-warn"> · {overdue} дольше {slaMinutes} мин</span>
+            )}
           </div>
         </div>
         <div className="page-head-actions">
@@ -68,7 +77,7 @@ export default function CleaningPage() {
               <button
                 key={unit.id}
                 type="button"
-                className="unit-card glass"
+                className={`unit-card glass ${unit.is_overdue ? 'is-overdue' : ''}`}
                 data-status={unit.id === selected?.id ? 'booked' : undefined}
                 onClick={() => setSelected(unit)}
               >
@@ -80,6 +89,15 @@ export default function CleaningPage() {
                   <span className="unit-status">
                     <StatusDot status="cleaning" />
                     {unit.pending} из {unit.total}
+                  </span>
+                </div>
+                <div className="unit-foot">
+                  <span
+                    className={`sla ${unit.is_overdue ? 'sla-over' : ''}`}
+                    title={unit.waiting_since ? `С ${unit.waiting_since}` : undefined}
+                  >
+                    ждёт {elapsedLabel(unit.waiting_minutes)}
+                    {unit.is_overdue && ` · дольше ${slaMinutes} мин`}
                   </span>
                 </div>
               </button>
