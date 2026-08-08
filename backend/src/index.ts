@@ -1,22 +1,42 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { HTTPException } from 'hono/http-exception'
+import { requireAuth } from './lib/auth'
+import authRoutes from './routes/auth'
+import unitRoutes from './routes/units'
+import bookingRoutes from './routes/bookings'
+import cleaningRoutes from './routes/cleaning'
+import type { AppEnv } from './types'
 
-export type Bindings = {
-  DB: D1Database
-}
-
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<AppEnv>()
 
 app.use('/api/*', cors())
 
-app.get('/api/health', (c) => c.json({ ok: true, service: 'resort-pms-backend' }))
+app.get('/api/health', (c) => c.json({ ok: true, service: 'almaz-resort-pms-api' }))
 
-// Smoke-test endpoint: confirms the D1 binding works and the schema is applied.
-app.get('/api/units', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    'SELECT id, type, name, category, capacity FROM units ORDER BY type, name'
-  ).all()
-  return c.json(results)
+// Public: login lives here, /auth/me guards itself.
+app.route('/api/auth', authRoutes)
+
+// Everything below requires a valid staff token.
+app.use('/api/units/*', requireAuth)
+app.use('/api/units', requireAuth)
+app.use('/api/bookings/*', requireAuth)
+app.use('/api/bookings', requireAuth)
+app.use('/api/cleaning/*', requireAuth)
+app.use('/api/cleaning', requireAuth)
+
+app.route('/api/units', unitRoutes)
+app.route('/api/bookings', bookingRoutes)
+app.route('/api/cleaning', cleaningRoutes)
+
+app.onError((err, c) => {
+  if (err instanceof HTTPException) {
+    return c.json({ error: err.message }, err.status)
+  }
+  console.error('Unhandled error', err)
+  return c.json({ error: 'Internal server error' }, 500)
 })
+
+app.notFound((c) => c.json({ error: 'Not found' }, 404))
 
 export default app

@@ -1,0 +1,49 @@
+import type { CalendarDay } from '../types'
+import { todayIso } from '../format'
+
+const DOW = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
+
+/** Monday-based column index for a YYYY-MM-DD string. */
+function weekdayIndex(iso: string): number {
+  return (new Date(`${iso}T00:00:00`).getDay() + 6) % 7
+}
+
+export default function MonthCalendar({
+  days,
+  onSelect,
+}: {
+  days: CalendarDay[]
+  onSelect?: (day: CalendarDay) => void
+}) {
+  if (days.length === 0) return null
+
+  const leadingBlanks = weekdayIndex(days[0].date)
+  const today = todayIso()
+
+  return (
+    <div className="cal-grid">
+      {DOW.map((label) => (
+        <div key={label} className="cal-dow">
+          {label}
+        </div>
+      ))}
+
+      {Array.from({ length: leadingBlanks }, (_, index) => (
+        <div key={`blank-${index}`} className="cal-day is-empty" />
+      ))}
+
+      {days.map((day) => (
+        <div
+          key={day.date}
+          className={`cal-day ${day.date === today ? 'is-today' : ''}`}
+          data-status={day.status}
+          title={day.guest_name ?? 'Свободно'}
+          onClick={() => onSelect?.(day)}
+          role={onSelect ? 'button' : undefined}
+        >
+          {Number(day.date.slice(8, 10))}
+        </div>
+      ))}
+    </div>
+  )
+}
