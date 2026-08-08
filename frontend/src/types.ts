@@ -28,6 +28,10 @@ export type Booking = {
   is_paid?: boolean
   /** Set when this booking is part of a multi-unit group booking. */
   group_id?: number | null
+  /** Why the booking ended — set when it moves to 'free'. */
+  cancel_reason?: string | null
+  cancel_note?: string | null
+  cancelled_at?: string | null
   /** Money fields are present only for the admin role. */
   total_amount?: number
   prepaid_amount?: number

@@ -10,6 +10,7 @@ import MonthCalendar from '../components/MonthCalendar'
 import PaymentModal from '../components/PaymentModal'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
 import { almatyMonth, dateRange, money, timeRange } from '../format'
+import { CANCEL_REASON_LABELS, type CancelReason } from '../cancellation'
 import {
   STATUS_LABELS,
   UNIT_TYPE_LABELS,
@@ -252,6 +253,18 @@ export default function UnitDetailPage() {
                   <span>Статус</span>
                   <span>{STATUS_LABELS[booking.status ?? 'booked']}</span>
                 </div>
+                {booking.cancel_reason && (
+                  <div className="info-row">
+                    <span>Причина завершения</span>
+                    <span>
+                      {CANCEL_REASON_LABELS[booking.cancel_reason as CancelReason] ??
+                        booking.cancel_reason}
+                      {booking.cancel_note && (
+                        <span className="cancel-note">{booking.cancel_note}</span>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="unit-empty">Активной брони нет</div>

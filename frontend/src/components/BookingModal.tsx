@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { api } from '../api'
 import { Alert, Modal } from './ui'
 import { addDaysIso, todayIso } from '../format'
+import { CANCEL_REASONS, CANCEL_REASON_LABELS, needsNote, type CancelReason } from '../cancellation'
 import {
   CURRENCIES,
   CURRENCY_LABELS,
@@ -55,8 +56,15 @@ export default function BookingModal({
     (booking?.currency as Currency) ?? DEFAULT_CURRENCY
   )
 
+  const [cancelReason, setCancelReason] = useState<CancelReason>('checked_out')
+  const [cancelNote, setCancelNote] = useState('')
+
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  // Going to 'free' from an active booking is either a checkout or a
+  // cancellation; the API requires a reason to tell them apart.
+  const ending = !!booking && booking.status !== 'free' && status === 'free'
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -69,6 +77,7 @@ export default function BookingModal({
         date_from: toApi(dateFrom, hourly),
         date_to: toApi(dateTo, hourly),
         status,
+        ...(ending ? { cancel_reason: cancelReason, cancel_note: cancelNote || null } : {}),
       }
 
       if (booking) {
@@ -173,6 +182,37 @@ export default function BookingModal({
             <option value="free">Выехал / отменена</option>
           </select>
         </div>
+
+        {ending && (
+          <div className="cancel-block">
+            <div className="field">
+              <label htmlFor="cancel-reason">Причина завершения</label>
+              <select
+                id="cancel-reason"
+                value={cancelReason}
+                onChange={(event) => setCancelReason(event.target.value as CancelReason)}
+              >
+                {CANCEL_REASONS.map((reason) => (
+                  <option key={reason} value={reason}>
+                    {CANCEL_REASON_LABELS[reason]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="cancel-note">
+                Комментарий{needsNote(cancelReason) ? '' : ' (необязательно)'}
+              </label>
+              <input
+                id="cancel-note"
+                value={cancelNote}
+                onChange={(event) => setCancelNote(event.target.value)}
+                placeholder={needsNote(cancelReason) ? 'Опишите причину' : ''}
+                required={needsNote(cancelReason)}
+              />
+            </div>
+          </div>
+        )}
 
         {canSetPrice && (
           <>

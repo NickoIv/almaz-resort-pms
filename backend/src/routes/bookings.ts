@@ -7,7 +7,8 @@ import { resetChecklist } from '../lib/cleaning'
 import { writeAudit } from '../lib/audit'
 import { chargesSumSql, remainingOf } from '../lib/money'
 import { cleanName, cleanOptional } from '../lib/text'
-import { addHours, almatyNow } from '../lib/time'
+import { CANCEL_REASONS, isCancelReason } from '../lib/cancellation'
+import { addHours, almatyNow, SQL_NOW } from '../lib/time'
 import type { AppEnv, BookingStatus, UnitType } from '../types'
 
 type BookingRow = {
@@ -25,6 +26,9 @@ type BookingRow = {
   created_at: string
   group_id: number | null
   charges_total?: number
+  cancel_reason: string | null
+  cancel_note: string | null
+  cancelled_at: string | null
 }
 
 const BOOKING_STATUSES: BookingStatus[] = ['free', 'booked', 'occupied']
@@ -43,6 +47,9 @@ function serializeBooking(row: BookingRow, withMoney: boolean) {
     status: row.status,
     created_at: row.created_at,
     group_id: row.group_id,
+    cancel_reason: row.cancel_reason,
+    cancel_note: row.cancel_note,
+    cancelled_at: row.cancelled_at,
     is_paid: remainingOf(row.total_amount, row.charges_total ?? 0, row.prepaid_amount) <= 0,
     ...(withMoney
       ? {
@@ -514,23 +521,59 @@ bookings.patch('/:id', canBook, async (c) => {
     await assertNoOverlap(c.env.DB, existing.unit_id, dateFrom, dateTo, id)
   }
 
+  // Going from booked/occupied to free is either a checkout or a cancellation.
+  // The reason is what distinguishes them afterwards, so it is required on
+  // that transition and recorded on the booking itself.
+  const ending = existing.status !== 'free' && status === 'free'
+  let cancelReason = existing.cancel_reason
+  let cancelNote = existing.cancel_note
+
+  if (ending) {
+    if (!isCancelReason(body.cancel_reason)) {
+      throw new HTTPException(400, {
+        message: `Укажите причину: ${CANCEL_REASONS.join(', ')}`,
+      })
+    }
+    cancelReason = body.cancel_reason
+    cancelNote = cleanOptional(body.cancel_note, 300)
+    if (cancelReason === 'other' && !cancelNote) {
+      throw new HTTPException(400, { message: 'Для причины «Другое» опишите её текстом' })
+    }
+  }
+
   const updated = await c.env.DB.prepare(
     `UPDATE bookings
-     SET guest_name = ?, guest_phone = ?, date_from = ?, date_to = ?, status = ?
+     SET guest_name = ?, guest_phone = ?, date_from = ?, date_to = ?, status = ?,
+         cancel_reason = ?, cancel_note = ?,
+         cancelled_at = CASE WHEN ? THEN ${SQL_NOW} ELSE cancelled_at END
      WHERE id = ?
      RETURNING *`
   )
-    .bind(guestName, guestPhone, dateFrom, dateTo, status, id)
+    .bind(
+      guestName,
+      guestPhone,
+      dateFrom,
+      dateTo,
+      status,
+      cancelReason,
+      cancelNote,
+      ending ? 1 : 0,
+      id
+    )
     .first<BookingRow>()
 
   if (!updated) throw new HTTPException(500, { message: 'Failed to update booking' })
 
   // Checking out queues the unit for housekeeping.
-  if (existing.status !== 'free' && status === 'free') {
+  if (ending) {
     await resetChecklist(c.env.DB, existing.unit_id, unit.type, id)
   }
 
-  await writeAudit(c.env.DB, staff.sub, `booking.update:${status}`, 'bookings', id)
+  // The reason rides in the audit action so the journal reads on its own.
+  const auditAction = ending
+    ? `booking.update:free:${cancelReason}`
+    : `booking.update:${status}`
+  await writeAudit(c.env.DB, staff.sub, auditAction, 'bookings', id)
   return c.json(serializeBooking(updated, canSeeMoney(staff.role)))
 })
 

@@ -3,6 +3,7 @@ import { api } from '../api'
 import { Alert, EmptyState, Spinner } from '../components/ui'
 import { downloadCsv } from '../csv'
 import { todayIso } from '../format'
+import { CANCEL_REASON_LABELS, type CancelReason } from '../cancellation'
 import { ROLE_LABELS, type Role } from '../types'
 
 type AuditEntry = {
@@ -55,10 +56,14 @@ const STATUS_WORDS: Record<string, string> = {
 function describe(entry: AuditEntry): string {
   if (ACTION_LABELS[entry.action]) return ACTION_LABELS[entry.action]
 
-  // booking.update:<status> carries the new status after the colon.
+  // booking.update:<status>[:<reason>] — the reason is present when a booking
+  // was ended, which is what distinguishes a checkout from a cancellation.
   if (entry.action.startsWith('booking.update:')) {
-    const status = entry.action.split(':')[1]
-    return `Изменена бронь — ${STATUS_WORDS[status] ?? status}`
+    const [, status, reason] = entry.action.split(':')
+    const base = `Изменена бронь — ${STATUS_WORDS[status] ?? status}`
+    return reason
+      ? `${base} (${CANCEL_REASON_LABELS[reason as CancelReason] ?? reason})`
+      : base
   }
   if (entry.action.startsWith('notification.test')) {
     return `Тест уведомления (${entry.action.split(':')[1] ?? ''})`.trim()
