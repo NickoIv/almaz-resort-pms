@@ -85,20 +85,20 @@ export default function WaitlistPage() {
         <EmptyState icon="📝">Записей нет</EmptyState>
       ) : (
         <section className="panel glass">
-          <div className="staff-rows">
+          <div className="row-list">
             {entries.map((entry) => (
               <div
                 key={entry.id}
-                className={`staff-row ${entry.status !== 'open' ? 'is-disabled' : ''}`}
+                className={`row-card ${entry.status !== 'open' ? 'is-disabled' : ''}`}
               >
-                <div className="staff-identity">
-                  <div className="staff-name">
+                <div className="row-main">
+                  <div className="row-title">
                     {entry.guest_name}
                     <span className="tag">{STATUS_LABELS[entry.status]}</span>
                     {/* Dates already in the past — shown so the list can be tidied. */}
                     {entry.is_stale && <span className="tag tag-off">даты прошли</span>}
                   </div>
-                  <div className="staff-phone">
+                  <div className="row-sub">
                     {entry.guest_phone ?? 'без телефона'} · {UNIT_TYPE_LABELS[entry.unit_type]}
                     {entry.unit_name ? ` «${entry.unit_name}»` : ''} ·{' '}
                     {dateRange(entry.date_from, entry.date_to)}
@@ -106,7 +106,7 @@ export default function WaitlistPage() {
                   {entry.note && <div className="setting-hint">{entry.note}</div>}
                 </div>
 
-                <div className="staff-actions">
+                <div className="row-actions">
                   {entry.status === 'open' ? (
                     <>
                       <button

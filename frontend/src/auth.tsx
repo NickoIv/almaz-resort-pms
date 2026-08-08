@@ -65,9 +65,14 @@ export function useAuth(): AuthState {
   return context
 }
 
-/** Where each role lands after logging in. */
+/**
+ * Where each role lands after logging in.
+ *
+ * The admin gets the summary; the other two go straight to the one page they
+ * work in, where a dashboard would only be a detour.
+ */
 export const HOME_BY_ROLE: Record<Role, string> = {
-  admin: '/rooms',
+  admin: '/',
   housekeeper: '/cleaning',
   waiter: '/restaurant',
 }

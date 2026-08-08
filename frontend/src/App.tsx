@@ -5,6 +5,7 @@ import { Spinner } from './components/ui'
 import AnalyticsPage from './pages/AnalyticsPage'
 import AuditPage from './pages/AuditPage'
 import CleaningPage from './pages/CleaningPage'
+import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import RestaurantPage from './pages/RestaurantPage'
 import RoomsPage from './pages/RoomsPage'
@@ -32,6 +33,16 @@ export default function App() {
           </RequireRole>
         }
       >
+        {/* The admin lands on the summary; RequireRole bounces the other two
+            roles straight back to the single page they actually work in. */}
+        <Route
+          index
+          element={
+            <RequireRole roles={['admin']}>
+              <DashboardPage />
+            </RequireRole>
+          }
+        />
         <Route
           path="/rooms"
           element={

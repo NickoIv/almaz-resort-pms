@@ -92,7 +92,7 @@ export default function StaffPage() {
       ) : staff.length === 0 ? (
         <EmptyState icon="👤">Сотрудников пока нет</EmptyState>
       ) : (
-        <div className="staff-list">
+        <div className="panel-stack">
           {ROLE_ORDER.map((role) => {
             const group = staff.filter((member) => member.role === role)
             if (group.length === 0) return null
@@ -104,24 +104,24 @@ export default function StaffPage() {
                   <span className="count">{group.length}</span>
                 </div>
 
-                <div className="staff-rows">
+                <div className="row-list">
                   {group.map((member) => {
                     const isSelf = member.id === user?.id
                     return (
                       <div
                         key={member.id}
-                        className={`staff-row ${member.is_active ? '' : 'is-disabled'}`}
+                        className={`row-card ${member.is_active ? '' : 'is-disabled'}`}
                       >
-                        <div className="staff-identity">
-                          <div className="staff-name">
+                        <div className="row-main">
+                          <div className="row-title">
                             {member.name}
                             {isSelf && <span className="tag">это вы</span>}
                             {!member.is_active && <span className="tag tag-off">отключён</span>}
                           </div>
-                          <div className="staff-phone">{member.phone}</div>
+                          <div className="row-sub">{member.phone}</div>
                         </div>
 
-                        <div className="staff-actions">
+                        <div className="row-actions">
                           <button
                             className="btn btn-sm btn-ghost"
                             onClick={() => setEditing(member)}

@@ -3,21 +3,8 @@ import { api } from '../api'
 import { Alert, EmptyState, Spinner } from '../components/ui'
 import { downloadCsv } from '../csv'
 import { todayIso } from '../format'
-import { CANCEL_REASON_LABELS, type CancelReason } from '../cancellation'
+import { describeAudit, GROUP_LABELS, type AuditEntry } from '../audit'
 import { ROLE_LABELS, type Role } from '../types'
-
-type AuditEntry = {
-  id: number
-  staff_user_id: number | null
-  staff_name: string | null
-  staff_role: Role | null
-  action: string
-  entity: string
-  entity_id: number | null
-  created_at: string
-  target: string | null
-  guest_name: string | null
-}
 
 type AuditResponse = {
   total: number
@@ -29,57 +16,6 @@ type AuditResponse = {
 type Filters = { actions: string[]; staff: { id: number; name: string; role: Role }[] }
 
 const PAGE_SIZE = 50
-
-/** Human wording for the action verbs written by writeAudit(). */
-const ACTION_LABELS: Record<string, string> = {
-  'login': 'Вход в систему',
-  'booking.create': 'Создана бронь',
-  'booking.quick': 'Быстрая бронь',
-  'booking.payment': 'Внесена оплата',
-  'booking.group.create': 'Создана групповая бронь',
-  'booking.group.payment': 'Оплата по группе',
-  'charge.create': 'Начисление добавлено',
-  'charge.delete': 'Начисление удалено',
-  'cleaning.done': 'Пункт уборки выполнен',
-  'cleaning.undone': 'Пункт уборки снят',
-  'cleaning.reset': 'Чек-лист сброшен',
-  'settings.update': 'Изменены настройки',
-  'guest.notes': 'Заметка о госте',
-}
-
-const STATUS_WORDS: Record<string, string> = {
-  free: 'выезд / отмена',
-  booked: 'бронь',
-  occupied: 'заселение',
-}
-
-function describe(entry: AuditEntry): string {
-  if (ACTION_LABELS[entry.action]) return ACTION_LABELS[entry.action]
-
-  // booking.update:<status>[:<reason>] — the reason is present when a booking
-  // was ended, which is what distinguishes a checkout from a cancellation.
-  if (entry.action.startsWith('booking.update:')) {
-    const [, status, reason] = entry.action.split(':')
-    const base = `Изменена бронь — ${STATUS_WORDS[status] ?? status}`
-    return reason
-      ? `${base} (${CANCEL_REASON_LABELS[reason as CancelReason] ?? reason})`
-      : base
-  }
-  if (entry.action.startsWith('notification.test')) {
-    return `Тест уведомления (${entry.action.split(':')[1] ?? ''})`.trim()
-  }
-  return entry.action
-}
-
-const GROUP_LABELS: Record<string, string> = {
-  booking: 'Брони',
-  charge: 'Начисления',
-  cleaning: 'Уборка',
-  settings: 'Настройки',
-  login: 'Входы',
-  guest: 'Гости',
-  notification: 'Уведомления',
-}
 
 export default function AuditPage() {
   const [data, setData] = useState<AuditResponse | null>(null)
@@ -123,7 +59,7 @@ export default function AuditPage() {
         entry.created_at,
         entry.staff_name ?? '—',
         entry.staff_role ? ROLE_LABELS[entry.staff_role] : '—',
-        describe(entry),
+        describeAudit(entry),
         entry.target ?? (entry.entity_id ? `${entry.entity} #${entry.entity_id}` : entry.entity),
         entry.guest_name ?? '',
         entry.action,
@@ -152,8 +88,11 @@ export default function AuditPage() {
         </div>
       </div>
 
+      {/* Both chip rows are their own contained strips: with a dozen action
+          buckets and every staff member who ever logged in, an unbounded row
+          used to widen the page and push the heading off the left edge. */}
       <div className="toolbar">
-        <div className="chip-row">
+        <div className="filter-strip">
           <button
             className={`chip ${action === '' ? 'active' : ''}`}
             onClick={() => {
@@ -178,7 +117,7 @@ export default function AuditPage() {
         </div>
 
         {filters.staff.length > 0 && (
-          <div className="chip-row">
+          <div className="filter-strip">
             <button
               className={`chip ${staffId === '' ? 'active' : ''}`}
               onClick={() => {
@@ -214,34 +153,42 @@ export default function AuditPage() {
       ) : (
         <>
           <section className="panel glass">
-            <table className="data-table audit-table">
-              <thead>
-                <tr>
-                  <th>Когда</th>
-                  <th>Сотрудник</th>
-                  <th>Действие</th>
-                  <th>Объект</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.entries.map((entry) => (
-                  <tr key={entry.id}>
-                    <td className="audit-when">{entry.created_at.replace('T', ' ').slice(0, 16)}</td>
-                    <td>
-                      {entry.staff_name ?? '—'}
-                      {entry.staff_role && (
-                        <span className="audit-role">{ROLE_LABELS[entry.staff_role]}</span>
-                      )}
-                    </td>
-                    <td>{describe(entry)}</td>
-                    <td>
-                      {entry.target ?? (entry.entity_id ? `#${entry.entity_id}` : '—')}
-                      {entry.guest_name && <span className="audit-guest">{entry.guest_name}</span>}
-                    </td>
+            {/* The table is the one genuinely wide thing on the page, so it
+                scrolls inside itself rather than dragging the page with it. */}
+            <div className="table-scroll">
+              <table className="data-table audit-table">
+                <thead>
+                  <tr>
+                    <th>Когда</th>
+                    <th>Сотрудник</th>
+                    <th>Действие</th>
+                    <th>Объект</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.entries.map((entry) => (
+                    <tr key={entry.id}>
+                      <td className="audit-when">
+                        {entry.created_at.replace('T', ' ').slice(0, 16)}
+                      </td>
+                      <td>
+                        {entry.staff_name ?? '—'}
+                        {entry.staff_role && (
+                          <span className="audit-role">{ROLE_LABELS[entry.staff_role]}</span>
+                        )}
+                      </td>
+                      <td>{describeAudit(entry)}</td>
+                      <td>
+                        {entry.target ?? (entry.entity_id ? `#${entry.entity_id}` : '—')}
+                        {entry.guest_name && (
+                          <span className="audit-guest">{entry.guest_name}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
 
           {totalPages > 1 && (

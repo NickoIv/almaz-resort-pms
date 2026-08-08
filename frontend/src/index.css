@@ -25,6 +25,25 @@
   --radius-md: 16px;
   --radius-sm: 10px;
 
+  /* Card metrics, in one place.
+
+     Every card-like surface — panels, unit cards, stat and dashboard tiles,
+     list rows — was given its own padding and corner radius as each feature
+     landed, so a grid of them never quite lined up. These four values are the
+     single source of truth; a surface that wants to look like a card uses
+     them rather than inventing its own. */
+  --card-pad: 18px;
+  --card-radius: 18px;
+  --card-gap: 16px;
+
+  /* Rows nested inside a card need a tighter box, or the nesting reads as
+     two unrelated cards stacked. */
+  --row-pad: 13px 15px;
+  --row-radius: 12px;
+
+  /* Every action button in a page header, whatever its variant. */
+  --action-height: 34px;
+
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.36);
   --shadow-lift: 0 16px 44px rgba(0, 0, 0, 0.46);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -77,8 +96,32 @@ button {
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--card-radius);
   box-shadow: var(--shadow);
+}
+
+/* ── Shared card surfaces ──────────────────────────────────────────────────
+   One rule so a panel, a unit card, a stat and a dashboard tile can never
+   drift apart again. Anything that needs a different box is deliberately not
+   in this list.                                                              */
+
+.panel,
+.unit-card,
+.stat,
+.tile {
+  padding: var(--card-pad);
+  border-radius: var(--card-radius);
+}
+
+/* Grids of cards: same gutter everywhere, and rows of equal height so the
+   bottom edges line up even when one card carries an extra line. */
+.unit-grid,
+.stat-row,
+.tile-grid,
+.dash-grid {
+  display: grid;
+  gap: var(--card-gap);
+  align-items: stretch;
 }
 
 .glass-soft {
@@ -138,15 +181,47 @@ button {
   font-size: 12px;
 }
 
-.nav {
+/* ── Sidebar navigation ────────────────────────────────────────────────────
+   Eight links in the topbar left no room to say which belong together, and no
+   room for anything else either. They now sit in a column, in three labelled
+   groups.                                                                    */
+
+.shell-body {
+  flex: 1;
   display: flex;
-  gap: 6px;
-  margin-left: 8px;
-  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0;
+  min-height: 0;
 }
 
-.nav a {
-  padding: 8px 15px;
+.sidebar {
+  position: sticky;
+  top: 65px;
+  flex: 0 0 208px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px 14px;
+  align-self: stretch;
+  border-right: 1px solid var(--glass-border-soft);
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-group-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-faint);
+  padding: 0 12px 6px;
+}
+
+.nav-link {
+  padding: 9px 12px;
   border-radius: 11px;
   color: var(--text-dim);
   text-decoration: none;
@@ -154,17 +229,15 @@ button {
   border: 1px solid transparent;
   transition:
     background 0.18s var(--ease),
-    color 0.18s var(--ease),
-    transform 0.18s var(--ease);
+    color 0.18s var(--ease);
 }
 
-.nav a:hover {
+.nav-link:hover {
   color: var(--text);
   background: var(--glass);
-  transform: translateY(-1px);
 }
 
-.nav a.active {
+.nav-link.active {
   color: var(--text);
   background: var(--glass-strong);
   border-color: var(--glass-border);
@@ -261,7 +334,9 @@ button {
   padding: 28px;
   max-width: 1480px;
   width: 100%;
-  margin: 0 auto;
+  /* Without this a wide child — a data table, a long chip row — can force the
+     flex item past its share and drag the whole page sideways. */
+  min-width: 0;
 }
 
 .page-head {
@@ -282,11 +357,29 @@ button {
   margin-top: 4px;
 }
 
+/* ── Page header actions ───────────────────────────────────────────────────
+   Every page's header buttons, from the single "Обновить" on the waitlist to
+   the four on a unit detail view. Sizing lives here rather than on the
+   individual buttons, so a .btn, a .btn-sm and a .btn-primary sitting side by
+   side are the same height whatever each page happened to reach for.         */
+
 .page-head-actions {
   margin-left: auto;
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
+  gap: 10px;
+}
+
+.page-head-actions .btn {
+  height: var(--action-height);
+  padding: 0 14px;
+  font-size: 13px;
+  border-radius: 10px;
+  /* A wrapping label would make one button taller than its neighbours; these
+     are short enough to stay on one line and wrap as whole buttons instead. */
+  white-space: nowrap;
 }
 
 /* ── Buttons ───────────────────────────────────────────────────────────────── */
@@ -424,15 +517,12 @@ button {
 }
 
 .unit-grid {
-  display: grid;
   grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
-  gap: 16px;
 }
 
 .unit-card {
   position: relative;
   overflow: hidden;
-  padding: 18px;
   text-align: left;
   display: flex;
   flex-direction: column;
@@ -653,12 +743,15 @@ button {
   }
 }
 
-.panel {
-  padding: 20px;
+.panel + .panel {
+  margin-top: var(--card-gap);
 }
 
-.panel + .panel {
-  margin-top: 18px;
+/* A column of panels — the staff page, grouped by role. */
+.panel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
 }
 
 .panel-title {
@@ -1095,6 +1188,38 @@ button {
   align-items: center;
 }
 
+/* ── Contained filter strip ────────────────────────────────────────────────
+   A chip row whose contents are open-ended: every action bucket the log has
+   ever recorded, every staff member who ever signed in. It wraps, and if a
+   single chip is still too wide for a narrow viewport the strip scrolls
+   inside itself. What it must never do is widen its parent — that pushed the
+   audit page into horizontal overflow and carried the heading off-screen.    */
+
+.filter-strip {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  /* Room for the chips' hover lift, which would otherwise be clipped by the
+     overflow this rule introduces. */
+  padding: 3px 0;
+  scrollbar-width: thin;
+}
+
+.filter-strip .chip {
+  flex: 0 0 auto;
+}
+
+/* Wide content scrolls in its own box rather than stretching the page. */
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: thin;
+}
+
 .filters {
   margin-bottom: 20px;
 }
@@ -1169,14 +1294,11 @@ button {
 /* ── Stat tiles ────────────────────────────────────────────────────────────── */
 
 .stat-row {
-  display: grid;
   grid-template-columns: repeat(auto-fit, minmax(216px, 1fr));
-  gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: var(--card-gap);
 }
 
 .stat {
-  padding: 20px;
   transition:
     transform 0.22s var(--ease),
     box-shadow 0.22s var(--ease);
@@ -1472,6 +1594,13 @@ button {
   text-align: right;
   font-variant-numeric: tabular-nums;
   color: var(--text);
+}
+
+/* Only the final column may lose its right padding — it has nothing to sit
+   beside. Applying that to every .num ran the weekday table's "Сумма" figures
+   straight into the occupancy bars next to them. */
+.data-table th:last-child,
+.data-table td:last-child {
   padding-right: 0;
 }
 
@@ -2400,6 +2529,23 @@ button {
     display: none !important;
   }
 
+  /* Nothing in the chrome prints, so collapse it outright rather than merely
+     hiding it — left in the flow, the sidebar would indent every sheet by its
+     width and cost the printout 208px of usable paper. */
+  .topbar,
+  .sidebar {
+    display: none !important;
+  }
+
+  .shell-body {
+    display: block;
+  }
+
+  .content {
+    padding: 0;
+    max-width: none;
+  }
+
   .sheet-overlay {
     position: static;
     padding: 0;
@@ -2502,27 +2648,24 @@ button {
   cursor: pointer;
 }
 
-/* ── Staff management ──────────────────────────────────────────────────────── */
+/* ── List rows ─────────────────────────────────────────────────────────────
+   The row card: a person on the staff page, a guest on the waitlist, a unit
+   or an event on the dashboard. Previously three near-identical copies under
+   staff-* names; one shape now, so a row looks the same wherever it appears. */
 
-.staff-list {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.staff-rows {
+.row-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.staff-row {
+.row-card {
   display: flex;
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
-  padding: 13px 15px;
-  border-radius: var(--radius-sm);
+  padding: var(--row-pad);
+  border-radius: var(--row-radius);
   border: 1px solid var(--glass-border-soft);
   background: rgba(255, 255, 255, 0.03);
   transition:
@@ -2530,21 +2673,22 @@ button {
     border-color 0.16s var(--ease);
 }
 
-.staff-row:hover {
+.row-card:hover {
   transform: translateY(-2px);
   border-color: var(--glass-border);
 }
 
-/* Disabled accounts stay listed — history references them — but recede. */
-.staff-row.is-disabled {
+/* Disabled accounts and closed waitlist entries stay listed — history
+   references them — but recede. */
+.row-card.is-disabled {
   opacity: 0.55;
 }
 
-.staff-identity {
+.row-main {
   min-width: 0;
 }
 
-.staff-name {
+.row-title {
   font-size: 14.5px;
   font-weight: 500;
   display: flex;
@@ -2553,18 +2697,38 @@ button {
   flex-wrap: wrap;
 }
 
-.staff-phone {
+.row-sub {
   font-size: 12px;
   color: var(--text-faint);
   margin-top: 3px;
   font-variant-numeric: tabular-nums;
 }
 
-.staff-actions {
+.row-when {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.row-actions {
   margin-left: auto;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/* Row buttons follow the header rule: one height regardless of variant. */
+.row-actions .btn {
+  height: var(--action-height);
+  padding: 0 13px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.row-card.is-overdue {
+  border-color: rgba(255, 92, 114, 0.45);
 }
 
 .tag-off {
@@ -2574,16 +2738,103 @@ button {
 }
 
 @media (max-width: 640px) {
-  .staff-actions {
+  .row-actions {
     margin-left: 0;
     width: 100%;
   }
+}
+
+/* ── Dashboard ─────────────────────────────────────────────────────────────
+   Read-only summary tiles. Each is a link to the page that can act on the
+   number, so the dashboard never becomes a second place to do the work.      */
+
+.tile-grid {
+  grid-template-columns: repeat(auto-fit, minmax(214px, 1fr));
+  margin-bottom: var(--card-gap);
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  color: inherit;
+  text-decoration: none;
+  transition:
+    transform 0.22s var(--ease),
+    box-shadow 0.22s var(--ease),
+    border-color 0.22s var(--ease);
+}
+
+.tile:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: var(--shadow-lift);
+}
+
+.tile-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 9px;
+}
+
+.tile-value {
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tile-of {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-faint);
+  letter-spacing: 0;
+}
+
+/* Pushed to the bottom so the footers line up across a row of tiles even
+   when one of them carries a meter and the others do not. */
+.tile-foot {
+  margin-top: auto;
+  padding-top: 9px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* The two summary panels hold unrelated lists of unrelated length; stretching
+   the shorter one to match would buy alignment with a column of dead space. */
+.dash-grid {
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  align-items: start;
+}
+
+.dash-empty {
+  font-size: 13px;
+  color: var(--text-faint);
+  padding: 6px 0 2px;
+}
+
+.panel-title .count a {
+  color: var(--text-faint);
+  text-decoration: none;
+}
+
+.panel-title .count a:hover {
+  color: var(--text);
 }
 
 /* ── Audit log ─────────────────────────────────────────────────────────────── */
 
 .audit-table td:first-child {
   display: table-cell;
+}
+
+/* The shared table right-aligns its last column for figures. Nothing in this
+   table is a figure, so the "Объект" heading follows its cells back to the
+   left instead of floating away from them. */
+.audit-table th:last-child {
+  text-align: left;
 }
 
 .audit-when {
@@ -2632,11 +2883,43 @@ button {
   .chip:hover,
   .picker-item:hover,
   .stat:hover,
+  .tile:hover,
+  .row-card:hover,
   .check-item:hover:not(:disabled),
-  .nav a:hover,
+  .nav-link:hover,
   .tab:hover,
   .cal-day:hover {
     transform: none;
+  }
+}
+
+/* Below the sidebar's comfortable width it becomes a horizontal strip above
+   the content, group labels inline with their links. */
+@media (max-width: 860px) {
+  .shell-body {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: static;
+    flex: none;
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    padding: 12px 18px;
+    border-right: none;
+    border-bottom: 1px solid var(--glass-border-soft);
+  }
+
+  .nav-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .nav-group-label {
+    padding: 0 6px 0 0;
   }
 }
 

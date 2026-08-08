@@ -476,7 +476,7 @@ describe('staff management page', () => {
     renderApp(<App />, { route: '/staff' })
     await screen.findByText('+77011112233')
 
-    const selfRow = screen.getByText('это вы').closest('.staff-row')!
+    const selfRow = screen.getByText('это вы').closest('.row-card')!
     const disableButton = within(selfRow as HTMLElement).getByRole('button', { name: 'Отключить' })
     expect(disableButton).toBeDisabled()
   })
@@ -749,5 +749,114 @@ describe('§10 review profile links', () => {
 
     await screen.findByRole('heading', { name: 'Номера' })
     expect(screen.queryByText('Отзывы')).not.toBeInTheDocument()
+  })
+})
+
+describe('§11 grouped navigation and the dashboard', () => {
+  const DASH_ROUTES = {
+    'GET /api/auth/me': { user: STAFF.admin },
+    'GET /api/units': [ROOM_WITH_GUEST, GAZEBO],
+    'GET /api/cleaning': {
+      sla_minutes: 60,
+      units: [
+        { id: 5, type: 'room', name: '105', category: 'standard', total: 8, pending: 3,
+          waiting_since: '2026-08-08 09:00', waiting_minutes: 95, is_overdue: true },
+      ],
+    },
+    'GET /api/waitlist/summary': { open: 3 },
+    'GET /api/audit': {
+      total: 1, limit: 6, offset: 0,
+      entries: [
+        { id: 9, staff_user_id: 1, staff_name: 'Нурлан Абдразаков', staff_role: 'admin',
+          action: 'booking.update:free:no_payment', entity: 'bookings', entity_id: 42,
+          created_at: '2026-08-08 18:20', target: '105', guest_name: 'Асель Жумабаева' },
+      ],
+    },
+    'GET /api/settings': { notifications: {}, telegram_configured: false },
+  }
+
+  it('groups the nav under Работа, Отчёты and Управление for an admin', async () => {
+    signIn('admin')
+    mockApi(DASH_ROUTES)
+    renderApp(<App />, { route: '/' })
+
+    const nav = await screen.findByRole('navigation', { name: 'Разделы' })
+    expect(within(nav).getByText('Работа')).toBeInTheDocument()
+    expect(within(nav).getByText('Отчёты')).toBeInTheDocument()
+    expect(within(nav).getByText('Управление')).toBeInTheDocument()
+
+    // Every link stays reachable — grouping is not hiding.
+    for (const label of ['Номера', 'Зона отдыха', 'Уборка', 'Ожидание',
+                         'Аналитика', 'Журнал', 'Персонал', 'Настройки']) {
+      expect(within(nav).getByRole('link', { name: label })).toBeInTheDocument()
+    }
+  })
+
+  it('drops a group whose every item the role cannot see', async () => {
+    signIn('housekeeper')
+    mockApi(baseRoutes('housekeeper'))
+    renderApp(<App />, { route: '/cleaning' })
+
+    const nav = await screen.findByRole('navigation', { name: 'Разделы' })
+    expect(within(nav).getByText('Работа')).toBeInTheDocument()
+    // No reports and no management items are allowed, so neither heading shows.
+    expect(within(nav).queryByText('Отчёты')).not.toBeInTheDocument()
+    expect(within(nav).queryByText('Управление')).not.toBeInTheDocument()
+    expect(within(nav).getByRole('link', { name: 'Уборка' })).toBeInTheDocument()
+    expect(within(nav).queryByRole('link', { name: 'Номера' })).not.toBeInTheDocument()
+  })
+
+  it('lands the admin on a dashboard of summary tiles', async () => {
+    signIn('admin')
+    mockApi(DASH_ROUTES)
+    renderApp(<App />, { route: '/' })
+
+    expect(await screen.findByRole('heading', { name: 'Сводка' })).toBeInTheDocument()
+
+    // One of two units is an occupied room; the gazebo is not counted as a room.
+    const occupancy = screen.getByText('Занято номеров').closest('.tile')!
+    expect(within(occupancy as HTMLElement).getByText('1')).toBeInTheDocument()
+    expect(within(occupancy as HTMLElement).getByText(/из 1/)).toBeInTheDocument()
+
+    const waitlist = screen.getByText('Лист ожидания').closest('.tile')!
+    expect(within(waitlist as HTMLElement).getByText('3')).toBeInTheDocument()
+
+    // The SLA breach is surfaced, not just the count of dirty units.
+    expect(screen.getByText(/дольше 60 мин/)).toBeInTheDocument()
+
+    // Recent activity reuses the log's wording for the same action code.
+    expect(screen.getByText(/Изменена бронь — выезд \/ отмена/)).toBeInTheDocument()
+  })
+
+  it('links every tile to the page that can act on it', async () => {
+    signIn('admin')
+    mockApi(DASH_ROUTES)
+    renderApp(<App />, { route: '/' })
+
+    await screen.findByRole('heading', { name: 'Сводка' })
+    const tiles = [...document.querySelectorAll('.tile')]
+    expect(tiles.map((tile) => tile.getAttribute('href'))).toEqual([
+      '/rooms', '/cleaning', '/rooms', '/waitlist',
+    ])
+  })
+
+  it('keeps a housekeeper out of the dashboard', async () => {
+    signIn('housekeeper')
+    mockApi(baseRoutes('housekeeper'))
+    renderApp(<App />, { route: '/' })
+
+    // Bounced to the one page they work in, not shown an empty summary.
+    expect(await screen.findByRole('heading', { name: 'Уборка' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Сводка' })).not.toBeInTheDocument()
+  })
+
+  it('still renders the log when a tile endpoint fails', async () => {
+    signIn('admin')
+    mockApi({ ...DASH_ROUTES, 'GET /api/waitlist/summary': () => { throw new Error('down') } })
+    renderApp(<App />, { route: '/' })
+
+    // The waitlist tile degrades to zero rather than blanking the page.
+    expect(await screen.findByRole('heading', { name: 'Сводка' })).toBeInTheDocument()
+    expect(screen.getByText('Занято номеров')).toBeInTheDocument()
   })
 })
