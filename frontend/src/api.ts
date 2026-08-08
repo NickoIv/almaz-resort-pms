@@ -31,6 +31,38 @@ type RequestOptions = {
   body?: unknown
 }
 
+/**
+ * Downloads an authenticated endpoint straight to a file.
+ *
+ * A plain <a href> cannot carry the bearer token, so the body is fetched and
+ * handed to the browser as a blob, keeping the filename the server chose.
+ */
+export async function downloadAuthed(path: string, fallbackName: string): Promise<void> {
+  const token = getToken()
+  const response = await fetch(`${BASE}/api${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null)
+    const message = (payload as { error?: string } | null)?.error ?? `Ошибка (${response.status})`
+    if (response.status === 401) setToken(null)
+    throw new ApiError(message, response.status)
+  }
+
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const name = /filename="([^"]+)"/.exec(disposition)?.[1] ?? fallbackName
+
+  const url = URL.createObjectURL(await response.blob())
+  const link = document.createElement('a')
+  link.href = url
+  link.download = name
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const token = getToken()
   const response = await fetch(`${BASE}/api${path}`, {

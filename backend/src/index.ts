@@ -7,6 +7,7 @@ import { deliverDigest } from './lib/notify'
 import analyticsRoutes from './routes/analytics'
 import auditRoutes from './routes/audit'
 import authRoutes from './routes/auth'
+import backupRoutes from './routes/backup'
 import unitRoutes from './routes/units'
 import bookingRoutes from './routes/bookings'
 import cleaningRoutes from './routes/cleaning'
@@ -39,6 +40,7 @@ app.use('/api/audit', requireAuth)
 app.use('/api/audit/*', requireAuth)
 app.use('/api/staff', requireAuth)
 app.use('/api/staff/*', requireAuth)
+app.use('/api/backup/*', requireAuth)
 
 app.route('/api/units', unitRoutes)
 app.route('/api/bookings', bookingRoutes)
@@ -48,6 +50,7 @@ app.route('/api/settings', settingsRoutes)
 app.route('/api/guests', guestRoutes)
 app.route('/api/audit', auditRoutes)
 app.route('/api/staff', staffRoutes)
+app.route('/api/backup', backupRoutes)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {

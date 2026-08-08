@@ -17,6 +17,16 @@ export type Bindings = {
   /** Telegram — kept as an optional secondary channel. */
   TELEGRAM_BOT_TOKEN?: string
   TELEGRAM_CHAT_ID?: string
+  /**
+   * Where daily backups go. KV works on the free plan with no card; R2 needs
+   * enabling in the dashboard first. Whichever is bound gets used — see
+   * lib/backup-store.ts. With neither, the scheduled backup skips and the
+   * manual export/import still works.
+   */
+  BACKUPS?: KVNamespace
+  BACKUPS_R2?: R2Bucket
+  /** Set at deploy time so a backup file records which build produced it. */
+  APP_VERSION?: string
 }
 
 /** Payload embedded in the signed JWT handed to staff on login. */

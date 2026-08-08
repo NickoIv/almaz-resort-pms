@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api } from '../api'
+import { api, downloadAuthed } from '../api'
 import { Alert, Spinner } from '../components/ui'
 
 type NotificationKey =
@@ -56,6 +56,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -111,6 +112,20 @@ export default function SettingsPage() {
       setError(err instanceof Error ? err.message : 'Не удалось отправить')
     } finally {
       setSending(false)
+    }
+  }
+
+  async function downloadBackup() {
+    setDownloading(true)
+    setError(null)
+    setNotice(null)
+    try {
+      await downloadAuthed('/backup/export', 'almaz-pms-backup.json')
+      setNotice('Резервная копия скачана. Храните её вне этого компьютера.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось скачать копию')
+    } finally {
+      setDownloading(false)
     }
   }
 
@@ -180,6 +195,20 @@ export default function SettingsPage() {
         <div className="field-hint" style={{ marginTop: 10 }}>
           Основной канал — WhatsApp через Green API. Telegram сохранён как резервный: выберите
           «Оба», чтобы дублировать сводку в оба мессенджера.
+        </div>
+      </section>
+
+      <section className="panel glass" style={{ marginBottom: 18 }}>
+        <div className="panel-title">Резервная копия</div>
+        <p className="field-hint" style={{ marginBottom: 14 }}>
+          Один JSON-файл со всеми данными: объекты, брони, платежи, начисления, чек-листы уборки,
+          сотрудники (без PIN-кодов), заметки о гостях, настройки и журнал действий. У Cloudflare D1
+          нет отмены удаления — эта копия единственный способ вернуть данные.
+        </p>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button className="btn btn-sm" onClick={downloadBackup} disabled={downloading}>
+            {downloading ? 'Готовим файл…' : 'Скачать резервную копию'}
+          </button>
         </div>
       </section>
 
