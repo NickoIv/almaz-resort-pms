@@ -204,4 +204,73 @@ analytics.get('/summary', async (c) => {
   })
 })
 
+/**
+ * GET /api/analytics/payments?from=&to= — every individual payment in the
+ * range, for handing to an accountant.
+ *
+ * Distinct from the summary: that aggregates, this is the underlying ledger
+ * line by line, in the order the money arrived, with a running total so the
+ * final row can be reconciled against the summary's revenue figure.
+ */
+analytics.get('/payments', async (c) => {
+  const today = await c.env.DB.prepare(`SELECT ${SQL_TODAY} AS today`).first<{ today: string }>()
+  const defaultTo = today?.today ?? new Date().toISOString().slice(0, 10)
+  const from = c.req.query('from') ?? `${defaultTo.slice(0, 7)}-01`
+  const to = c.req.query('to') ?? defaultTo
+
+  if (!isIsoDate(from) || !isIsoDate(to)) {
+    throw new HTTPException(400, { message: 'from and to must be YYYY-MM-DD dates' })
+  }
+  if (to < from) {
+    throw new HTTPException(400, { message: 'to must not be earlier than from' })
+  }
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT p.id, p.paid_at, p.amount, p.method, p.group_id,
+            b.id AS booking_id, b.guest_name, b.guest_phone, b.currency,
+            b.date_from, b.date_to,
+            u.name AS unit_name, u.type AS unit_type
+     FROM payments p
+     JOIN bookings b ON b.id = p.booking_id
+     JOIN units u ON u.id = b.unit_id
+     WHERE date(p.paid_at) BETWEEN date(?) AND date(?)
+     ORDER BY p.paid_at, p.id`
+  )
+    .bind(from, to)
+    .all<{
+      id: number
+      paid_at: string
+      amount: number
+      method: string
+      group_id: number | null
+      booking_id: number
+      guest_name: string
+      guest_phone: string | null
+      currency: string
+      date_from: string
+      date_to: string
+      unit_name: string
+      unit_type: UnitType
+    }>()
+
+  let running = 0
+  const rows = results.map((row) => {
+    running = Number((running + row.amount).toFixed(2))
+    return { ...row, running_total: running }
+  })
+
+  const byMethod: Record<string, number> = {}
+  for (const row of results) {
+    byMethod[row.method] = Number(((byMethod[row.method] ?? 0) + row.amount).toFixed(2))
+  }
+
+  return c.json({
+    range: { from, to },
+    count: rows.length,
+    total: running,
+    by_method: byMethod,
+    payments: rows,
+  })
+})
+
 export default analytics

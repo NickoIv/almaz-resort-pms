@@ -222,3 +222,28 @@ export const STATUS_LABELS: Record<UnitStatus, string> = {
   booked: 'Забронирован',
   occupied: 'Занят',
 }
+export type PaymentActRow = {
+  id: number
+  paid_at: string
+  amount: number
+  method: string
+  group_id: number | null
+  booking_id: number
+  guest_name: string
+  guest_phone: string | null
+  currency: string
+  date_from: string
+  date_to: string
+  unit_name: string
+  unit_type: UnitType
+  /** Cumulative sum in payment order, so the last row reconciles to the total. */
+  running_total: number
+}
+
+export type PaymentAct = {
+  range: { from: string; to: string }
+  count: number
+  total: number
+  by_method: Record<string, number>
+  payments: PaymentActRow[]
+}

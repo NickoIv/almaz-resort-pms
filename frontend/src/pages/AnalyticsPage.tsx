@@ -12,7 +12,7 @@ import {
   todayIso,
 } from '../format'
 import { downloadCsv } from '../csv'
-import { UNIT_TYPE_LABELS, type Analytics } from '../types'
+import { UNIT_TYPE_LABELS, type Analytics, type PaymentAct } from '../types'
 
 // All ranges are anchored to the hotel's calendar, not the viewer's device:
 // an admin in Bangkok must see the same "current month" as reception.
@@ -29,6 +29,7 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [actBusy, setActBusy] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -84,6 +85,49 @@ export default function AnalyticsPage() {
     downloadCsv(`almaz-pms-analytics-${data.range.from}_${data.range.to}.csv`, rows)
   }
 
+  /**
+   * Акт по платежам — the payment ledger line by line for the selected range,
+   * separate from the summary CSV above. An accountant needs every transaction
+   * with a running total, not aggregates.
+   */
+  async function exportPaymentAct() {
+    setActBusy(true)
+    setError(null)
+    try {
+      const act = await api<PaymentAct>(`/analytics/payments?from=${from}&to=${to}`)
+
+      const rows: (string | number | null)[][] = [
+        ['Акт по платежам'],
+        ['Период', act.range.from, act.range.to],
+        ['Платежей', act.count],
+        [],
+        ['№', 'Дата', 'Объект', 'Гость', 'Телефон', 'Период проживания', 'Способ', 'Сумма', 'Нарастающим итогом'],
+        ...act.payments.map((row, index) => [
+          index + 1,
+          row.paid_at,
+          row.unit_name,
+          row.guest_name,
+          row.guest_phone ?? '',
+          `${row.date_from} — ${row.date_to}`,
+          row.method,
+          row.amount,
+          row.running_total,
+        ]),
+        [],
+        ['ИТОГО', '', '', '', '', '', '', act.total, ''],
+        [],
+        ['По способам оплаты'],
+        ...Object.entries(act.by_method).map(([method, sum]) => [method, sum]),
+      ]
+
+      downloadCsv(`almaz-pms-payments-${act.range.from}_${act.range.to}.csv`, rows)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось сформировать акт')
+    } finally {
+      setActBusy(false)
+    }
+  }
+
   const mom = data?.month_over_month
   const changeUp = (mom?.change ?? 0) >= 0
 
@@ -99,6 +143,9 @@ export default function AnalyticsPage() {
         <div className="page-head-actions">
           <button className="btn btn-sm" onClick={exportCsv} disabled={!data}>
             Экспорт CSV
+          </button>
+          <button className="btn btn-sm" onClick={exportPaymentAct} disabled={actBusy}>
+            {actBusy ? 'Готовим…' : 'Акт по платежам'}
           </button>
         </div>
       </div>
