@@ -47,3 +47,6 @@ Thumbs.db
 # Test / coverage
 coverage/
 .nyc_output/
+# Claude Code local settings — permission allowlists are per-machine and
+# must not be granted repo-wide by being committed.
+.claude/
