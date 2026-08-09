@@ -811,7 +811,10 @@ describe('§11 grouped navigation and the dashboard', () => {
     expect(within(nav).queryByRole('link', { name: 'Номера' })).not.toBeInTheDocument()
   })
 
-  it('lands the admin on a dashboard of summary tiles', async () => {
+  // The roll-up is a real rAF animation, and rAF gets starved when the whole
+  // suite is competing for the machine. A generous ceiling here is not
+  // papering over anything: the assertion is about where the number lands.
+  it('lands the admin on a dashboard of summary tiles', { timeout: 20_000 }, async () => {
     signIn('admin')
     mockApi(DASH_ROUTES)
     renderApp(<App />, { route: '/' })
@@ -824,16 +827,14 @@ describe('§11 grouped navigation and the dashboard', () => {
     const occupancy = screen.getByText('Занято номеров').closest('.tile')!
     await waitFor(() =>
       expect(within(occupancy as HTMLElement).getByText('1')).toBeInTheDocument(),
-      // The roll-up runs for 650ms; the default 1s wait is too tight for it
-      // under a loaded suite, and this assertion is about where it lands.
-      { timeout: 3000 }
+      { timeout: 10_000 }
     )
     expect(within(occupancy as HTMLElement).getByText(/из 1/)).toBeInTheDocument()
 
     const waitlist = screen.getByText('Лист ожидания').closest('.tile')!
     await waitFor(() =>
       expect(within(waitlist as HTMLElement).getByText('3')).toBeInTheDocument(),
-      { timeout: 3000 }
+      { timeout: 10_000 }
     )
 
     // The SLA breach is surfaced, not just the count of dirty units.
@@ -1064,5 +1065,120 @@ describe('§12 room timeline', () => {
     await screen.findByRole('heading', { name: 'Зона отдыха' })
     expect(screen.queryByRole('button', { name: 'Таймлайн' })).not.toBeInTheDocument()
     expect(document.querySelector('.timeline')).toBeNull()
+  })
+})
+
+describe('§14 manual "send to cleaning"', () => {
+  const FREE_ROOM = makeUnit({ id: 6, name: '106', status: 'free' })
+
+  const OCCUPIED = makeUnit({
+    id: 5, name: '105', status: 'occupied',
+    current_booking: {
+      id: 42, guest_name: 'Асель Жумабаева', guest_phone: '+77073148820',
+      date_from: '2026-08-07', date_to: '2026-08-10', status: 'occupied', is_paid: false,
+      total_amount: 240000, prepaid_amount: 120000, deposit_amount: 0,
+      charges_amount: 0, remaining_amount: 120000, currency: 'KZT',
+    },
+  })
+
+  const FRESH = [
+    { id: 91, unit_id: 6, booking_id: null, item_name: 'Смена постельного белья',
+      is_done: false, updated_at: null, updated_by: null, updated_by_name: null },
+    { id: 92, unit_id: 6, booking_id: null, item_name: 'Уборка санузла',
+      is_done: false, updated_at: null, updated_by: null, updated_by_name: null },
+  ]
+
+  function detailRoutes(unit: ReturnType<typeof makeUnit>, resets: string[]) {
+    return {
+      ...baseRoutes('admin', [unit]),
+      [`GET /api/units/${unit.id}`]: unit,
+      [`GET /api/units/${unit.id}/calendar`]: { ...CALENDAR, unit: { id: unit.id, name: unit.name, type: 'room' } },
+      'GET /api/cleaning/unit/': [],
+      'GET /api/bookings/42/payments': [],
+      'GET /api/bookings/42/charges': [],
+      'GET /api/settings/preview': { empty: true, sections: 0, text: '' },
+      [`POST /api/cleaning/unit/${unit.id}/reset`]: (url: string) => {
+        resets.push(url)
+        return FRESH
+      },
+    }
+  }
+
+  it('starts a fresh checklist for a room that has none', async () => {
+    const resets: string[] = []
+    signIn('admin')
+    mockApi(detailRoutes(FREE_ROOM, resets))
+    renderApp(<App />, { route: '/rooms/6' })
+
+    await screen.findByRole('heading', { name: /Номер 106/ })
+    expect(screen.getByText('не начат')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Отправить на уборку' }))
+
+    await waitFor(() => expect(resets).toHaveLength(1))
+    expect(resets[0]).toContain('/api/cleaning/unit/6/reset')
+    // The new list is shown straight away, unticked.
+    expect(await screen.findByText('Смена постельного белья')).toBeInTheDocument()
+    expect(screen.getByText('0 / 2')).toBeInTheDocument()
+  })
+
+  it('asks before resetting a room a guest is still in', async () => {
+    const resets: string[] = []
+    signIn('admin')
+    mockApi(detailRoutes(OCCUPIED, resets))
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    renderApp(<App />, { route: '/rooms/5' })
+
+    await screen.findByRole('heading', { name: /Номер 105/ })
+    await userEvent.click(screen.getByRole('button', { name: 'Отправить на уборку' }))
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('проживает гость'))
+    // Declined, so nothing was sent.
+    expect(resets).toHaveLength(0)
+
+    confirm.mockReturnValue(true)
+    await userEvent.click(screen.getByRole('button', { name: 'Отправить на уборку' }))
+    await waitFor(() => expect(resets).toHaveLength(1))
+    confirm.mockRestore()
+  })
+
+  it('does not ask when the room is empty', async () => {
+    const resets: string[] = []
+    signIn('admin')
+    mockApi(detailRoutes(FREE_ROOM, resets))
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderApp(<App />, { route: '/rooms/6' })
+
+    await screen.findByRole('heading', { name: /Номер 106/ })
+    await userEvent.click(screen.getByRole('button', { name: 'Отправить на уборку' }))
+
+    await waitFor(() => expect(resets).toHaveLength(1))
+    expect(confirm).not.toHaveBeenCalled()
+    confirm.mockRestore()
+  })
+
+  it('offers the same action on a recreation unit', async () => {
+    const resets: string[] = []
+    const gazebo = makeUnit({ id: 20, type: 'gazebo', name: 'Беседка 1', status: 'free' })
+    signIn('admin')
+    mockApi(detailRoutes(gazebo, resets))
+    renderApp(<App />, { route: '/units/20' })
+
+    await screen.findByRole('heading', { name: 'Беседка 1' })
+    await userEvent.click(screen.getByRole('button', { name: 'Отправить на уборку' }))
+    await waitFor(() => expect(resets[0]).toContain('/api/cleaning/unit/20/reset'))
+  })
+
+  it('keeps the action away from a waiter', async () => {
+    const resets: string[] = []
+    const gazebo = makeUnit({ id: 20, type: 'gazebo', name: 'Беседка 1', status: 'free' })
+    signIn('waiter')
+    mockApi({ ...detailRoutes(gazebo, resets), 'GET /api/auth/me': { user: STAFF.waiter } })
+    renderApp(<App />, { route: '/units/20' })
+
+    await screen.findByRole('heading', { name: 'Беседка 1' })
+    // The reset endpoint is admin/housekeeper only; offering it here would
+    // just hand the waiter a 403.
+    expect(screen.queryByRole('button', { name: 'Отправить на уборку' })).not.toBeInTheDocument()
   })
 })

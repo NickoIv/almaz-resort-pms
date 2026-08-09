@@ -61,6 +61,7 @@ export default function UnitDetailPage() {
   const [showCharge, setShowCharge] = useState(false)
   const [showGuest, setShowGuest] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
+  const [sendingToCleaning, setSendingToCleaning] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -124,6 +125,42 @@ export default function UnitDetailPage() {
   if (loading) return <Spinner />
   if (error) return <Alert>{error}</Alert>
   if (!unit) return <EmptyState icon="🔍">Объект не найден</EmptyState>
+
+  /**
+   * Start a fresh checklist for this unit, whatever its booking says.
+   *
+   * Until now a checklist only ever appeared on checkout, so a room that got
+   * dirty mid-stay, or one whose list someone ticked off too early, could not
+   * be put back in the queue at all. The endpoint for it already existed and
+   * nothing called it.
+   */
+  async function sendToCleaning() {
+    if (!unit) return
+    // Resetting under a guest who is still in the room is a legitimate thing
+    // to want and an easy thing to do by accident, so it is confirmed.
+    if (
+      active &&
+      !window.confirm(
+        `В «${unit.name}» сейчас проживает гость. Всё равно отправить на уборку — ` +
+          'чек-лист начнётся заново?'
+      )
+    ) {
+      return
+    }
+
+    setSendingToCleaning(true)
+    setError(null)
+    try {
+      const fresh = await api<ChecklistItem[]>(`/cleaning/unit/${unit.id}/reset`, {
+        method: 'POST',
+      })
+      setChecklist(fresh)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось отправить на уборку')
+    } finally {
+      setSendingToCleaning(false)
+    }
+  }
 
   // Rooms are sold by night and have a housekeeping checklist; recreation
   // units are sold by the hour and have neither.
@@ -200,15 +237,21 @@ export default function UnitDetailPage() {
 
           <PhotoGallery unitId={unit.id} bookingId={active?.id ?? null} />
 
-          {/* Housekeeping checklists exist for rooms only. */}
-          {isRoom && (
-            <section className="panel glass">
-              <div className="panel-title">
-                <StatusDot status="cleaning" /> Чек-лист уборки
-                <span className="count">
-                  {doneCount} / {checklist.length}
-                </span>
+          {/* Both rooms and recreation units have checklists — different
+              templates, same queue — so the panel is no longer room-only. */}
+          <section className="panel glass">
+            <div className="panel-title">
+              <StatusDot status="cleaning" /> Чек-лист уборки
+              <span className="count">
+                {checklist.length > 0 ? `${doneCount} / ${checklist.length}` : 'не начат'}
+              </span>
+            </div>
+
+            {checklist.length === 0 ? (
+              <div className="dash-empty">
+                Чек-листа нет — объект считается чистым.
               </div>
+            ) : (
               <Checklist
                 items={checklist}
                 onChanged={(updated) =>
@@ -217,8 +260,19 @@ export default function UnitDetailPage() {
                   )
                 }
               />
-            </section>
-          )}
+            )}
+
+            {isAdmin && (
+              <button
+                className="btn btn-sm"
+                style={{ marginTop: 16 }}
+                onClick={sendToCleaning}
+                disabled={sendingToCleaning}
+              >
+                {sendingToCleaning ? 'Отправляем…' : 'Отправить на уборку'}
+              </button>
+            )}
+          </section>
         </div>
 
         <div>

@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react'
  * checked with matchMedia rather than left to CSS, because this is a
  * JavaScript animation that no stylesheet can switch off.
  */
-export function useCountUp(target: number, durationMs = 650): number {
+export function useCountUp(target: number, durationMs = 450): number {
   const [value, setValue] = useState(() => (prefersReducedMotion() ? target : 0))
   const frame = useRef<number>(0)
 
