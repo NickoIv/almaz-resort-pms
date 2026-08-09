@@ -50,6 +50,7 @@ function routes(role: 'admin' | 'housekeeper' | 'waiter', alerts: unknown[], cal
     'GET /api/cleaning': { sla_minutes: 60, units: [] },
     'GET /api/settings': { notifications: {}, telegram_configured: false },
     'GET /api/units/forecast': { total_units: 14, days: [] },
+    'GET /api/settings/preview': { empty: true, sections: 0, text: '' },
     'GET /api/alerts': (url: string) => {
       calls?.push(url)
       return { sla_minutes: 60, booking_window_hours: 8, alerts }

@@ -773,6 +773,11 @@ describe('§11 grouped navigation and the dashboard', () => {
       ],
     },
     'GET /api/settings': { notifications: {}, telegram_configured: false },
+    'GET /api/settings/preview': {
+      empty: false,
+      sections: 2,
+      text: 'Taura PMS · сводка на 2026-08-09 — Выезды сегодня (1): 105, Асель',
+    },
   }
 
   it('groups the nav under Работа, Отчёты and Управление for an admin', async () => {
@@ -858,6 +863,37 @@ describe('§11 grouped navigation and the dashboard', () => {
     // Bounced to the one page they work in, not shown an empty summary.
     expect(await screen.findByRole('heading', { name: 'Уборка' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Сводка' })).not.toBeInTheDocument()
+  })
+
+  it('shows the outgoing digest here rather than under Settings', async () => {
+    signIn('admin')
+    mockApi(DASH_ROUTES)
+    renderApp(<App />, { route: '/' })
+
+    await screen.findByRole('heading', { name: 'Сводка' })
+    expect(screen.getByText('Сводка для рассылки')).toBeInTheDocument()
+    expect(screen.getByText(/Выезды сегодня/)).toBeInTheDocument()
+  })
+
+  it('leaves the digest preview off the settings page', async () => {
+    signIn('admin')
+    mockApi({
+      ...DASH_ROUTES,
+      'GET /api/settings': {
+        notifications: { notify_checkins: true },
+        channel: 'whatsapp',
+        whatsapp_configured: false,
+        telegram_configured: false,
+        text: { hotel_name: 'Taura', hotel_details: '', reviews_2gis_url: '', reviews_google_url: '' },
+      },
+      'GET /api/backup/stored': { backups: [] },
+    })
+    renderApp(<App />, { route: '/settings' })
+
+    await screen.findByRole('heading', { name: /Настройки|Уведомления/ })
+    // The toggles stay; the operational preview does not.
+    expect(screen.queryByText('Предпросмотр сводки')).not.toBeInTheDocument()
+    expect(screen.queryByText('Сводка для рассылки')).not.toBeInTheDocument()
   })
 
   it('still renders the log when a tile endpoint fails', async () => {

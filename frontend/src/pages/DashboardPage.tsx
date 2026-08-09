@@ -6,11 +6,14 @@ import { describeAudit, type AuditEntry } from '../audit'
 import { elapsedLabel, percent, todayIso } from '../format'
 import type { CleaningOverview, CleaningUnit, Unit } from '../types'
 
+type DigestPreview = { empty: boolean; sections: number; text: string }
+
 type Loaded = {
   units: Unit[]
   cleaning: CleaningOverview
   waitlist: { open: number }
   audit: AuditEntry[]
+  digest: DigestPreview | null
 }
 
 /** A booking touches "today" if its start or end date falls on it. */
@@ -40,9 +43,13 @@ export default function DashboardPage() {
       api<{ entries: AuditEntry[] }>('/audit?limit=6')
         .then((r) => r.entries)
         .catch(() => []),
+      // What today's WhatsApp/Telegram digest would say. It belongs here
+      // rather than under Settings: it reports the state of the day, it does
+      // not configure anything.
+      api<DigestPreview>('/settings/preview').catch(() => null),
     ])
-      .then(([units, cleaning, waitlist, audit]) =>
-        setData({ units, cleaning, waitlist, audit })
+      .then(([units, cleaning, waitlist, audit, digest]) =>
+        setData({ units, cleaning, waitlist, audit, digest })
       )
       .catch((err) => setError(err instanceof Error ? err.message : 'Ошибка загрузки'))
   }, [])
@@ -171,6 +178,26 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
+          )}
+        </section>
+
+        <section className="panel glass">
+          <div className="panel-title">
+            Сводка для рассылки
+            <span className="count">
+              <Link to="/settings">каналы →</Link>
+            </span>
+          </div>
+
+          {data.digest === null ? (
+            <div className="dash-empty">Предпросмотр недоступен.</div>
+          ) : data.digest.empty ? (
+            <div className="dash-empty">
+              Сейчас сообщать не о чем — заездов, выездов, просроченной уборки и долгов нет.
+            </div>
+          ) : (
+            // The API returns plain text already; there is no markup to strip.
+            <pre className="digest-preview">{data.digest.text}</pre>
           )}
         </section>
 

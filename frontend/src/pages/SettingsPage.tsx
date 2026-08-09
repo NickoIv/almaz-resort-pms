@@ -68,7 +68,6 @@ const CHANNELS: { key: NotifyChannel; label: string; hint: string }[] = [
 
 export default function SettingsPage() {
   const [data, setData] = useState<SettingsResponse | null>(null)
-  const [preview, setPreview] = useState<{ empty: boolean; text: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
@@ -85,13 +84,11 @@ export default function SettingsPage() {
     setLoading(true)
     Promise.all([
       api<SettingsResponse>('/settings'),
-      api<{ empty: boolean; sections: number; text: string }>('/settings/preview'),
       api<StoredBackups>('/backup/stored').catch(() => null),
     ])
-      .then(([settings, digest, backups]) => {
+      .then(([settings, backups]) => {
         setData(settings)
         setText(settings.text)
-        setPreview(digest)
         setStored(backups)
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Ошибка загрузки'))
@@ -108,7 +105,6 @@ export default function SettingsPage() {
       const next = await api<SettingsResponse>('/settings', { method: 'PUT', body })
       setData(next)
       setText(next.text)
-      setPreview(await api('/settings/preview'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось сохранить')
     } finally {
@@ -319,50 +315,33 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <div className="detail-grid">
-        <section className="panel glass">
-          <div className="panel-title">Какие уведомления отправлять</div>
+      <section className="panel glass">
+        <div className="panel-title">Какие уведомления отправлять</div>
 
-          <div className="check-list">
-            {TOGGLES.map((item) => {
-              const on = data?.notifications[item.key] ?? false
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  className={`check-item setting-item ${on ? 'done' : ''}`}
-                  onClick={() => save({ [item.key]: !on }, item.key)}
-                  disabled={saving === item.key}
-                >
-                  <span className="setting-icon">{item.icon}</span>
-                  <span className="setting-text">
-                    <span className="check-label">{item.title}</span>
-                    <span className="setting-hint">{item.hint}</span>
-                  </span>
-                  <span className={`switch ${on ? 'on' : ''}`}>
-                    <span className="switch-knob" />
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </section>
-
-        <section className="panel glass">
-          <div className="panel-title">
-            Предпросмотр сводки
-            <span className="count">как сейчас</span>
-          </div>
-          {preview?.empty ? (
-            <div className="unit-empty">
-              Сейчас сообщать не о чем — заездов, выездов, просроченной уборки и долгов нет.
-            </div>
-          ) : (
-            // The API already returns plain text; no markup to strip.
-            <pre className="digest-preview">{preview?.text ?? ''}</pre>
-          )}
-        </section>
-      </div>
+        <div className="check-list">
+          {TOGGLES.map((item) => {
+            const on = data?.notifications[item.key] ?? false
+            return (
+              <button
+                key={item.key}
+                type="button"
+                className={`check-item setting-item ${on ? 'done' : ''}`}
+                onClick={() => save({ [item.key]: !on }, item.key)}
+                disabled={saving === item.key}
+              >
+                <span className="setting-icon">{item.icon}</span>
+                <span className="setting-text">
+                  <span className="check-label">{item.title}</span>
+                  <span className="setting-hint">{item.hint}</span>
+                </span>
+                <span className={`switch ${on ? 'on' : ''}`}>
+                  <span className="switch-knob" />
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </section>
 
       {restoring && (
         <RestoreModal onClose={() => setRestoring(false)} onRestored={load} />

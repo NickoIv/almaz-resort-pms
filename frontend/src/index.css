@@ -1820,8 +1820,13 @@ button {
   flex: 1;
 }
 
-.setting-item .check-label {
+/* A settings row reuses .check-item for its layout, which brings the "done"
+   strikethrough with it. Here "done" means the notification is switched ON, so
+   striking it through said the opposite of the truth. The old cancel rule was
+   one class weaker than .check-item.done .check-label and silently lost. */
+.check-item.setting-item .check-label {
   text-decoration: none;
+  color: var(--text);
 }
 
 .setting-hint {
