@@ -70,6 +70,20 @@ jobs:
       - run: npm run typecheck
         working-directory: backend
 
+      # Prints the token's scopes, never the token. A missing permission shows
+      # up at the API as "the given account is not authorized" — an access
+      # error that reads like the account is wrong when it is really the token
+      # that is short a scope. Two seconds here turns that into a list you can
+      # compare against.
+      - name: Show token permissions
+        if: needs.check.outputs.configured == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: backend
+          command: whoami
+
       # Migrations run before the Worker that depends on them, and a failure
       # here stops the deploy: shipping code that expects a table the database
       # does not have is the one ordering that must never happen.
