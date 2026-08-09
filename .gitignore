@@ -50,3 +50,7 @@ coverage/
 # Claude Code local settings — permission allowlists are per-machine and
 # must not be granted repo-wide by being committed.
 .claude/
+
+# Specification documents live alongside the project but never in it —
+# they are the brief, not the build.
+*.docx
