@@ -51,6 +51,8 @@ coverage/
 # must not be granted repo-wide by being committed.
 .claude/
 
-# Specification documents live alongside the project but never in it —
-# they are the brief, not the build.
+# New brief documents should not be swept in by . Three older
+# ones (Resort_PMS_plan / _rooms_fixes / _value) were committed in earlier
+# sessions and stay tracked — .gitignore does not affect tracked files, and
+# removing them is not this rule’s business.
 *.docx
