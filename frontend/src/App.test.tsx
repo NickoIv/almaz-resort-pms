@@ -1182,3 +1182,80 @@ describe('§14 manual "send to cleaning"', () => {
     expect(screen.queryByRole('button', { name: 'Отправить на уборку' })).not.toBeInTheDocument()
   })
 })
+
+describe('§14 external delivery is switched off', () => {
+  const SETTINGS = (over: Record<string, unknown> = {}) => ({
+    notifications: {
+      notify_checkins: true, notify_checkouts: true,
+      notify_cleaning: true, notify_unpaid: true,
+    },
+    channel: 'whatsapp',
+    external_delivery: false,
+    whatsapp_configured: false,
+    telegram_configured: false,
+    text: { hotel_name: 'Taura', hotel_details: '', reviews_2gis_url: '', reviews_google_url: '' },
+    ...over,
+  })
+
+  const routes = (settings: unknown) => ({
+    'GET /api/auth/me': { user: STAFF.admin },
+    'GET /api/units': [makeUnit()],
+    'GET /api/cleaning': { sla_minutes: 60, units: [] },
+    'GET /api/alerts': { sla_minutes: 60, booking_window_hours: 8, alerts: [] },
+    'GET /api/backup/stored': { configured: true, kind: 'kv', retention: 7, backups: [] },
+    'GET /api/settings': settings,
+  })
+
+  it('shows the channels as out of use rather than as a broken feature', async () => {
+    signIn('admin')
+    mockApi(routes(SETTINGS()))
+    renderApp(<App />, { route: '/settings' })
+
+    await screen.findByRole('heading', { name: 'Настройки' })
+
+    for (const label of ['WhatsApp', 'Telegram', 'Оба']) {
+      expect(screen.getByRole('button', { name: label })).toBeDisabled()
+    }
+    expect(
+      screen.getByText(/Не используется — персонал работает через приложение/)
+    ).toBeInTheDocument()
+  })
+
+  it('drops the credential warnings and the test button', async () => {
+    signIn('admin')
+    mockApi(routes(SETTINGS()))
+    renderApp(<App />, { route: '/settings' })
+
+    await screen.findByRole('heading', { name: 'Настройки' })
+
+    // Nothing should read as "live but misconfigured" any more.
+    expect(screen.queryByText(/green-api\.com/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/GREEN_API_INSTANCE_ID/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/TELEGRAM_BOT_TOKEN/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Отправить тест/ })).not.toBeInTheDocument()
+  })
+
+  it('keeps the digest content toggles live — they feed the dashboard panel', async () => {
+    signIn('admin')
+    mockApi(routes(SETTINGS()))
+    renderApp(<App />, { route: '/settings' })
+
+    await screen.findByRole('heading', { name: 'Настройки' })
+    expect(screen.getByText('Что попадает в сводку')).toBeInTheDocument()
+
+    const toggle = screen.getByText('Заезды').closest('button')!
+    expect(toggle).not.toBeDisabled()
+  })
+
+  it('brings the controls back if the server ever re-enables delivery', async () => {
+    signIn('admin')
+    mockApi(routes(SETTINGS({ external_delivery: true, whatsapp_configured: true })))
+    renderApp(<App />, { route: '/settings' })
+
+    await screen.findByRole('heading', { name: 'Настройки' })
+
+    // The page follows the server flag rather than hardcoding the decision.
+    expect(screen.getByRole('button', { name: 'WhatsApp' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: /Отправить тест/ })).toBeInTheDocument()
+  })
+})

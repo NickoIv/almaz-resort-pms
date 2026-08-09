@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react'
 export function useCountUp(target: number, durationMs = 450): number {
   const [value, setValue] = useState(() => (prefersReducedMotion() ? target : 0))
   const frame = useRef<number>(0)
+  const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
     if (prefersReducedMotion() || target === 0) {
@@ -32,7 +33,19 @@ export function useCountUp(target: number, durationMs = 450): number {
     }
 
     frame.current = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame.current)
+
+    // A guaranteed landing, independent of the frame loop. Browsers throttle
+    // requestAnimationFrame in a background tab, so a dashboard opened in a
+    // tab nobody is looking at could otherwise sit on a partial figure until
+    // it is focused — showing 4 where the answer is 6. This also stops the
+    // animation being a source of flake in tests, where a loaded machine
+    // starves the frame loop the same way.
+    settle.current = setTimeout(() => setValue(target), durationMs + 100)
+
+    return () => {
+      cancelAnimationFrame(frame.current)
+      clearTimeout(settle.current)
+    }
   }, [target, durationMs])
 
   return value

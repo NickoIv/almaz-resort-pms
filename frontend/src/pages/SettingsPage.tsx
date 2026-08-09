@@ -29,6 +29,13 @@ type SettingsResponse = {
   notifications: Record<NotificationKey, boolean>
   channel: NotifyChannel
   text: TextSettings
+  /**
+   * Whether the server will actually send anything. It answers false today —
+   * staff work inside the app all shift — and this page follows it rather
+   * than hardcoding the fact, so re-enabling delivery is one constant on the
+   * server and the controls here come back with it.
+   */
+  external_delivery: boolean
   whatsapp_configured: boolean
   telegram_configured: boolean
 }
@@ -154,8 +161,11 @@ export default function SettingsPage() {
   if (loading) return <Spinner />
 
   const channel = data?.channel ?? 'whatsapp'
-  const needsWhatsApp = (channel === 'whatsapp' || channel === 'both') && !data?.whatsapp_configured
-  const needsTelegram = (channel === 'telegram' || channel === 'both') && !data?.telegram_configured
+  const externalDelivery = data?.external_delivery ?? false
+  const needsWhatsApp =
+    externalDelivery && (channel === 'whatsapp' || channel === 'both') && !data?.whatsapp_configured
+  const needsTelegram =
+    externalDelivery && (channel === 'telegram' || channel === 'both') && !data?.telegram_configured
   const canSend = !needsWhatsApp && !needsTelegram
 
   return (
@@ -163,13 +173,19 @@ export default function SettingsPage() {
       <div className="page-head">
         <div>
           <h1>Настройки</h1>
-          <div className="page-sub">Уведомления персоналу · сводка в 09:00 и 18:00</div>
+          <div className="page-sub">Состав сводки, реквизиты и резервные копии</div>
         </div>
-        <div className="page-head-actions">
-          <button className="btn btn-sm btn-primary" onClick={sendTest} disabled={sending || !canSend}>
-            {sending ? 'Отправка…' : 'Отправить тест'}
-          </button>
-        </div>
+        {externalDelivery && (
+          <div className="page-head-actions">
+            <button
+              className="btn btn-sm btn-primary"
+              onClick={sendTest}
+              disabled={sending || !canSend}
+            >
+              {sending ? 'Отправка…' : 'Отправить тест'}
+            </button>
+          </div>
+        )}
       </div>
 
       {error && <Alert>{error}</Alert>}
@@ -180,8 +196,7 @@ export default function SettingsPage() {
           WhatsApp пока не подключён. Заведите инстанс на green-api.com и задайте секреты на
           сервере: <code>npx wrangler secret put GREEN_API_INSTANCE_ID</code>,
           <code>npx wrangler secret put GREEN_API_TOKEN</code> и
-          <code>npx wrangler secret put GREEN_API_CHAT_ID</code> (номер или id группы вида
-          <code>77011112233@c.us</code>). До этого рассылка не работает.
+          <code>npx wrangler secret put GREEN_API_CHAT_ID</code>.
         </div>
       )}
 
@@ -192,31 +207,44 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <section className="panel glass" style={{ marginBottom: 18 }}>
+      <section className="panel glass" style={{ marginBottom: 16 }}>
         <div className="panel-title">
-          Канал отправки
-          <span className="count">
-            {data?.whatsapp_configured ? 'WhatsApp подключён' : 'WhatsApp не подключён'}
-            {data?.telegram_configured ? ' · Telegram подключён' : ''}
-          </span>
+          Внешняя рассылка
+          <span className="count">{externalDelivery ? 'включена' : 'не используется'}</span>
         </div>
         <div className="chip-row">
           {CHANNELS.map((item) => (
             <button
               key={item.key}
               type="button"
-              className={`chip ${channel === item.key ? 'active' : ''}`}
-              onClick={() => save({ channel: item.key }, item.key)}
-              disabled={saving === item.key}
-              title={item.hint}
+              className={`chip ${externalDelivery && channel === item.key ? 'active' : ''}`}
+              onClick={externalDelivery ? () => save({ channel: item.key }, item.key) : undefined}
+              disabled={!externalDelivery || saving === item.key}
+              title={
+                externalDelivery
+                  ? item.hint
+                  : 'Не используется — персонал работает через приложение'
+              }
             >
               {item.label}
             </button>
           ))}
         </div>
-        <div className="field-hint" style={{ marginTop: 10 }}>
-          Основной канал — WhatsApp через Green API. Telegram сохранён как резервный: выберите
-          «Оба», чтобы дублировать сводку в оба мессенджера.
+        <div className="field-hint" style={{ marginTop: 16 }}>
+          {externalDelivery ? (
+            <>
+              Основной канал — WhatsApp через Green API. Telegram сохранён как резервный:
+              выберите «Оба», чтобы дублировать сводку в оба мессенджера.
+            </>
+          ) : (
+            <>
+              Не используется — персонал работает через приложение. Задачи видны на страницах
+              «Уборка» и «Зона отдыха», срочное приходит в колокольчик со звуком, а сводка за
+              день — на странице «Сводка». Рассылка в мессенджеры нужна, чтобы достучаться до
+              человека вне приложения; здесь смена так не устроена. Код каналов сохранён — если
+              рассылка снова понадобится, её включают на сервере.
+            </>
+          )}
         </div>
       </section>
 
@@ -316,7 +344,10 @@ export default function SettingsPage() {
       </section>
 
       <section className="panel glass">
-        <div className="panel-title">Какие уведомления отправлять</div>
+        <div className="panel-title">
+          Что попадает в сводку
+          <span className="count">видно на странице «Сводка»</span>
+        </div>
 
         <div className="check-list">
           {TOGGLES.map((item) => {

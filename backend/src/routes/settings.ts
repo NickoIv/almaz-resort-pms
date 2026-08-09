@@ -15,7 +15,7 @@ import {
   type NotificationKey,
   type NotifyChannel,
 } from '../lib/notifications'
-import { channelStatus, deliverDigest } from '../lib/notify'
+import { channelStatus, deliverDigest, EXTERNAL_DELIVERY_ENABLED } from '../lib/notify'
 import { SQL_NOW } from '../lib/time'
 import type { AppEnv, Bindings } from '../types'
 
@@ -105,6 +105,17 @@ settings.get('/preview', async (c) => {
 /** POST /api/settings/test-notification — send the digest now, to the chosen channel. */
 settings.post('/test-notification', async (c) => {
   const staff = c.get('staff')
+
+  // Kept working rather than removed: flipping EXTERNAL_DELIVERY_ENABLED back
+  // on is all it takes to restore the whole feature, test button included.
+  if (!EXTERNAL_DELIVERY_ENABLED) {
+    throw new HTTPException(503, {
+      message:
+        'Внешняя рассылка отключена — персонал работает через приложение. ' +
+        'Сводка доступна на странице «Сводка».',
+    })
+  }
+
   const body = await readJson<{ channel: NotifyChannel }>(c)
 
   const channel =

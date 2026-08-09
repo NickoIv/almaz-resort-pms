@@ -5,7 +5,7 @@ import { requireAuth } from './lib/auth'
 import { backupFilename, exportAll } from './lib/backup'
 import { backupStore, DAILY_PREFIX, pruneDaily } from './lib/backup-store'
 import { buildDigest, loadChannel, loadSettings } from './lib/notifications'
-import { deliverDigest } from './lib/notify'
+import { deliverDigest, EXTERNAL_DELIVERY_ENABLED } from './lib/notify'
 import alertRoutes from './routes/alerts'
 import analyticsRoutes from './routes/analytics'
 import auditRoutes from './routes/audit'
@@ -133,6 +133,20 @@ async function scheduled(event: ScheduledController, env: Bindings): Promise<voi
 
     if (!digest) {
       console.log('scheduled: nothing to report')
+      return
+    }
+
+    // The digest is still built: the same query feeds the dashboard's summary
+    // panel, and keeping the cron exercising it means a break in that logic
+    // shows up here rather than only when someone opens the page.
+    if (!EXTERNAL_DELIVERY_ENABLED) {
+      // Deliberately console.log, not warn. Nothing has gone wrong — external
+      // delivery is off by decision, and a twice-daily warning about absent
+      // Green API credentials is noise that trains people to ignore the log.
+      console.log(
+        `scheduled: digest ready (${digest.sections.length} sections); ` +
+          'external delivery is off, nothing sent'
+      )
       return
     }
 
