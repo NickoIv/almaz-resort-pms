@@ -1,12 +1,18 @@
 name: Deploy
 
-# Every push to main typechecks and builds, then redeploys both halves of the app.
+# Every push to main checks both halves, applies any pending D1 migrations,
+# then redeploys the Worker and the Pages site.
 #
-# Deployment is skipped (not failed) until these repository secrets exist:
-#   CLOUDFLARE_API_TOKEN   — needs "Workers Scripts: Edit", "Cloudflare Pages: Edit", "D1: Edit"
+# Requires these repository secrets:
+#   CLOUDFLARE_API_TOKEN   — "Workers Scripts: Edit", "Cloudflare Pages: Edit", "D1: Edit"
 #   CLOUDFLARE_ACCOUNT_ID  — the account hosting the Worker and the Pages project
 # and this repository variable:
-#   VITE_API_URL           — public URL of the deployed Worker
+#   VITE_API_URL           — public URL of the deployed Worker, baked in at build time
+#
+# Without the token the run still checks and builds, but deploys nothing and
+# says so loudly. It stays green on purpose: a build is a legitimate result,
+# and failing it would mean a red repository for a missing credential rather
+# than a broken change.
 on:
   push:
     branches: [main]
@@ -26,9 +32,23 @@ jobs:
         run: |
           if [ -n "$CF_TOKEN" ] && [ -n "$CF_ACCOUNT" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare credentials present — this run will deploy." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Cloudflare credentials are not set — build only, no deploy."
+            missing=""
+            [ -z "$CF_TOKEN" ] && missing="CLOUDFLARE_API_TOKEN"
+            [ -z "$CF_ACCOUNT" ] && missing="$missing CLOUDFLARE_ACCOUNT_ID"
+            # A warning rather than a notice, and repeated in the summary: a
+            # green run that quietly deployed nothing is how this went
+            # unnoticed for days.
+            echo "::warning title=Nothing was deployed::Missing secret(s):$missing. The app is still running the previous version."
+            {
+              echo "## ⚠️ Nothing was deployed"
+              echo
+              echo "Missing repository secret(s): \`$missing\`"
+              echo
+              echo "The checks below ran, but the live app still runs the previous version."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
   backend:
@@ -50,6 +70,13 @@ jobs:
       - run: npm run typecheck
         working-directory: backend
 
+      # Migrations run before the Worker that depends on them, and a failure
+      # here stops the deploy: shipping code that expects a table the database
+      # does not have is the one ordering that must never happen.
+      #
+      # The database is named, not addressed by its "DB" binding — the binding
+      # resolves locally but not against the remote instance, which fails with
+      # a misleading "account is not authorized" error.
       - name: Apply D1 migrations
         if: needs.check.outputs.configured == 'true'
         uses: cloudflare/wrangler-action@v3
@@ -57,7 +84,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: backend
-          command: d1 migrations apply DB --remote
+          command: d1 migrations apply almaz_resort_pms_db --remote
 
       - name: Deploy Worker
         if: needs.check.outputs.configured == 'true'
@@ -85,6 +112,14 @@ jobs:
         working-directory: frontend
 
       - run: npm run lint
+        working-directory: frontend
+
+      # The whole suite under seven device timezones, which also covers the
+      # plain `npm test` run. Two real bugs in this app have been timezone bugs
+      # — a date arithmetic helper losing a day east of Greenwich, and "today"
+      # following the viewer's device instead of the hotel — so the zone matrix
+      # is the run worth having on every push, not a slower optional one.
+      - run: npm run test:tz
         working-directory: frontend
 
       - run: npm run build
