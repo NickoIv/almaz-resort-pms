@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
+import MountainRidge from '../components/MountainRidge'
 import { Alert, CountUp, Spinner, StatusDot } from '../components/ui'
 import { describeAudit, type AuditEntry } from '../audit'
 import { elapsedLabel, percent, todayIso } from '../format'
@@ -88,7 +89,10 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="page-head">
+      <div className="page-head has-ridge">
+        {/* Much fainter than on the login screen: a texture behind the
+            heading, never something the eye has to resolve. */}
+        <MountainRidge className="ridge-dashboard" />
         <div>
           <h1>Сводка</h1>
           <div className="page-sub">Положение дел на {today}</div>

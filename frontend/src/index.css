@@ -161,15 +161,39 @@
   --card-gap: 16px;
   --row-pad: 13px 15px;
   --row-radius: 12px;
-  --action-height: 36px;
+  /* Topbar controls — the bell, the theme toggle, the date input — share one
+     height with the small button so the header reads as a single row. */
+  --action-height: 32px;
 
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Type. Fraunces carries the character — titles, big numbers, the clock —
-     while the dense parts of the app stay on a plain sans, because a display
-     face at 13px in a table is just harder to read. */
+  /* Type. One sans across the whole operational interface; hierarchy comes
+     from size and weight, not from swapping typeface. A serif reads as
+     editorial, and this is a tool someone uses at speed for eight hours.
+     Fraunces survives on exactly one thing: the wordmark on the login screen,
+     where it is a logo rather than an interface element. */
   --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
   --font-ui: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+  /* Five steps, and nothing between them. */
+  --text-xl: 32px;
+  --text-lg: 24px;
+  --text-md: 18px;
+  --text-base: 15px;
+  --text-sm: 13px;
+
+  /* One 8px spacing scale, replacing values accumulated a session at a time. */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 48px;
+  /* The one half-step, for gaps inside a single control. */
+  --space-half: 4px;
+
+  /* Controls come in two heights and nothing else. */
+  --control-h: 40px;
+  --control-h-sm: 32px;
 }
 
 * {
@@ -188,7 +212,7 @@ body {
   /* Up from the browser default's effective 13-14px in this app's components:
      the whole interface was reading small. Everything below is sized relative
      to this in spirit, and was scaled with it. */
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.5;
   color: var(--text);
   background: var(--bg-0);
@@ -212,17 +236,44 @@ h4 {
   letter-spacing: -0.01em;
 }
 
-/* Fraunces only where it has room to be read as a shape: page titles, the big
-   numbers, the clock. Its optical-size axis is set low so it stays a display
-   face rather than drifting towards a text face. */
-h1,
-.tile-value,
-.stat-value,
-.clock-time {
+/* The wordmark, and only the wordmark. */
+.login-wordmark {
   font-family: var(--font-display);
-  font-variation-settings: 'SOFT' 0, 'WONK' 0, 'opsz' 40;
+  font-variation-settings: 'SOFT' 0, 'WONK' 0, 'opsz' 72;
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
+}
+
+/* The type scale. Every heading and figure in the app resolves to one of
+   these; a size that is not on the scale is a mistake, not a nuance. */
+h1 {
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+
+h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+h3,
+h4 {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.tile-value,
+.stat-value {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock-time {
+  font-size: var(--text-md);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Gold is the one ornamental colour, and it is spent only here: the figures
@@ -300,8 +351,8 @@ button {
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 14px 28px;
+  gap: 16px;
+  padding: 16px 24px;
   background: var(--topbar-bg);
   backdrop-filter: blur(20px) saturate(140%);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
@@ -311,9 +362,9 @@ button {
 .brand {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 8px;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 15px;
   letter-spacing: 0.01em;
   white-space: nowrap;
 }
@@ -324,7 +375,7 @@ button {
   display: grid;
   place-items: center;
   border-radius: 9px;
-  font-size: 16px;
+  font-size: 15px;
   background: linear-gradient(135deg, var(--accent), var(--accent-light));
   box-shadow: 0 4px 16px rgb(var(--accent-rgb) / 0.45);
 }
@@ -354,8 +405,8 @@ button {
   flex: 0 0 208px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 22px 14px;
+  gap: 16px;
+  padding: 24px 16px;
   align-self: stretch;
   border-right: 1px solid var(--border-soft);
 }
@@ -363,19 +414,19 @@ button {
 .nav-group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
 }
 
 .nav-group-label {
-  font-size: 11.5px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.09em;
   color: var(--text-faint);
-  padding: 0 12px 6px;
+  padding: 0 8px 4px;
 }
 
 .nav-link {
-  padding: 9px 12px;
+  padding: 8px 8px;
   border-radius: 11px;
   color: var(--text-dim);
   text-decoration: none;
@@ -401,26 +452,26 @@ button {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 
 .reviews {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding-right: 14px;
+  gap: 8px;
+  padding-right: 16px;
   border-right: 1px solid var(--border-soft);
 }
 
 .reviews-label {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .reviews-link {
-  padding: 4px 10px;
+  padding: 4px 8px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -448,9 +499,9 @@ button {
 .clock {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   line-height: 1.25;
-  padding-right: 14px;
+  padding-right: 16px;
   border-right: 1px solid var(--border-soft);
 }
 
@@ -468,7 +519,7 @@ button {
 }
 
 .clock-zone {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -480,18 +531,18 @@ button {
 }
 
 .who-name {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
 }
 
 .who-role {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
 }
 
 .content {
   flex: 1;
-  padding: 28px;
+  padding: 24px;
   max-width: 1480px;
   width: 100%;
   /* Without this a wide child — a data table, a long chip row — can force the
@@ -504,16 +555,16 @@ button {
   align-items: flex-end;
   gap: 16px;
   flex-wrap: wrap;
-  margin-bottom: 22px;
+  margin-bottom: 24px;
 }
 
 .page-head h1 {
-  font-size: 30px;
+  font-size: 32px;
 }
 
 .page-sub {
   color: var(--text-faint);
-  font-size: 14px;
+  font-size: 15px;
   margin-top: 4px;
 }
 
@@ -529,17 +580,13 @@ button {
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
+/* Header buttons take their height from .btn-sm like everything else — the
+   header no longer defines a third size of its own. */
 .page-head-actions .btn {
-  height: var(--action-height);
-  padding: 0 14px;
-  font-size: 14px;
-  border-radius: 10px;
-  /* A wrapping label would make one button taller than its neighbours; these
-     are short enough to stay on one line and wrap as whole buttons instead. */
-  white-space: nowrap;
+  height: var(--control-h-sm);
 }
 
 /* ── Buttons ───────────────────────────────────────────────────────────────── */
@@ -548,63 +595,118 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px 18px;
-  border-radius: 12px;
+  /* One gap, so a button carrying an icon lines up with one that does not. */
+  gap: var(--space-1);
+  height: var(--control-h);
+  padding: 0 var(--space-2);
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--surface);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   color: var(--text);
   cursor: pointer;
-  font-size: 15px;
+  font-size: var(--text-base);
+  font-weight: 500;
+  white-space: nowrap;
   transition:
-    transform 0.18s var(--ease),
-    box-shadow 0.18s var(--ease),
-    background 0.18s var(--ease);
+    background 0.16s var(--ease),
+    border-color 0.16s var(--ease),
+    opacity 0.16s var(--ease);
+}
+
+/* Secondary is what a bare .btn already is; the class exists so a page can
+   say so rather than leaving the reader to infer it. */
+.btn-secondary {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.btn svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
 }
 
 .btn:hover:not(:disabled) {
-  transform: translateY(-2px);
   background: var(--surface-2);
-  box-shadow: var(--shadow-lift);
+  border-color: var(--border-strong);
 }
 
 .btn:active:not(:disabled) {
-  transform: translateY(0);
+  transform: translateY(1px);
 }
 
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Disabled.
+
+   Element opacity alone was measured and cannot do this job. A ghost or
+   danger button has no fill of its own — its "face" is the page — so fading
+   the whole control fades the label against a background that does not move
+   with it. In Taura Day those two variants stay under 4.5:1 at every opacity
+   that still reads as disabled; at 0.9, where they finally pass, the button
+   no longer looks disabled at all. The original 0.45 put the primary action
+   at 2.06:1, which is where the unreadable label on the Cleaning page came
+   from.
+
+   So the face is neutralised instead: a flat surface, a soft border, and a
+   label at --text-dim, which measures ~9:1 on night and ~6:1 on day. A light
+   opacity remains for the sense of an inert control. Nothing here lowers the
+   label's contrast — it raises it — and a disabled button loses its variant
+   identity on purpose, because an action you cannot take has no primacy. */
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.9;
   cursor: not-allowed;
+  background: var(--surface);
+  border-color: var(--border-soft);
+  color: var(--text-dim);
+  box-shadow: none;
 }
 
+/* Solid rather than a gradient: a gradient fading under opacity blends into
+   the page and takes the label's contrast down with it. */
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-light));
-  border-color: transparent;
-  font-weight: 500;
-  box-shadow: 0 6px 22px rgb(var(--accent-rgb) / 0.4);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--accent-light), var(--accent));
-  box-shadow: 0 14px 34px rgb(var(--accent-rgb) / 0.5);
+  background: var(--accent-light);
+  border-color: var(--accent-light);
 }
 
 .btn-danger {
-  border-color: rgb(var(--occupied-rgb) / 0.4);
+  background: transparent;
+  border-color: rgb(var(--occupied-rgb) / 0.55);
   color: var(--occupied-ink);
 }
 
+.btn-danger:hover:not(:disabled) {
+  background: var(--tint-occupied);
+  border-color: var(--occupied);
+}
+
+/* The only size modifier in the system. */
 .btn-sm {
-  padding: 7px 13px;
-  font-size: 14px;
-  border-radius: 10px;
+  height: var(--control-h-sm);
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
 }
 
 .btn-ghost {
   background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--surface-2);
   border-color: var(--border-soft);
+  color: var(--text);
 }
 
 /* ── Status dots & pills ───────────────────────────────────────────────────── */
@@ -644,8 +746,8 @@ button {
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 4px 11px;
+  gap: 8px;
+  padding: 4px 8px;
   border-radius: 999px;
   font-size: 13px;
   background: rgb(var(--lift-rgb) / 0.07);
@@ -667,13 +769,13 @@ button {
   flex-wrap: wrap;
   font-size: 13px;
   color: var(--text-dim);
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .legend span {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 
 .unit-grid {
@@ -686,7 +788,7 @@ button {
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 16px;
   transition:
     transform 0.22s var(--ease),
     box-shadow 0.22s var(--ease),
@@ -698,7 +800,7 @@ button {
   all: unset;
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 16px;
   cursor: pointer;
   flex: 1;
 }
@@ -745,11 +847,11 @@ button {
 .unit-card-top {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
 }
 
 .unit-name {
-  font-size: 21px;
+  font-size: 18px;
   font-weight: 600;
   line-height: 1.1;
 }
@@ -757,20 +859,20 @@ button {
 .unit-meta {
   font-size: 13px;
   color: var(--text-faint);
-  margin-top: 3px;
+  margin-top: 4px;
 }
 
 .unit-status {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   font-size: 13px;
   color: var(--text-dim);
 }
 
 .unit-guest {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
 }
 
@@ -785,7 +887,7 @@ button {
 
 .unit-empty {
   color: var(--text-faint);
-  font-size: 14px;
+  font-size: 15px;
   font-style: italic;
 }
 
@@ -795,11 +897,11 @@ button {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding-top: 3px;
+  padding-top: 4px;
 }
 
 .money {
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--text-dim);
 }
 
@@ -817,12 +919,12 @@ button {
 .cal-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .cal-month {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 500;
   min-width: 168px;
   text-align: center;
@@ -832,12 +934,12 @@ button {
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
+  gap: 4px;
 }
 
 .cal-dow {
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   padding-bottom: 4px;
   text-transform: uppercase;
@@ -854,7 +956,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-dim);
   transition:
     transform 0.16s var(--ease),
@@ -893,7 +995,7 @@ button {
 .detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-  gap: 18px;
+  gap: 16px;
   align-items: start;
 }
 
@@ -917,10 +1019,10 @@ button {
 .panel-title {
   font-size: 15px;
   font-weight: 600;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
 }
 
 .panel-title .count {
@@ -935,13 +1037,13 @@ button {
 .pay-rows {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 8px;
 }
 
 .pay-row {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: 8px;
   font-size: 15px;
 }
 
@@ -955,7 +1057,7 @@ button {
 }
 
 .pay-row.total {
-  padding-top: 10px;
+  padding-top: 8px;
   border-top: 1px solid var(--border-soft);
   font-weight: 600;
 }
@@ -965,7 +1067,7 @@ button {
   border-radius: 999px;
   background: rgb(var(--lift-rgb) / 0.08);
   overflow: hidden;
-  margin: 14px 0 4px;
+  margin: 16px 0 4px;
 }
 
 .pay-bar-fill {
@@ -986,8 +1088,8 @@ button {
 .check-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 11px 14px;
+  gap: 8px;
+  padding: 8px 16px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-soft);
   background: rgb(var(--lift-rgb) / 0.03);
@@ -1040,7 +1142,7 @@ button {
 }
 
 .check-by {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   white-space: nowrap;
 }
@@ -1050,8 +1152,8 @@ button {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  margin-bottom: 14px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .field label {
@@ -1062,7 +1164,7 @@ button {
 .field input,
 .field select {
   width: 100%;
-  padding: 12px 14px;
+  padding: 8px 16px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: rgb(var(--lift-rgb) / 0.05);
@@ -1092,7 +1194,7 @@ button {
 .field-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 8px;
 }
 
 /* ── Login ─────────────────────────────────────────────────────────────────── */
@@ -1107,7 +1209,7 @@ button {
 .login-card {
   width: 100%;
   max-width: 396px;
-  padding: 34px;
+  padding: 32px;
   animation: rise 0.5s var(--ease);
 }
 
@@ -1128,14 +1230,14 @@ button {
   border-radius: 15px;
   display: grid;
   place-items: center;
-  font-size: 25px;
-  margin-bottom: 18px;
+  font-size: 24px;
+  margin-bottom: 16px;
   background: linear-gradient(135deg, var(--accent), var(--accent-light));
   box-shadow: 0 8px 28px rgb(var(--accent-rgb) / 0.45);
 }
 
 .login-card h1 {
-  font-size: 22px;
+  font-size: 24px;
 }
 
 .login-card .page-sub {
@@ -1144,8 +1246,8 @@ button {
 
 .login-card .btn {
   width: 100%;
-  margin-top: 6px;
-  padding: 13px;
+  margin-top: 4px;
+  padding: 16px;
 }
 
 .pin-input {
@@ -1154,10 +1256,10 @@ button {
 }
 
 .hint {
-  margin-top: 22px;
+  margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid var(--border-soft);
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text-faint);
   line-height: 1.7;
 }
@@ -1165,25 +1267,25 @@ button {
 /* ── Feedback ──────────────────────────────────────────────────────────────── */
 
 .alert {
-  padding: 11px 15px;
+  padding: 8px 16px;
   border-radius: 12px;
-  font-size: 14px;
-  margin-bottom: 14px;
+  font-size: 15px;
+  margin-bottom: 16px;
   border: 1px solid rgb(var(--occupied-rgb) / 0.36);
   background: rgb(var(--occupied-rgb) / 0.13);
   color: var(--occupied-ink);
 }
 
 .empty-state {
-  padding: 52px 24px;
+  padding: 48px 24px;
   text-align: center;
   color: var(--text-faint);
   font-size: 15px;
 }
 
 .empty-state .big {
-  font-size: 34px;
-  margin-bottom: 12px;
+  font-size: 32px;
+  margin-bottom: 8px;
 }
 
 .splash {
@@ -1215,7 +1317,7 @@ button {
   z-index: 60;
   display: grid;
   place-items: center;
-  padding: 22px;
+  padding: 24px;
   background: var(--scrim);
   backdrop-filter: blur(7px);
   -webkit-backdrop-filter: blur(7px);
@@ -1234,7 +1336,7 @@ button {
 .modal {
   width: 100%;
   max-width: 448px;
-  padding: 26px;
+  padding: 24px;
   max-height: 90vh;
   overflow-y: auto;
   animation: rise 0.28s var(--ease);
@@ -1242,13 +1344,13 @@ button {
 
 .modal h2 {
   font-size: 18px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .modal-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 20px;
+  gap: 8px;
+  margin-top: 16px;
 }
 
 .modal-actions .btn {
@@ -1260,11 +1362,11 @@ button {
 .back-link {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   color: var(--text-dim);
   text-decoration: none;
-  font-size: 14px;
-  margin-bottom: 14px;
+  font-size: 15px;
+  margin-bottom: 16px;
   transition: color 0.16s var(--ease);
 }
 
@@ -1275,13 +1377,13 @@ button {
 .info-rows {
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 8px;
   font-size: 15px;
 }
 
 .info-row {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 .info-row span:first-child {
@@ -1298,16 +1400,16 @@ button {
 
 .tabs {
   display: flex;
-  gap: 6px;
-  margin-bottom: 20px;
+  gap: 4px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
 }
 
 .tab {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 9px 17px;
+  gap: 8px;
+  padding: 8px 16px;
   border-radius: 12px;
   border: 1px solid transparent;
   background: transparent;
@@ -1333,11 +1435,11 @@ button {
 }
 
 .tab-count {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   background: rgb(var(--lift-rgb) / 0.08);
   border-radius: 999px;
-  padding: 1px 7px;
+  padding: 0 8px;
 }
 
 .chip-row,
@@ -1365,7 +1467,7 @@ button {
   overflow-x: auto;
   /* Room for the chips' hover lift, which would otherwise be clipped by the
      overflow this rule introduces. */
-  padding: 3px 0;
+  padding: 4px 0;
   scrollbar-width: thin;
 }
 
@@ -1381,17 +1483,17 @@ button {
 }
 
 .filters {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .chip {
-  padding: 8px 15px;
+  padding: 8px 16px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   transition:
     transform 0.16s var(--ease),
     background 0.16s var(--ease),
@@ -1416,18 +1518,18 @@ button {
   align-items: center;
   gap: 8px;
   margin-left: auto;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-faint);
 }
 
 .filters-dates input {
-  padding: 8px 12px;
+  padding: 8px 8px;
   border-radius: 11px;
   border: 1px solid var(--border);
   background: rgb(var(--lift-rgb) / 0.05);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   outline: none;
 }
 
@@ -1472,7 +1574,7 @@ button {
 .stat-label {
   font-size: 13px;
   color: var(--text-dim);
-  margin-bottom: 9px;
+  margin-bottom: 8px;
 }
 
 .stat-value {
@@ -1483,12 +1585,12 @@ button {
 }
 
 .stat-foot {
-  margin-top: 9px;
+  margin-top: 8px;
   font-size: 13px;
   color: var(--text-faint);
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 
 .meter {
@@ -1496,7 +1598,7 @@ button {
   border-radius: 999px;
   background: rgb(var(--lift-rgb) / 0.08);
   overflow: hidden;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .meter-fill {
@@ -1556,21 +1658,21 @@ button {
 
 .chart-legend {
   display: flex;
-  gap: 18px;
+  gap: 16px;
   font-size: 13px;
   color: var(--text-dim);
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .chart-legend span {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 
 .chart-body {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   height: 232px;
 }
 
@@ -1578,10 +1680,10 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
-  padding-bottom: 2px;
+  padding-bottom: 0;
   text-align: right;
   min-width: 46px;
 }
@@ -1591,7 +1693,7 @@ button {
   flex: 1;
   display: flex;
   align-items: flex-end;
-  gap: 10px;
+  gap: 8px;
   border-bottom: 1px solid var(--chart-baseline);
 }
 
@@ -1616,9 +1718,9 @@ button {
 }
 
 .chart-value {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-dim);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1631,7 +1733,7 @@ button {
   justify-content: flex-end;
   height: 100%;
   /* 2px surface gap between stacked segments. */
-  gap: 2px;
+  gap: 0;
   /* Rounds the data-end at the top of the stack — whichever segment ends up
      there — while the bottom stays anchored square on the baseline. */
   border-radius: 4px 4px 0 0;
@@ -1661,7 +1763,7 @@ button {
   bottom: calc(100% + 10px);
   left: 50%;
   transform: translateX(-50%);
-  padding: 11px 14px;
+  padding: 8px 16px;
   border-radius: var(--radius-sm);
   font-size: 13px;
   white-space: nowrap;
@@ -1681,7 +1783,7 @@ button {
   align-items: center;
   gap: 8px;
   color: var(--text-dim);
-  padding: 2px 0;
+  padding: 0 0;
 }
 
 .chart-tip-row b {
@@ -1691,22 +1793,22 @@ button {
 }
 
 .chart-tip-row.total {
-  margin-top: 6px;
-  padding-top: 7px;
+  margin-top: 4px;
+  padding-top: 8px;
   border-top: 1px solid var(--border-soft);
 }
 
 .chart-labels {
   display: flex;
-  gap: 10px;
-  margin-top: 10px;
-  padding-left: 58px;
+  gap: 8px;
+  margin-top: 8px;
+  padding-left: 48px;
 }
 
 .chart-labels span {
   flex: 1;
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   text-transform: capitalize;
 }
@@ -1716,10 +1818,10 @@ button {
 }
 
 .chart-empty {
-  padding: 44px 20px;
+  padding: 48px 16px;
   text-align: center;
   color: var(--text-faint);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 /* ── Data table ────────────────────────────────────────────────────────────── */
@@ -1727,22 +1829,22 @@ button {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14.5px;
+  font-size: 15px;
 }
 
 .data-table th {
   text-align: left;
   font-weight: 500;
-  font-size: 12.5px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-faint);
-  padding: 0 12px 10px 0;
+  padding: 0 8px 8px 0;
   border-bottom: 1px solid var(--border-soft);
 }
 
 .data-table td {
-  padding: 11px 12px 11px 0;
+  padding: 8px 8px 8px 0;
   border-bottom: 1px solid var(--border-soft);
   color: var(--text-dim);
 }
@@ -1751,7 +1853,7 @@ button {
   color: var(--text);
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
 }
 
 .data-table tr:last-child td {
@@ -1776,9 +1878,9 @@ button {
 /* ── Settings ──────────────────────────────────────────────────────────────── */
 
 .notice {
-  padding: 13px 16px;
+  padding: 16px 16px;
   border-radius: 12px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
   margin-bottom: 16px;
   border: 1px solid rgb(var(--free-rgb) / 0.32);
@@ -1794,8 +1896,8 @@ button {
 
 .notice code {
   display: inline-block;
-  margin: 0 3px;
-  padding: 2px 8px;
+  margin: 0 4px;
+  padding: 0 8px;
   border-radius: 7px;
   background: rgba(0, 0, 0, 0.28);
   font-size: 13px;
@@ -1804,7 +1906,7 @@ button {
 
 .setting-item {
   align-items: flex-start;
-  padding: 14px 16px;
+  padding: 16px 16px;
 }
 
 .setting-icon {
@@ -1816,7 +1918,7 @@ button {
 .setting-text {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   flex: 1;
 }
 
@@ -1842,7 +1944,7 @@ button {
   background: rgb(var(--lift-rgb) / 0.13);
   border: 1px solid var(--border-soft);
   flex: none;
-  padding: 2px;
+  padding: 0;
   display: flex;
   transition: background 0.18s var(--ease);
 }
@@ -1871,7 +1973,7 @@ button {
   background: rgba(0, 0, 0, 0.24);
   border: 1px solid var(--border-soft);
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--text-dim);
   white-space: pre-wrap;
@@ -1885,8 +1987,8 @@ button {
 .toolbar {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .search {
@@ -1900,14 +2002,14 @@ button {
 .search-icon {
   position: absolute;
   left: 14px;
-  font-size: 17px;
+  font-size: 18px;
   color: var(--text-faint);
   pointer-events: none;
 }
 
 .search input {
   width: 100%;
-  padding: 11px 38px 11px 38px;
+  padding: 8px 32px 8px 32px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: rgb(var(--lift-rgb) / 0.05);
@@ -1946,7 +2048,7 @@ button {
   color: var(--text-dim);
   cursor: pointer;
   line-height: 1;
-  font-size: 16px;
+  font-size: 15px;
   display: grid;
   place-items: center;
   transition: background 0.16s var(--ease);
@@ -1960,12 +2062,12 @@ button {
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 
 .chip-count {
-  font-size: 12px;
-  padding: 1px 6px;
+  font-size: 13px;
+  padding: 0 4px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.22);
   color: inherit;
@@ -1973,18 +2075,18 @@ button {
 }
 
 .chip-sm {
-  padding: 5px 11px;
+  padding: 4px 8px;
   font-size: 13px;
 }
 
 .result-line {
   font-size: 13px;
   color: var(--text-faint);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .field-hint {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text-faint);
   line-height: 1.5;
 }
@@ -1994,7 +2096,7 @@ button {
 .charge-row {
   position: relative;
   color: var(--text-dim);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .charge-row span:first-child {
@@ -2029,44 +2131,44 @@ button {
 }
 
 .pay-row.subtotal {
-  padding-top: 9px;
+  padding-top: 8px;
   border-top: 1px dashed var(--border-soft);
 }
 
 .deposit-box {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   margin-top: 16px;
-  padding: 13px 15px;
+  padding: 16px 16px;
   border-radius: var(--radius-sm);
   border: 1px solid rgb(var(--cleaning-rgb) / 0.28);
   background: rgb(var(--cleaning-rgb) / 0.09);
 }
 
 .deposit-label {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--cleaning-ink);
 }
 
 .deposit-hint {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .deposit-value {
   margin-left: auto;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .tag {
   margin-left: 8px;
-  padding: 1px 7px;
+  padding: 0 8px;
   border-radius: 999px;
-  font-size: 11.5px;
+  font-size: 13px;
   background: rgb(var(--accent-rgb) / 0.2);
   border: 1px solid rgb(var(--accent-rgb) / 0.35);
   color: var(--text-dim);
@@ -2077,8 +2179,8 @@ button {
 .group-units {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 14px;
+  gap: 8px;
+  margin-top: 16px;
 }
 
 .pill-current {
@@ -2090,17 +2192,17 @@ button {
 .picker {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   max-height: 232px;
   overflow-y: auto;
-  padding: 12px;
+  padding: 8px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-soft);
   background: rgba(0, 0, 0, 0.18);
 }
 
 .picker-title {
-  font-size: 12px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-faint);
@@ -2110,16 +2212,16 @@ button {
 .picker-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .picker-item {
-  padding: 7px 12px;
+  padding: 8px 8px;
   border-radius: 9px;
   border: 1px solid var(--border-soft);
   background: rgb(var(--lift-rgb) / 0.04);
   color: var(--text-dim);
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
   transition:
     transform 0.16s var(--ease),
@@ -2142,7 +2244,7 @@ button {
 /* Busy right now — still selectable, since the group may be for later dates. */
 .picker-item.busy::after {
   content: '•';
-  margin-left: 6px;
+  margin-left: 4px;
   color: var(--occupied);
 }
 
@@ -2158,19 +2260,19 @@ button {
 }
 
 .guest-phone {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-faint);
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .mini-stats {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: 8px;
 }
 
 .mini-stat {
-  padding: 12px 14px;
+  padding: 8px 16px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-soft);
   background: rgb(var(--lift-rgb) / 0.04);
@@ -2183,20 +2285,20 @@ button {
 }
 
 .mini-stat-label {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
-  margin-top: 3px;
+  margin-top: 4px;
 }
 
 .notes-area {
   width: 100%;
-  padding: 12px 14px;
+  padding: 8px 16px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: rgb(var(--lift-rgb) / 0.05);
   color: var(--text);
   font: inherit;
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.6;
   resize: vertical;
   outline: none;
@@ -2210,7 +2312,7 @@ button {
 .notes-foot {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-top: 8px;
 }
 
@@ -2228,8 +2330,8 @@ button {
 .stay-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 11px 14px;
+  gap: 8px;
+  padding: 8px 16px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-soft);
   background: rgb(var(--lift-rgb) / 0.03);
@@ -2243,18 +2345,18 @@ button {
 .stay-dates {
   font-size: 13px;
   color: var(--text-faint);
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .stay-money {
   margin-left: auto;
   text-align: right;
-  font-size: 14px;
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
 }
 
 .stay-status {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text-faint);
 }
 
@@ -2263,8 +2365,8 @@ button {
 .photo-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .photo {
@@ -2289,8 +2391,8 @@ button {
 
 .photo figcaption {
   position: relative;
-  padding: 7px 9px;
-  font-size: 11.5px;
+  padding: 8px 8px;
+  font-size: 13px;
   line-height: 1.4;
 }
 
@@ -2341,13 +2443,13 @@ button {
 /* ── Occupancy forecast ────────────────────────────────────────────────────── */
 
 .forecast {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .forecast-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(38px, 1fr));
-  gap: 6px;
+  gap: 4px;
 }
 
 .forecast-day {
@@ -2380,7 +2482,7 @@ button {
   z-index: 1;
   width: 100%;
   padding: 4px 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -2401,12 +2503,12 @@ button {
 
 .forecast-date {
   font-size: 13px;
-  margin-top: 5px;
+  margin-top: 4px;
   font-variant-numeric: tabular-nums;
 }
 
 .forecast-dow {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--text-faint);
 }
 
@@ -2423,7 +2525,7 @@ button {
 }
 
 .weekday-count {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
 }
 
@@ -2774,8 +2876,8 @@ button {
 /* ── Cancellation reason ───────────────────────────────────────────────────── */
 
 .cancel-block {
-  padding: 14px 15px 2px;
-  margin-bottom: 14px;
+  padding: 16px 16px 0;
+  margin-bottom: 16px;
   border-radius: var(--radius-sm);
   border: 1px solid rgb(var(--booked-rgb) / 0.32);
   background: rgb(var(--booked-rgb) / 0.09);
@@ -2783,42 +2885,42 @@ button {
 
 .cancel-note {
   display: block;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text-faint);
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 /* ── Restore preview ───────────────────────────────────────────────────────── */
 
 .restore-preview {
   margin-bottom: 16px;
-  padding: 13px 15px;
+  padding: 16px 16px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-soft);
   background: rgba(0, 0, 0, 0.22);
-  font-size: 13.5px;
+  font-size: 13px;
   max-height: 190px;
   overflow-y: auto;
 }
 
 .restore-preview .info-row {
-  padding: 2px 0;
+  padding: 0 0;
 }
 
 .field input[type='file'] {
-  padding: 9px 12px;
-  font-size: 14px;
+  padding: 8px 8px;
+  font-size: 15px;
 }
 
 .field input[type='file']::file-selector-button {
-  margin-right: 12px;
-  padding: 6px 13px;
+  margin-right: 8px;
+  padding: 4px 16px;
   border-radius: 9px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 13.5px;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -2836,7 +2938,7 @@ button {
 .row-card {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   flex-wrap: wrap;
   padding: var(--row-pad);
   border-radius: var(--row-radius);
@@ -2863,7 +2965,7 @@ button {
 }
 
 .row-title {
-  font-size: 15.5px;
+  font-size: 15px;
   font-weight: 500;
   display: flex;
   align-items: center;
@@ -2874,7 +2976,7 @@ button {
 .row-sub {
   font-size: 13px;
   color: var(--text-faint);
-  margin-top: 3px;
+  margin-top: 4px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2893,12 +2995,9 @@ button {
   flex-wrap: wrap;
 }
 
-/* Row buttons follow the header rule: one height regardless of variant. */
+/* Row buttons follow the same rule. */
 .row-actions .btn {
-  height: var(--action-height);
-  padding: 0 13px;
-  font-size: 14px;
-  white-space: nowrap;
+  height: var(--control-h-sm);
 }
 
 .row-card.is-overdue {
@@ -2947,7 +3046,7 @@ button {
 .tile-label {
   font-size: 13px;
   color: var(--text-dim);
-  margin-bottom: 9px;
+  margin-bottom: 8px;
 }
 
 .tile-value {
@@ -2961,7 +3060,7 @@ button {
 }
 
 .tile-of {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--text-faint);
   letter-spacing: 0;
@@ -2971,7 +3070,7 @@ button {
    when one of them carries a meter and the others do not. */
 .tile-foot {
   margin-top: auto;
-  padding-top: 9px;
+  padding-top: 8px;
   font-size: 13px;
   color: var(--text-faint);
 }
@@ -2984,9 +3083,9 @@ button {
 }
 
 .dash-empty {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-faint);
-  padding: 6px 0 2px;
+  padding: 4px 0 0;
 }
 
 .panel-title .count a {
@@ -3014,28 +3113,28 @@ button {
 .audit-when {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--text-faint);
 }
 
 .audit-role,
 .audit-guest {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .pager {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  margin-top: 18px;
+  gap: 16px;
+  margin-top: 16px;
 }
 
 .pager-info {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
@@ -3076,9 +3175,9 @@ button {
 @media (max-width: 760px) {
   .topbar {
     flex-wrap: wrap;
-    row-gap: 10px;
-    padding: 10px 14px;
-    gap: 12px;
+    row-gap: 8px;
+    padding: 8px 16px;
+    gap: 8px;
   }
 
   .topbar-right {
@@ -3086,7 +3185,7 @@ button {
     width: 100%;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 8px;
   }
 }
 
@@ -3101,8 +3200,8 @@ button {
     width: 100%;
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 8px 20px;
-    padding: 12px 18px;
+    gap: 8px 16px;
+    padding: 8px 16px;
     border-right: none;
     border-bottom: 1px solid var(--border-soft);
   }
@@ -3115,13 +3214,13 @@ button {
   }
 
   .nav-group-label {
-    padding: 0 6px 0 0;
+    padding: 0 4px 0 0;
   }
 }
 
 @media (max-width: 640px) {
   .content {
-    padding: 18px 14px;
+    padding: 16px 16px;
   }
 
   .chart-body {
@@ -3152,18 +3251,18 @@ button {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .timeline-nav {
   display: flex;
-  gap: 6px;
+  gap: 4px;
 }
 
 .timeline-nav .btn {
   height: var(--action-height);
-  padding: 0 12px;
+  padding: 0 8px;
   min-width: 38px;
 }
 
@@ -3177,13 +3276,13 @@ button {
 
 .timeline-jump input {
   height: var(--action-height);
-  padding: 0 10px;
+  padding: 0 8px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   color-scheme: dark;
 }
 
@@ -3195,7 +3294,7 @@ button {
 .timeline-scale {
   margin-left: auto;
   display: flex;
-  gap: 6px;
+  gap: 4px;
 }
 
 /* The one place the app scrolls sideways on purpose: 30 columns will not fit a
@@ -3222,12 +3321,12 @@ button {
 .tl-row {
   display: grid;
   align-items: center;
-  column-gap: 2px;
+  column-gap: 0;
   min-height: var(--tl-row-h);
 }
 
 .tl-row + .tl-row {
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .tl-head {
@@ -3241,8 +3340,8 @@ button {
   /* Opaque on purpose: the bars scroll underneath it, and a translucent
      surface would let them show through the room number. */
   background: var(--surface-opaque);
-  padding: 0 10px 0 2px;
-  font-size: 14px;
+  padding: 0 8px 0 0;
+  font-size: 15px;
   font-weight: 600;
   text-align: left;
   height: 100%;
@@ -3251,7 +3350,7 @@ button {
 }
 
 .tl-corner {
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -3275,18 +3374,18 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
+  gap: 0;
   font-variant-numeric: tabular-nums;
   padding-bottom: 4px;
 }
 
 .tl-day-num {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .tl-day-dow {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-faint);
 }
 
@@ -3345,7 +3444,7 @@ button {
   padding: 0 8px;
   cursor: pointer;
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--on-status);
   font-weight: 500;
   white-space: nowrap;
@@ -3387,7 +3486,7 @@ button {
 }
 
 .timeline-hint {
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 /* ── Card / timeline switch ────────────────────────────────────────────────── */
@@ -3395,8 +3494,8 @@ button {
 .view-switch {
   display: inline-flex;
   height: var(--action-height);
-  padding: 3px;
-  gap: 3px;
+  padding: 4px;
+  gap: 4px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -3407,8 +3506,8 @@ button {
   background: none;
   color: var(--text-dim);
   font: inherit;
-  font-size: 14px;
-  padding: 0 12px;
+  font-size: 15px;
+  padding: 0 8px;
   border-radius: 8px;
   cursor: pointer;
   white-space: nowrap;
@@ -3452,15 +3551,15 @@ button {
 .alert-bell {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   height: var(--action-height);
-  padding: 0 12px;
+  padding: 0 8px;
   border-radius: 999px;
   border: 1px solid rgb(var(--occupied-rgb) / 0.5);
   background: rgb(var(--occupied-rgb) / 0.16);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
   animation: alert-pulse 1.6s var(--ease) infinite;
 }
@@ -3499,7 +3598,7 @@ button {
   right: 0;
   z-index: 40;
   width: min(400px, calc(100vw - 32px));
-  padding: 12px;
+  padding: 8px;
   /* Long lists scroll inside the panel rather than off the screen. */
   max-height: min(60vh, 460px);
   overflow-y: auto;
@@ -3516,8 +3615,8 @@ button {
 .alert-panel-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 8px;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -3527,7 +3626,7 @@ button {
 .alert-panel-head .btn {
   margin-left: auto;
   height: 26px;
-  padding: 0 10px;
+  padding: 0 8px;
   font-size: 13px;
   text-transform: none;
   letter-spacing: 0;
@@ -3545,8 +3644,8 @@ button {
 .alert-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 10px 11px;
+  gap: 8px;
+  padding: 8px 8px;
   border-radius: var(--row-radius);
   border: 1px solid var(--border-soft);
   background: rgb(var(--lift-rgb) / 0.05);
@@ -3567,7 +3666,7 @@ button {
 }
 
 .alert-icon {
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.3;
 }
 
@@ -3578,7 +3677,7 @@ button {
 
 .alert-title {
   display: block;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--text);
   text-decoration: none;
@@ -3590,18 +3689,18 @@ button {
 }
 
 .alert-detail {
-  margin-top: 3px;
+  margin-top: 4px;
   font-size: 13px;
   color: var(--text-faint);
 }
 
 .alert-kind {
   display: inline-block;
-  margin-right: 7px;
-  padding: 1px 7px;
+  margin-right: 8px;
+  padding: 0 8px;
   border-radius: 999px;
   background: rgb(var(--lift-rgb) / 0.08);
-  font-size: 11.5px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -3615,7 +3714,7 @@ button {
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1;
 }
 
@@ -3781,3 +3880,96 @@ button {
 /* The paper sheet keeps its own black-on-white palette in both themes: it is a
    document, and a receipt handed to a guest does not follow the app's mood.
    That is why the colours in that section are literal rather than tokens. */
+
+/* ── Mountain ridge ────────────────────────────────────────────────────────
+   Decoration, and held to decoration's rules: single colour, low opacity,
+   never underneath anything that has to be read at speed. The login screen
+   gets the visible one; the dashboard gets a hint of it behind the heading.  */
+
+.ridge {
+  display: block;
+  width: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ridge-far,
+.ridge-near {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.ridge-far {
+  opacity: 0.28;
+}
+
+.ridge-near {
+  opacity: 0.55;
+}
+
+.ridge-snow {
+  fill: var(--gold);
+  stroke: none;
+  opacity: 0.6;
+}
+
+/* Anchored to the bottom of the viewport, behind the card. Fitted to the
+   width rather than cropped, so the whole ridge line is visible instead of
+   two fragments either side of the card. */
+.ridge-login {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: auto;
+  z-index: 0;
+}
+
+.login-wrap {
+  position: relative;
+}
+
+.login-card {
+  position: relative;
+  z-index: 1;
+}
+
+/* On the dashboard it is a texture rather than a picture: a quarter of the
+   opacity, clipped to the heading strip, and stopped short of the text. */
+.page-head.has-ridge {
+  position: relative;
+  overflow: hidden;
+}
+
+.ridge-dashboard {
+  position: absolute;
+  right: 0;
+  bottom: -16px;
+  width: min(520px, 55%);
+  height: 96px;
+  opacity: 0.22;
+  z-index: 0;
+}
+
+.page-head.has-ridge > div,
+.page-head.has-ridge > .page-head-actions {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 760px) {
+  /* On a phone the heading strip is too tight for it to be anything but
+     noise behind the title. */
+  .ridge-dashboard {
+    display: none;
+  }
+}
+
+/* ── Login wordmark ───────────────────────────────────────────────────────── */
+
+.login-wordmark {
+  font-size: var(--text-xl);
+  line-height: 1.1;
+}

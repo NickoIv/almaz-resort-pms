@@ -226,7 +226,7 @@ export default function UnitDetailPage() {
             <div className="panel-title">
               Гость
               {isAdmin && booking?.guest_phone && (
-                <button className="btn btn-sm btn-ghost count" onClick={() => setShowGuest(true)}>
+                <button className="btn btn-sm btn-ghost card-action" onClick={() => setShowGuest(true)}>
                   История гостя →
                 </button>
               )}

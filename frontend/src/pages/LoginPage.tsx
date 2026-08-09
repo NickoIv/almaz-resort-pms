@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { HOME_BY_ROLE, useAuth } from '../auth'
+import MountainRidge from '../components/MountainRidge'
 import { Alert, Spinner } from '../components/ui'
 
 export default function LoginPage() {
@@ -31,10 +32,14 @@ export default function LoginPage() {
 
   return (
     <div className="login-wrap">
+      {/* The one piece of imagery in the app, and the only place the serif
+          survives — here it is a wordmark, not an interface element. */}
+      <MountainRidge className="ridge-login" />
+
       <form className="login-card glass" onSubmit={handleSubmit}>
         <div className="login-logo">◈</div>
-        <h1>Taura PMS</h1>
-        <div className="page-sub">Вход для персонала</div>
+        <h1 className="login-wordmark">Taura</h1>
+        <div className="page-sub">PMS · вход для персонала</div>
 
         {error && <Alert>{error}</Alert>}
 
