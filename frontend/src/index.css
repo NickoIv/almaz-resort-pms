@@ -3240,3 +3240,219 @@ button {
     margin-left: 0;
   }
 }
+
+/* ── Alert centre ──────────────────────────────────────────────────────────
+   The bell only exists while something is outstanding, so its presence is
+   itself the signal. Nothing here dismisses itself on a timer: these are
+   events a person has to act on, and a toast that fades after five seconds is
+   how such a thing gets missed.                                             */
+
+.alert-center {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.alert-bell {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: var(--action-height);
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 92, 114, 0.5);
+  background: rgba(255, 92, 114, 0.16);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  animation: alert-pulse 1.6s var(--ease) infinite;
+}
+
+.alert-bell:hover {
+  background: rgba(255, 92, 114, 0.26);
+}
+
+.alert-bell-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.alert-bell-count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ring and glow rather than movement: a control that jumps around is harder
+   to click, and this one sits next to the logout button. */
+@keyframes alert-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 92, 114, 0.55);
+    border-color: rgba(255, 92, 114, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(255, 92, 114, 0);
+    border-color: rgba(255, 92, 114, 0.95);
+  }
+}
+
+.alert-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 40;
+  width: min(400px, calc(100vw - 32px));
+  padding: 12px;
+  /* Long lists scroll inside the panel rather than off the screen. */
+  max-height: min(60vh, 460px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  /* Opaque, unlike the glass panels elsewhere. This one floats over a dense
+     page, and at 6% white the cards behind it read straight through the text —
+     the one list that has to be legible at a glance was the least legible
+     thing on screen. */
+  background: rgba(21, 14, 52, 0.97);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+}
+
+.alert-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+.alert-panel-head .btn {
+  margin-left: auto;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.alert-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 11px;
+  border-radius: var(--row-radius);
+  border: 1px solid var(--glass-border-soft);
+  background: rgba(255, 255, 255, 0.05);
+  line-height: 1.35;
+}
+
+/* A coloured edge per kind, so the list is scannable without reading it. */
+.alert-item[data-kind='sla'] {
+  border-left: 3px solid var(--occupied);
+}
+
+.alert-item[data-kind='waitlist'] {
+  border-left: 3px solid var(--booked);
+}
+
+.alert-item[data-kind='booking'] {
+  border-left: 3px solid var(--cleaning);
+}
+
+.alert-icon {
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.alert-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.alert-title {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.alert-title:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.alert-detail {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.alert-kind {
+  display: inline-block;
+  margin-right: 7px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.alert-dismiss {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border-soft);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.alert-dismiss:hover {
+  color: var(--free);
+  border-color: var(--free);
+}
+
+@media (max-width: 640px) {
+  .alert-panel {
+    /* Anchored to the viewport instead of the bell, which is close to the
+       right edge on a phone. */
+    position: fixed;
+    top: 62px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+}
+
+/* Reduced motion, declared after the pulse it is switching off.
+
+   Both rules are a single class, so specificity cannot settle it: the later
+   one wins, and the earlier reduced-motion block further up this file was
+   silently losing to the .alert-bell rule above. Placement is the fix; a
+   sprinkling of !important would only hide the ordering problem.
+
+   The badge, its colour and its count stay exactly as they are. Only the
+   pulsing stops — the alert is still unmissable, it just holds still. */
+@media (prefers-reduced-motion: reduce) {
+  .alert-bell {
+    animation: none;
+    box-shadow: 0 0 0 2px rgba(255, 92, 114, 0.5);
+    border-color: rgba(255, 92, 114, 0.95);
+  }
+}

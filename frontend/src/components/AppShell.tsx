@@ -1,7 +1,11 @@
+import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth'
+import AlertCenter from './AlertCenter'
 import AlmatyClock from './AlmatyClock'
 import ReviewsLink from './ReviewsLink'
+import { unlockSound } from '../sound'
+import { useAlerts } from '../useAlerts'
 import { ROLE_LABELS, type Role } from '../types'
 
 type NavItem = { to: string; label: string; roles: Role[] }
@@ -49,6 +53,24 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 
 export default function AppShell() {
   const { user, logout } = useAuth()
+
+  // Browsers refuse to make a sound until the page has been interacted with.
+  // One silent unlock on the first click or keypress after login is enough for
+  // the rest of the session; { once: true } takes the listener straight back
+  // off again.
+  useEffect(() => {
+    const unlock = () => unlockSound()
+    window.addEventListener('pointerdown', unlock, { once: true })
+    window.addEventListener('keydown', unlock, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
+
+  // Hooks must run before the early return, so the role is read defensively.
+  const { alerts, acknowledge, acknowledgeAll } = useAlerts(user?.role ?? 'waiter')
+
   if (!user) return null
 
   const groups = NAV_GROUPS.map((group) => ({
@@ -68,6 +90,11 @@ export default function AppShell() {
         </div>
 
         <div className="topbar-right">
+          <AlertCenter
+            alerts={alerts}
+            onAcknowledge={acknowledge}
+            onAcknowledgeAll={acknowledgeAll}
+          />
           <ReviewsLink />
           <AlmatyClock />
           <div className="who">

@@ -6,6 +6,7 @@ import { backupFilename, exportAll } from './lib/backup'
 import { backupStore, DAILY_PREFIX, pruneDaily } from './lib/backup-store'
 import { buildDigest, loadChannel, loadSettings } from './lib/notifications'
 import { deliverDigest } from './lib/notify'
+import alertRoutes from './routes/alerts'
 import analyticsRoutes from './routes/analytics'
 import auditRoutes from './routes/audit'
 import authRoutes from './routes/auth'
@@ -47,10 +48,13 @@ app.use('/api/staff', requireAuth)
 app.use('/api/staff/*', requireAuth)
 app.use('/api/backup/*', requireAuth)
 app.use('/api/photos/*', requireAuth)
+app.use('/api/alerts', requireAuth)
+app.use('/api/alerts/*', requireAuth)
 app.use('/api/rooms/*', requireAuth)
 app.use('/api/waitlist', requireAuth)
 app.use('/api/waitlist/*', requireAuth)
 
+app.route('/api/alerts', alertRoutes)
 app.route('/api/rooms', roomRoutes)
 app.route('/api/units', unitRoutes)
 app.route('/api/bookings', bookingRoutes)
