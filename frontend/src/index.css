@@ -2442,76 +2442,6 @@ button {
 
 /* ── Occupancy forecast ────────────────────────────────────────────────────── */
 
-.forecast {
-  margin-bottom: 16px;
-}
-
-.forecast-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(38px, 1fr));
-  gap: 4px;
-}
-
-.forecast-day {
-  text-align: center;
-}
-
-.forecast-bar {
-  position: relative;
-  height: 68px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-soft);
-  background: rgb(var(--lift-rgb) / 0.04);
-  overflow: hidden;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-/* Fill grows from the bottom with how full the day is, so a tall column
-   reads as "busy" at a glance. */
-.forecast-bar-fill {
-  position: absolute;
-  inset: auto 0 0 0;
-  background: linear-gradient(180deg, rgb(var(--accent-rgb) / 0.55), rgb(var(--accent-light-rgb) / 0.75));
-  transition: height 0.35s var(--ease);
-}
-
-.forecast-free {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  padding: 4px 0;
-  font-size: 15px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-/* No rooms left: flagged by colour and by the zero already in the column. */
-.forecast-day.is-full .forecast-bar {
-  border-color: rgb(var(--occupied-rgb) / 0.5);
-}
-
-.forecast-day.is-full .forecast-bar-fill {
-  background: linear-gradient(180deg, rgb(var(--occupied-rgb) / 0.5), rgb(var(--occupied-rgb) / 0.8));
-}
-
-.forecast-day.is-today .forecast-bar {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgb(var(--accent-rgb) / 0.45);
-}
-
-.forecast-date {
-  font-size: 13px;
-  margin-top: 4px;
-  font-variant-numeric: tabular-nums;
-}
-
-.forecast-dow {
-  font-size: 13px;
-  color: var(--text-faint);
-}
-
 /* ── Weekday breakdown ─────────────────────────────────────────────────────── */
 
 .weekday-table td:first-child {
@@ -3427,8 +3357,11 @@ button {
   background: rgb(var(--booked-rgb) / 0.05);
 }
 
+/* Today is marked in the header, where it is read once. A full outline on
+   every row turned it into a stripe down the whole board competing with the
+   bookings, which are the thing to look at. */
 .tl-cell.is-today {
-  border-color: rgb(var(--accent-rgb) / 0.5);
+  background: rgb(var(--accent-rgb) / 0.07);
 }
 
 /* One booking, one bar — placed in the same grid area as the cells it covers,
@@ -3972,4 +3905,167 @@ button {
 .login-wordmark {
   font-size: var(--text-xl);
   line-height: 1.1;
+}
+
+/* ── Availability row ──────────────────────────────────────────────────────
+   How many rooms are free each night, in the board's own columns. It used to
+   be a separate strip further up the page laid out with auto-fit, which meant
+   its 14 cells wrapped to a second row with one orphan — and, worse, nothing
+   in it lined up with the rooms it was describing. Here the eye drops from
+   the number straight down the column to the free rows.                     */
+
+.tl-free-row {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.tl-free-label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-faint);
+}
+
+.tl-free {
+  text-align: center;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  padding: 4px 0;
+  border-radius: 6px;
+}
+
+/* Getting tight, and full. Colour plus the number itself, never colour alone. */
+.tl-free.is-low {
+  color: var(--booked-ink);
+  background: var(--tint-booked);
+}
+
+.tl-free.is-none {
+  color: var(--occupied-ink);
+  background: var(--tint-occupied);
+}
+
+/* ── Dragging a stay ──────────────────────────────────────────────────────── */
+
+/* A bar normally sits above the cells and takes the pointer, which is what
+   makes it clickable. During a drag that would hide the nights underneath it
+   from the selection, so the run would stop at the booking without saying
+   why. */
+.timeline.is-dragging .tl-bar {
+  pointer-events: none;
+  /* And faded, because the nights it covers are exactly the ones that would
+     be refused — the hatch marking them sits underneath the bar and would
+     otherwise be invisible at the moment it matters. */
+  opacity: 0.35;
+}
+
+.tl-cell.is-selected {
+  background: rgb(var(--accent-rgb) / 0.28);
+  border-color: var(--accent);
+}
+
+/* A night that cannot be taken.
+
+   Both the accent and the "occupied" colour are warm on this palette, so a
+   red tint alone sat too close to the ordinary selection to read as a
+   refusal at a glance. The hatch settles it, and settles it for anyone who
+   cannot separate the two hues at all: a blocked night is the only thing on
+   the board with a pattern. */
+.tl-cell.is-clash,
+.tl-row .tl-cell.is-selected.is-clash {
+  background-color: rgb(var(--occupied-rgb) / 0.5);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgb(var(--occupied-rgb) / 0.9) 0 4px,
+    transparent 4px 8px
+  );
+  border-color: var(--occupied);
+}
+
+.timeline-selection {
+  position: sticky;
+  bottom: 0;
+  margin-top: 8px;
+  padding: 8px 16px;
+  border-radius: var(--row-radius);
+  border: 1px solid var(--accent);
+  background: var(--surface-opaque);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: center;
+}
+
+.timeline-selection.is-clash {
+  border-color: var(--occupied);
+  color: var(--occupied-ink);
+}
+
+.timeline-clash {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.timeline-clash .btn {
+  margin-left: auto;
+}
+
+/* ── Booking card ─────────────────────────────────────────────────────────
+   Opened from a bar. Who, when, what is owed, and the edit form one press
+   away — the alternative was a trip to the room page and back for a fact
+   the board already had in hand.                                            */
+
+.tl-popover {
+  position: sticky;
+  bottom: 16px;
+  z-index: 20;
+  margin: 16px auto 0;
+  width: min(420px, 100%);
+  padding: 16px;
+  background: var(--panel-float);
+  border: 1px solid var(--border-strong);
+}
+
+.tl-popover-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tl-popover-guest {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.tl-popover-sub {
+  margin-top: 4px;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+.tl-popover-head .alert-dismiss {
+  margin-left: auto;
+}
+
+.tl-popover-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.tl-popover-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tl-bar.is-open {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
 }

@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { requireRole } from '../lib/auth'
+import { chargesSumSql } from '../lib/money'
 import { SQL_TODAY } from '../lib/time'
 import type { AppEnv, BookingStatus } from '../types'
 
@@ -19,9 +20,15 @@ type TimelineRow = {
   capacity: number
   booking_id: number | null
   guest_name: string | null
+  guest_phone: string | null
   status: BookingStatus | null
   date_from: string | null
   date_to: string | null
+  total_amount: number | null
+  prepaid_amount: number | null
+  deposit_amount: number | null
+  charges_total: number | null
+  currency: string | null
 }
 
 /** `2026-08-09`, and nothing else. */
@@ -72,7 +79,10 @@ rooms.get('/timeline', async (c) => {
        SELECT ${startExpr}, date(${startExpr}, '+' || ? || ' days')
      )
      SELECT u.id AS unit_id, u.name AS unit_name, u.category, u.capacity,
-            b.id AS booking_id, b.guest_name, b.status, b.date_from, b.date_to
+            b.id AS booking_id, b.guest_name, b.guest_phone, b.status,
+            b.date_from, b.date_to,
+            b.total_amount, b.prepaid_amount, b.deposit_amount, b.currency,
+            ${chargesSumSql('b')} AS charges_total
      FROM units u
      LEFT JOIN bookings b
        ON b.unit_id = u.id
@@ -93,6 +103,9 @@ rooms.get('/timeline', async (c) => {
   const start = startRow?.d ?? new Date().toISOString().slice(0, 10)
 
   // One entry per room, in the order the query returned them.
+  // The whole booking, not just its dates: this endpoint is admin-only, and
+  // carrying the money here means the board can open the edit form without a
+  // second round trip for something it already knows.
   const byRoom = new Map<number, {
     unit_id: number
     unit_name: string
@@ -101,9 +114,16 @@ rooms.get('/timeline', async (c) => {
     bookings: {
       id: number
       guest_name: string | null
+      guest_phone: string | null
       status: BookingStatus
       date_from: string
       date_to: string
+      total_amount: number
+      prepaid_amount: number
+      deposit_amount: number
+      charges_amount: number
+      remaining_amount: number
+      currency: string
     }[]
   }>()
 
@@ -119,12 +139,23 @@ rooms.get('/timeline', async (c) => {
     }
     // A LEFT JOIN miss is a room with nothing booked, not a booking to add.
     if (row.booking_id !== null && row.date_from && row.date_to && row.status) {
+      const total = row.total_amount ?? 0
+      const charges = row.charges_total ?? 0
+      const prepaid = row.prepaid_amount ?? 0
       byRoom.get(row.unit_id)!.bookings.push({
         id: row.booking_id,
         guest_name: row.guest_name,
+        guest_phone: row.guest_phone,
         status: row.status,
         date_from: row.date_from,
         date_to: row.date_to,
+        total_amount: total,
+        prepaid_amount: prepaid,
+        deposit_amount: row.deposit_amount ?? 0,
+        charges_amount: charges,
+        // Same formula as everywhere else: rate + charges − paid, deposit apart.
+        remaining_amount: Number((total + charges - prepaid).toFixed(2)),
+        currency: row.currency ?? 'KZT',
       })
     }
   }

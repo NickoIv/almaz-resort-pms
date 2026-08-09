@@ -85,6 +85,16 @@ export function renderApp(ui: ReactNode, { route = '/' }: { route?: string } = {
   )
 }
 
+/**
+ * Pins the Rooms page to the card grid.
+ *
+ * The board is the default now, so a test about cards has to say it wants
+ * cards — otherwise it is silently testing a different screen.
+ */
+export function useCardView(): void {
+  localStorage.setItem('taura_pms_rooms_view', 'cards')
+}
+
 /** Puts a token in storage so AuthProvider restores a session via /auth/me. */
 export function signIn(role: Role) {
   localStorage.setItem('almaz_pms_token', `test-token-${role}`)

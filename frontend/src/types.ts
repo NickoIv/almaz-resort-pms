@@ -277,13 +277,24 @@ export type WaitlistEntry = {
   is_stale?: boolean
 }
 
-/** One bar on the room timeline. Dates are the booking's true range. */
+/**
+ * One bar on the room timeline. Dates are the booking's true range, and the
+ * money travels with it so the board can open the edit form without a second
+ * request. The endpoint is admin-only, which is what makes that safe.
+ */
 export type TimelineBooking = {
   id: number
   guest_name: string | null
+  guest_phone: string | null
   status: UnitStatus
   date_from: string
   date_to: string
+  total_amount: number
+  prepaid_amount: number
+  deposit_amount: number
+  charges_amount: number
+  remaining_amount: number
+  currency: string
 }
 
 export type TimelineRoom = {

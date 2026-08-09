@@ -4,16 +4,33 @@ import { api } from '../api'
 import { useAuth } from '../auth'
 import BookingModal from '../components/BookingModal'
 import GroupBookingModal from '../components/GroupBookingModal'
-import OccupancyForecast from '../components/OccupancyForecast'
 import RoomTimeline from '../components/RoomTimeline'
 import UnitCard from '../components/UnitCard'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
 import { matchesQuery } from '../search'
-import type { Unit, UnitStatus } from '../types'
+import type { Booking, TimelineBooking, Unit, UnitStatus } from '../types'
 
 type StatusFilter = UnitStatus | 'all' | 'cleaning'
 
 type View = 'cards' | 'timeline'
+
+const VIEW_KEY = 'taura_pms_rooms_view'
+
+/**
+ * The board is the default.
+ *
+ * Cards answer "what is room 107 doing right now"; the board answers "what is
+ * free between these dates", which is the question the phone actually asks.
+ * Leaving the better view behind a toggle meant the work started with a click
+ * nobody remembered to make.
+ */
+function storedView(): View {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'cards' ? 'cards' : 'timeline'
+  } catch {
+    return 'timeline'
+  }
+}
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'Все' },
@@ -34,9 +51,26 @@ export default function RoomsPage() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [showGroup, setShowGroup] = useState(false)
-  const [view, setView] = useState<View>('cards')
-  // Set when an empty timeline cell is clicked: which room, and which day.
-  const [newBooking, setNewBooking] = useState<{ unitId: number; date: string } | null>(null)
+  const [view, setView] = useState<View>(storedView)
+  // Set when nights are dragged on the board: which room, and the range.
+  const [newBooking, setNewBooking] = useState<{
+    unitId: number
+    from: string
+    to: string
+  } | null>(null)
+  // Set when a bar on the board is opened for editing.
+  const [editing, setEditing] = useState<{ unitId: number; booking: Booking } | null>(null)
+  // Bumped after a save so the board pulls fresh bars without a full remount.
+  const [boardVersion, setBoardVersion] = useState(0)
+
+  const chooseView = useCallback((next: View) => {
+    setView(next)
+    try {
+      localStorage.setItem(VIEW_KEY, next)
+    } catch {
+      // Private mode: the preference just will not survive a reload.
+    }
+  }, [])
 
   const load = useCallback(() => {
     setLoading(true)
@@ -87,16 +121,16 @@ export default function RoomsPage() {
         <div className="page-head-actions">
           <div className="view-switch" role="group" aria-label="Вид">
             <button
-              className={`view-btn ${view === 'cards' ? 'active' : ''}`}
-              onClick={() => setView('cards')}
+              className={`view-btn ${view === 'timeline' ? 'active' : ''}`}
+              onClick={() => chooseView('timeline')}
             >
-              Карточки
+              Шахматка
             </button>
             <button
-              className={`view-btn ${view === 'timeline' ? 'active' : ''}`}
-              onClick={() => setView('timeline')}
+              className={`view-btn ${view === 'cards' ? 'active' : ''}`}
+              onClick={() => chooseView('cards')}
             >
-              Таймлайн
+              Карточки
             </button>
           </div>
           {isAdmin && (
@@ -112,8 +146,12 @@ export default function RoomsPage() {
 
       {view === 'timeline' ? (
         <RoomTimeline
+          reloadKey={boardVersion}
           onOpenRoom={(unitId) => navigate(`/rooms/${unitId}`)}
-          onNewBooking={(unitId, date) => setNewBooking({ unitId, date })}
+          onNewBooking={(unitId, from, to) => setNewBooking({ unitId, from, to })}
+          onEditBooking={(unitId, booking: TimelineBooking) =>
+            setEditing({ unitId, booking })
+          }
         />
       ) : (
         <>
@@ -152,9 +190,7 @@ export default function RoomsPage() {
             </div>
           </div>
 
-          {isAdmin && <OccupancyForecast />}
-
-          {error && <Alert>{error}</Alert>}
+              {error && <Alert>{error}</Alert>}
 
           {loading ? (
             <Spinner />
@@ -196,19 +232,37 @@ export default function RoomsPage() {
         <GroupBookingModal onClose={() => setShowGroup(false)} onSaved={load} />
       )}
 
-      {/* Opened from an empty timeline cell, pre-filled with that room and day.
-          It is the same form the card view uses — the timeline adds a way in,
-          not a second booking path. */}
+      {/* Opened by dragging nights on the board, pre-filled with that room and
+          range. It is the same form the card view uses — the board adds a way
+          in, not a second booking path. */}
       {newBooking && (
         <BookingModal
           unitId={newBooking.unitId}
           unitType="room"
           booking={null}
           canSetPrice={isAdmin}
-          initialFrom={newBooking.date}
+          initialFrom={newBooking.from}
+          initialTo={newBooking.to}
           onClose={() => setNewBooking(null)}
           onSaved={() => {
             setNewBooking(null)
+            setBoardVersion((v) => v + 1)
+            load()
+          }}
+        />
+      )}
+
+      {/* Editing straight from a bar, without a trip through the room page. */}
+      {editing && (
+        <BookingModal
+          unitId={editing.unitId}
+          unitType="room"
+          booking={editing.booking}
+          canSetPrice={isAdmin}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null)
+            setBoardVersion((v) => v + 1)
             load()
           }}
         />

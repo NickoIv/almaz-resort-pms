@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { makeUnit, mockApi, renderApp, signIn, STAFF } from './test-utils'
+import { makeUnit, mockApi, renderApp, signIn, STAFF, useCardView } from './test-utils'
 
 const ROOM_WITH_GUEST = makeUnit({
   id: 5,
@@ -83,6 +83,7 @@ function baseRoutes(role: 'admin' | 'housekeeper' | 'waiter', units = [ROOM_WITH
 describe('§1 clicking a card opens the detail view', () => {
   it('opens the room detail view when a room card is clicked', async () => {
     signIn('admin')
+    useCardView()
     mockApi({
       ...baseRoutes('admin'),
       'GET /api/units/5': ROOM_WITH_GUEST,
@@ -102,6 +103,7 @@ describe('§1 clicking a card opens the detail view', () => {
 
   it('shows the calendar, guest info and cleaning checklist in the detail view', async () => {
     signIn('admin')
+    useCardView()
     mockApi({
       ...baseRoutes('admin'),
       'GET /api/units/5': ROOM_WITH_GUEST,
@@ -126,6 +128,7 @@ describe('§1 clicking a card opens the detail view', () => {
 
   it('opens a detail view for a restaurant unit too', async () => {
     signIn('admin')
+    useCardView()
     mockApi({
       ...baseRoutes('admin', [GAZEBO]),
       'GET /api/units/20': GAZEBO,
@@ -191,6 +194,7 @@ describe('§1/§2 payment breakdown keeps deposit separate', () => {
 describe('§2 guest names render in full', () => {
   it('renders a full Cyrillic name without truncation or escaping', async () => {
     signIn('admin')
+    useCardView()
     mockApi(baseRoutes('admin'))
     renderApp(<App />, { route: '/rooms' })
     expect(await screen.findByText('Асель Жумабаева')).toBeInTheDocument()
@@ -198,6 +202,7 @@ describe('§2 guest names render in full', () => {
 
   it('renders names containing backslashes and angle brackets verbatim', async () => {
     signIn('admin')
+    useCardView()
     const tricky = makeUnit({
       id: 9,
       name: '109',
@@ -272,6 +277,7 @@ describe('§5 search and filter', () => {
 
   it('filters by guest name', async () => {
     signIn('admin')
+    useCardView()
     mockApi(baseRoutes('admin', rooms))
     renderApp(<App />, { route: '/rooms' })
 
@@ -284,6 +290,7 @@ describe('§5 search and filter', () => {
 
   it('filters by phone typed without punctuation', async () => {
     signIn('admin')
+    useCardView()
     mockApi(baseRoutes('admin', rooms))
     renderApp(<App />, { route: '/rooms' })
 
@@ -296,6 +303,7 @@ describe('§5 search and filter', () => {
 
   it('filters by status', async () => {
     signIn('admin')
+    useCardView()
     mockApi(baseRoutes('admin', rooms))
     renderApp(<App />, { route: '/rooms' })
 
@@ -908,7 +916,23 @@ describe('§11 grouped navigation and the dashboard', () => {
   })
 })
 
-describe('§12 room timeline', () => {
+describe('§12 the planning board', () => {
+  const booking = (over = {}) => ({
+    id: 42,
+    guest_name: 'Асель Жумабаева',
+    guest_phone: '+77073148820',
+    status: 'occupied' as const,
+    date_from: '2026-08-10',
+    date_to: '2026-08-13',
+    total_amount: 240000,
+    prepaid_amount: 120000,
+    deposit_amount: 50000,
+    charges_amount: 0,
+    remaining_amount: 120000,
+    currency: 'KZT',
+    ...over,
+  })
+
   /** 101 is booked across three nights; 104 has nothing. */
   const TIMELINE = {
     from: '2026-08-09',
@@ -917,20 +941,14 @@ describe('§12 room timeline', () => {
     dates: ['2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13',
             '2026-08-14', '2026-08-15'],
     rooms: [
-      {
-        unit_id: 5, unit_name: '101', category: 'standard', capacity: 2,
-        bookings: [{ id: 42, guest_name: 'Асель Жумабаева', status: 'occupied',
-                     date_from: '2026-08-10', date_to: '2026-08-13' }],
-      },
+      { unit_id: 5, unit_name: '101', category: 'standard', capacity: 2, bookings: [booking()] },
       { unit_id: 6, unit_name: '104', category: 'standard', capacity: 2, bookings: [] },
     ],
   }
 
-  /** Records every timeline URL the page asks for. */
   function routesWithSpy(calls: string[], body: unknown = TIMELINE) {
     return {
       ...baseRoutes('admin'),
-      'GET /api/units/forecast': { total_units: 14, days: [] },
       'GET /api/rooms/timeline': (url: string) => {
         calls.push(url)
         return body
@@ -938,80 +956,128 @@ describe('§12 room timeline', () => {
     }
   }
 
-  async function openTimeline(calls: string[], body: unknown = TIMELINE) {
+  /** The board is the default view, so nothing needs clicking to reach it. */
+  async function openBoard(calls: string[], body: unknown = TIMELINE) {
     signIn('admin')
     mockApi(routesWithSpy(calls, body))
     renderApp(<App />, { route: '/rooms' })
     await screen.findByRole('heading', { name: 'Номера' })
-    await userEvent.click(screen.getByRole('button', { name: 'Таймлайн' }))
     await waitFor(() => expect(calls.length).toBeGreaterThan(0))
+    await waitFor(() => expect(document.querySelector('.tl-row')).toBeTruthy())
   }
 
-  it('lays rooms out as rows and days as columns', async () => {
-    const calls: string[] = []
-    await openTimeline(calls)
+  function rowFor(name: string): Element {
+    return [...document.querySelectorAll('.tl-row')].find(
+      (r) => r.querySelector('.tl-room')?.textContent === name
+    )!
+  }
 
-    await waitFor(() => expect(document.querySelectorAll('.tl-bar').length).toBe(1))
-    // Two rooms plus the header row.
-    expect(document.querySelectorAll('.tl-row')).toHaveLength(3)
-    // Seven days for each of the two rooms; a bar covers cells, never replaces them.
+  /** A press-and-release across a run of cells, as a pointer would do it. */
+  function dragNights(cells: Element[]) {
+    fireEvent.pointerDown(cells[0], { pointerType: 'mouse' })
+    for (const cell of cells.slice(1)) fireEvent.pointerEnter(cell, { pointerType: 'mouse' })
+    fireEvent.pointerUp(window)
+  }
+
+  it('opens on the board rather than the card grid', async () => {
+    const calls: string[] = []
+    await openBoard(calls)
+
+    // Two rooms, plus the date header and the availability row.
+    expect(document.querySelectorAll('.tl-row')).toHaveLength(4)
     expect(document.querySelectorAll('.tl-cell')).toHaveLength(14)
     expect(screen.getByRole('button', { name: '101' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '104' })).toBeInTheDocument()
   })
 
+  it('counts free rooms per night in the columns of the board itself', async () => {
+    const calls: string[] = []
+    await openBoard(calls)
+
+    const free = [...document.querySelectorAll('.tl-free')].map((n) => n.textContent)
+    // 101 is taken on the nights of the 10th, 11th and 12th; 104 never is.
+    expect(free).toEqual(['2', '1', '1', '1', '2', '2', '2'])
+    // One room left reads as tight, and is marked as such.
+    expect(document.querySelectorAll('.tl-free.is-low')).toHaveLength(3)
+  })
+
   it('draws a multi-night stay as one continuous bar over its nights', async () => {
     const calls: string[] = []
-    await openTimeline(calls)
+    await openBoard(calls)
 
-    await waitFor(() => expect(document.querySelectorAll('.tl-bar').length).toBe(1))
     const bar = document.querySelector('.tl-bar') as HTMLElement
     expect(bar.textContent).toContain('Асель Жумабаева')
-    // 10→13 is three nights, starting on the window's second day. Column 1 is
-    // the room name, so the bar begins at column 3.
+    // 10 to 13 is three nights from the window's second day; column 1 is the
+    // room name, so the bar begins at column 3.
     expect(bar.style.gridColumn).toBe('3 / span 3')
-    expect(bar.dataset.status).toBe('occupied')
   })
 
-  it('opens the room when its bar is clicked', async () => {
+  it('turns a dragged run of nights into a booking for that range', async () => {
     const calls: string[] = []
-    signIn('admin')
-    mockApi({
-      ...routesWithSpy(calls),
-      'GET /api/units/5': ROOM_WITH_GUEST,
-      'GET /api/units/5/calendar': CALENDAR,
-      'GET /api/bookings/42/payments': [],
-      'GET /api/bookings/42/charges': [],
-    })
-    renderApp(<App />, { route: '/rooms' })
-    await screen.findByRole('heading', { name: 'Номера' })
-    await userEvent.click(screen.getByRole('button', { name: 'Таймлайн' }))
+    await openBoard(calls)
 
-    await waitFor(() => expect(document.querySelector('.tl-bar')).toBeTruthy())
-    await userEvent.click(document.querySelector('.tl-bar') as HTMLElement)
-
-    expect(await screen.findByRole('heading', { name: /Номер 105/ })).toBeInTheDocument()
-  })
-
-  it('opens the booking form on the day of the empty cell that was clicked', async () => {
-    const calls: string[] = []
-    await openTimeline(calls)
-
-    await waitFor(() => expect(document.querySelectorAll('.tl-cell').length).toBe(14))
-    // Room 104, fourth day of the window.
-    const cell = screen.getByRole('button', { name: 'Забронировать номер 104 на 2026-08-12' })
-    await userEvent.click(cell)
+    const cells = [...rowFor('104').querySelectorAll('.tl-cell')]
+    dragNights(cells.slice(1, 4)) // nights of the 10th, 11th and 12th
 
     expect(await screen.findByRole('heading', { name: 'Новая бронь' })).toBeInTheDocument()
     const dates = [...document.querySelectorAll('.modal input[type=date]')] as HTMLInputElement[]
-    expect(dates[0].value).toBe('2026-08-12')
-    // Default one night, not a stay ending before it starts.
+    expect(dates[0].value).toBe('2026-08-10')
+    // Three nights means checkout on the morning of the 13th.
+    expect(dates[1].value).toBe('2026-08-13')
+  })
+
+  it('books a single night from one press', async () => {
+    const calls: string[] = []
+    await openBoard(calls)
+
+    dragNights([[...rowFor('104').querySelectorAll('.tl-cell')][0]])
+
+    await screen.findByRole('heading', { name: 'Новая бронь' })
+    const dates = [...document.querySelectorAll('.modal input[type=date]')] as HTMLInputElement[]
+    expect(dates[0].value).toBe('2026-08-09')
+    expect(dates[1].value).toBe('2026-08-10')
+  })
+
+  it('refuses a run that crosses an existing booking, and says which nights', async () => {
+    const calls: string[] = []
+    await openBoard(calls)
+
+    const cells = [...rowFor('101').querySelectorAll('.tl-cell')]
+    dragNights(cells.slice(0, 3)) // the 9th is free, the 10th and 11th are not
+
+    // No form: the collision is caught before anyone types anything into one.
+    expect(screen.queryByRole('heading', { name: 'Новая бронь' })).not.toBeInTheDocument()
+    expect(await screen.findByText(/уже заняты/)).toBeInTheDocument()
+  })
+
+  it('opens a booking card from its bar, with the money already in hand', async () => {
+    const calls: string[] = []
+    await openBoard(calls)
+
+    await userEvent.click(document.querySelector('.tl-bar') as HTMLElement)
+
+    const card = await screen.findByRole('dialog', { name: 'Бронь' })
+    expect(within(card).getByText('Асель Жумабаева')).toBeInTheDocument()
+    expect(within(card).getByText(/120 000/)).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Изменить бронь' })).toBeInTheDocument()
+  })
+
+  it('edits straight from the board, without a trip to the room page', async () => {
+    const calls: string[] = []
+    await openBoard(calls)
+
+    await userEvent.click(document.querySelector('.tl-bar') as HTMLElement)
+    await userEvent.click(await screen.findByRole('button', { name: 'Изменить бронь' }))
+
+    expect(await screen.findByRole('heading', { name: /Бронь #42/ })).toBeInTheDocument()
+    const dates = [...document.querySelectorAll('.modal input[type=date]')] as HTMLInputElement[]
+    expect(dates[0].value).toBe('2026-08-10')
     expect(dates[1].value).toBe('2026-08-13')
   })
 
   it('switches between a week and a month', async () => {
     const calls: string[] = []
-    await openTimeline(calls)
+    await openBoard(calls)
 
     expect(calls[0]).toContain('days=7')
     await userEvent.click(screen.getByRole('button', { name: 'Месяц' }))
@@ -1022,21 +1088,15 @@ describe('§12 room timeline', () => {
 
   it('steps by the window and jumps straight to a date', async () => {
     const calls: string[] = []
-    await openTimeline(calls)
+    await openBoard(calls)
 
     const first = new URL(calls[0], 'http://x').searchParams.get('from')!
-
     await userEvent.click(screen.getByRole('button', { name: 'Следующий период' }))
     await waitFor(() => {
       const next = new URL(calls.at(-1)!, 'http://x').searchParams.get('from')!
-      // One week on, not one day.
-      const gap = (Date.parse(next) - Date.parse(first)) / 86_400_000
-      expect(gap).toBe(7)
+      expect((Date.parse(next) - Date.parse(first)) / 86_400_000).toBe(7)
     })
 
-    // Checking availability a long way out is the point of the date control.
-    // A date input takes a value, not keystrokes — userEvent.type would send
-    // the characters one at a time and the control would reject each of them.
     const jump = document.querySelector('.timeline-jump input') as HTMLInputElement
     fireEvent.change(jump, { target: { value: '2027-03-08' } })
     await waitFor(() => expect(calls.at(-1)).toContain('from=2027-03-08'))
@@ -1044,9 +1104,7 @@ describe('§12 room timeline', () => {
 
   it('shows every room in a far-future window, booked or not', async () => {
     const calls: string[] = []
-    // Nothing booked that far out — the rows must still be there, or the view
-    // would be emptiest exactly when it is being used to check availability.
-    await openTimeline(calls, {
+    await openBoard(calls, {
       ...TIMELINE,
       from: '2027-03-08',
       rooms: TIMELINE.rooms.map((room) => ({ ...room, bookings: [] })),
@@ -1055,6 +1113,8 @@ describe('§12 room timeline', () => {
     await waitFor(() => expect(document.querySelectorAll('.tl-cell').length).toBe(14))
     expect(document.querySelectorAll('.tl-bar')).toHaveLength(0)
     expect(screen.getByRole('button', { name: '101' })).toBeInTheDocument()
+    // Everything free, so nothing is flagged as tight.
+    expect(document.querySelectorAll('.tl-free.is-low')).toHaveLength(0)
   })
 
   it('leaves the restaurant page alone', async () => {
@@ -1063,7 +1123,7 @@ describe('§12 room timeline', () => {
     renderApp(<App />, { route: '/restaurant' })
 
     await screen.findByRole('heading', { name: 'Зона отдыха' })
-    expect(screen.queryByRole('button', { name: 'Таймлайн' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Шахматка' })).not.toBeInTheDocument()
     expect(document.querySelector('.timeline')).toBeNull()
   })
 })
