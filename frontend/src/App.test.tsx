@@ -814,12 +814,22 @@ describe('§11 grouped navigation and the dashboard', () => {
     expect(await screen.findByRole('heading', { name: 'Сводка' })).toBeInTheDocument()
 
     // One of two units is an occupied room; the gazebo is not counted as a room.
+    // The headline figures roll up from zero, so this waits for the settled
+    // value — which also proves the animation lands on the right number.
     const occupancy = screen.getByText('Занято номеров').closest('.tile')!
-    expect(within(occupancy as HTMLElement).getByText('1')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(within(occupancy as HTMLElement).getByText('1')).toBeInTheDocument(),
+      // The roll-up runs for 650ms; the default 1s wait is too tight for it
+      // under a loaded suite, and this assertion is about where it lands.
+      { timeout: 3000 }
+    )
     expect(within(occupancy as HTMLElement).getByText(/из 1/)).toBeInTheDocument()
 
     const waitlist = screen.getByText('Лист ожидания').closest('.tile')!
-    expect(within(waitlist as HTMLElement).getByText('3')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(within(waitlist as HTMLElement).getByText('3')).toBeInTheDocument(),
+      { timeout: 3000 }
+    )
 
     // The SLA breach is surfaced, not just the count of dirty units.
     expect(screen.getByText(/дольше 60 мин/)).toBeInTheDocument()

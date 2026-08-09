@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
 import { AuthProvider } from './auth'
+import { ThemeProvider } from './theme'
 import type { Role, Unit } from './types'
 
 export const STAFF: Record<Role, { id: number; name: string; phone: string; role: Role }> = {
@@ -73,10 +74,14 @@ export function mockApi(routes: Record<string, RouteHandler | unknown>) {
 
 /** Renders with a signed-in staff member and the router in place. */
 export function renderApp(ui: ReactNode, { route = '/' }: { route?: string } = {}) {
+  // Mirrors the provider tree in main.tsx, theme outermost — components read
+  // the palette, so a harness without it renders a different app than ships.
   return render(
-    <MemoryRouter initialEntries={[route]}>
-      <AuthProvider>{ui}</AuthProvider>
-    </MemoryRouter>
+    <ThemeProvider>
+      <MemoryRouter initialEntries={[route]}>
+        <AuthProvider>{ui}</AuthProvider>
+      </MemoryRouter>
+    </ThemeProvider>
   )
 }
 

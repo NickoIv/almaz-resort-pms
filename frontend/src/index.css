@@ -1,54 +1,175 @@
-/* ── Taura PMS — glass / frosted dark theme ────────────────────────────────── */
+/* ── Taura PMS — Alma-Arasan theme ────────────────────────────────────────── */
+
+/* ── Theme tokens ──────────────────────────────────────────────────────────
+   Taura sits in Alma-Arasan, up in the gorge: forest, stone and late light.
+   Two palettes, one set of names — nothing below this block should ever name
+   a colour directly, so a component cannot look right in one theme and wrong
+   in the other.
+
+   Night is the default and what staff use on shift. Day exists for a bright
+   reception desk and for printing previews.
+
+   Contrast was measured, not eyeballed: every ink token clears WCAG AA on
+   both its backgrounds, and text-dim in particular is a deliberate fix — the
+   old secondary text sat at 40% opacity and was unreadable on a dark card. */
+
+:root,
+:root[data-theme='night'] {
+  color-scheme: dark;
+
+  /* Surfaces, back to front */
+  --bg-0: #12151a;
+  --bg-1: #161b18;
+  --bg-2: #1a2320;
+  --surface: #1b2019;
+  --surface-2: #232a22;
+  --border: #2f4034;
+  --border-soft: #26332a;
+  /* Only for controls whose edge carries meaning — inputs, focus rings. */
+  --border-strong: #5a7364;
+
+  /* Ink */
+  --text: #f3efe6;
+  --text-dim: #b9c2b4;
+  --text-faint: #8fa089;
+
+  /* Brand: ember against forest */
+  --accent: #c9793b;
+  --accent-light: #e3a46b;
+  /* Spent sparingly — stat numbers and key totals, never body text. */
+  --gold: #d4af6a;
+
+  /* Status. -ink is the readable text version on a tinted chip. */
+  --free: #5fa777;
+  --free-ink: #a9dcbb;
+  --booked: #d8a441;
+  --booked-ink: #f0cf8d;
+  --occupied: #cf6a5a;
+  --occupied-ink: #f2ab9c;
+  --cleaning: #6ea8bd;
+  --cleaning-ink: #a9d6e6;
+
+  /* Tints behind status chips and rows */
+  --tint-free: rgba(95, 167, 119, 0.16);
+  --tint-booked: rgba(216, 164, 65, 0.16);
+  --tint-occupied: rgba(207, 106, 90, 0.16);
+  --tint-cleaning: rgba(110, 168, 189, 0.16);
+
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.42);
+  --shadow-lift: 0 16px 44px rgba(0, 0, 0, 0.52);
+
+  /* The wash behind everything: dawn on the ridge, kept very low contrast. */
+  --glow-1: rgba(201, 121, 59, 0.16);
+  --glow-2: rgba(95, 167, 119, 0.12);
+  --glow-3: rgba(212, 175, 106, 0.08);
+
+  /* Ink that sits on top of a filled accent or status colour. Both palettes
+     fill with mid-tone colours, so the readable choice is dark in each. */
+  --on-accent: #1a1206;
+  --on-status: #12180f;
+  /* Opaque twin of --surface, for anything scrolling content passes beneath. */
+  --surface-opaque: #1b2019;
+
+  /* Channel forms, so one colour can be reused at any opacity without a
+     second hex being invented for the tint. Space-separated rgb() with a
+     slash alpha, which every browser this app targets understands. */
+  --accent-rgb: 201 121 59;
+  --accent-light-rgb: 227 164 107;
+  --gold-rgb: 212 175 106;
+  --free-rgb: 95 167 119;
+  --booked-rgb: 216 164 65;
+  --occupied-rgb: 207 106 90;
+  --cleaning-rgb: 110 168 189;
+  /* The wash that lifts a surface off its background: white on a dark theme,
+     ink on a light one, so "slightly raised" means the same thing in both. */
+  --lift-rgb: 255 255 255;
+
+  --topbar-bg: rgb(18 21 26 / 0.72);
+  --scrim: rgb(8 10 8 / 0.66);
+  --panel-float: rgb(27 32 25 / 0.98);
+}
+
+:root[data-theme='day'] {
+  color-scheme: light;
+
+  --bg-0: #f6f3ec;
+  --bg-1: #f2eee5;
+  --bg-2: #ece7db;
+  --surface: #ffffff;
+  --surface-2: #f4f1e8;
+  --border: #e4dfd2;
+  --border-soft: #ece8dd;
+  --border-strong: #8d8672;
+
+  --text: #23281f;
+  --text-dim: #5b6355;
+  --text-faint: #646b5e;
+
+  /* Darkened so they still clear AA against paper-white. */
+  --accent: #9e5520;
+  --accent-light: #8c4a18;
+  --gold: #7e6120;
+
+  --free: #3f7d55;
+  --free-ink: #2c5c3d;
+  --booked: #a97a1c;
+  --booked-ink: #7a5711;
+  --occupied: #b04d3d;
+  --occupied-ink: #8c3527;
+  --cleaning: #3f7a92;
+  --cleaning-ink: #2c5a6d;
+
+  --tint-free: rgba(63, 125, 85, 0.12);
+  --tint-booked: rgba(169, 122, 28, 0.14);
+  --tint-occupied: rgba(176, 77, 61, 0.12);
+  --tint-cleaning: rgba(63, 122, 146, 0.12);
+
+  --shadow: 0 6px 20px rgba(35, 40, 31, 0.08);
+  --shadow-lift: 0 14px 34px rgba(35, 40, 31, 0.14);
+
+  --glow-1: rgba(201, 121, 59, 0.10);
+  --glow-2: rgba(95, 167, 119, 0.09);
+  --glow-3: rgba(212, 175, 106, 0.07);
+
+  /* The day accents are dark enough that white is the readable ink on them. */
+  --on-accent: #fdfaf3;
+  --on-status: #fdfaf3;
+  --surface-opaque: #ffffff;
+
+  --accent-rgb: 158 85 32;
+  --accent-light-rgb: 140 74 24;
+  --gold-rgb: 126 97 32;
+  --free-rgb: 63 125 85;
+  --booked-rgb: 169 122 28;
+  --occupied-rgb: 176 77 61;
+  --cleaning-rgb: 63 122 146;
+  --lift-rgb: 35 40 31;
+
+  --topbar-bg: rgb(246 243 236 / 0.85);
+  --scrim: rgb(35 40 31 / 0.34);
+  --panel-float: rgb(255 255 255 / 0.99);
+}
 
 :root {
-  --bg-0: #0a0718;
-  --bg-1: #150f33;
-  --bg-2: #1b1147;
-  --accent: #8b7cff;
-  --accent-2: #4d7cff;
-
-  --glass: rgba(255, 255, 255, 0.06);
-  --glass-strong: rgba(255, 255, 255, 0.1);
-  --glass-border: rgba(255, 255, 255, 0.14);
-  --glass-border-soft: rgba(255, 255, 255, 0.08);
-
-  --text: #f1eeff;
-  --text-dim: rgba(241, 238, 255, 0.66);
-  --text-faint: rgba(241, 238, 255, 0.4);
-
-  --free: #37d67a;
-  --booked: #f5c451;
-  --occupied: #ff5c72;
-  --cleaning: #4fc3f7;
-
   --radius-lg: 20px;
   --radius-md: 16px;
   --radius-sm: 10px;
 
-  /* Card metrics, in one place.
-
-     Every card-like surface — panels, unit cards, stat and dashboard tiles,
-     list rows — was given its own padding and corner radius as each feature
-     landed, so a grid of them never quite lined up. These four values are the
-     single source of truth; a surface that wants to look like a card uses
-     them rather than inventing its own. */
+  /* Card metrics, in one place. */
   --card-pad: 18px;
   --card-radius: 18px;
   --card-gap: 16px;
-
-  /* Rows nested inside a card need a tighter box, or the nesting reads as
-     two unrelated cards stacked. */
   --row-pad: 13px 15px;
   --row-radius: 12px;
+  --action-height: 36px;
 
-  /* Every action button in a page header, whatever its variant. */
-  --action-height: 34px;
-
-  --shadow: 0 8px 32px rgba(0, 0, 0, 0.36);
-  --shadow-lift: 0 16px 44px rgba(0, 0, 0, 0.46);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-  color-scheme: dark;
+  /* Type. Fraunces carries the character — titles, big numbers, the clock —
+     while the dense parts of the app stay on a plain sans, because a display
+     face at 13px in a table is just harder to read. */
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-ui: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 * {
@@ -63,13 +184,20 @@ body,
 
 body {
   margin: 0;
-  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-ui);
+  /* Up from the browser default's effective 13-14px in this app's components:
+     the whole interface was reading small. Everything below is sized relative
+     to this in spirit, and was scaled with it. */
+  font-size: 16px;
+  line-height: 1.5;
   color: var(--text);
   background: var(--bg-0);
+  /* Three washes rather than a flat fill — dawn light on the ridge. Kept far
+     below the contrast of anything on top of it. */
   background-image:
-    radial-gradient(1100px 700px at 12% -10%, rgba(139, 124, 255, 0.28), transparent 60%),
-    radial-gradient(900px 620px at 88% 4%, rgba(77, 124, 255, 0.24), transparent 62%),
-    radial-gradient(900px 700px at 50% 110%, rgba(180, 90, 255, 0.16), transparent 65%),
+    radial-gradient(1100px 700px at 12% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(900px 620px at 88% 4%, var(--glow-2), transparent 62%),
+    radial-gradient(900px 700px at 50% 110%, var(--glow-3), transparent 65%),
     linear-gradient(165deg, var(--bg-0) 0%, var(--bg-1) 48%, var(--bg-2) 100%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
@@ -84,6 +212,32 @@ h4 {
   letter-spacing: -0.01em;
 }
 
+/* Fraunces only where it has room to be read as a shape: page titles, the big
+   numbers, the clock. Its optical-size axis is set low so it stays a display
+   face rather than drifting towards a text face. */
+h1,
+.tile-value,
+.stat-value,
+.clock-time {
+  font-family: var(--font-display);
+  font-variation-settings: 'SOFT' 0, 'WONK' 0, 'opsz' 40;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+/* Gold is the one ornamental colour, and it is spent only here: the figures
+   a manager actually reads off the page. Put it on body text and it stops
+   meaning anything. */
+.tile-value,
+.stat-value {
+  color: var(--gold);
+}
+
+/* The qualifier beside a figure is not part of it. */
+.tile-of {
+  color: var(--text-faint);
+}
+
 button {
   font: inherit;
   color: inherit;
@@ -92,10 +246,10 @@ button {
 /* ── Glass surface ─────────────────────────────────────────────────────────── */
 
 .glass {
-  background: var(--glass);
+  background: var(--surface);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--border);
   border-radius: var(--card-radius);
   box-shadow: var(--shadow);
 }
@@ -125,10 +279,10 @@ button {
 }
 
 .glass-soft {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgb(var(--lift-rgb) / 0.04);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border-soft);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
 }
 
@@ -148,10 +302,10 @@ button {
   align-items: center;
   gap: 20px;
   padding: 14px 28px;
-  background: rgba(12, 8, 32, 0.55);
+  background: var(--topbar-bg);
   backdrop-filter: blur(20px) saturate(140%);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
-  border-bottom: 1px solid var(--glass-border-soft);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .brand {
@@ -159,7 +313,7 @@ button {
   align-items: center;
   gap: 11px;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: 0.01em;
   white-space: nowrap;
 }
@@ -170,15 +324,15 @@ button {
   display: grid;
   place-items: center;
   border-radius: 9px;
-  font-size: 15px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: 0 4px 16px rgba(139, 124, 255, 0.45);
+  font-size: 16px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-light));
+  box-shadow: 0 4px 16px rgb(var(--accent-rgb) / 0.45);
 }
 
 .brand-sub {
   color: var(--text-faint);
   font-weight: 400;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 /* ── Sidebar navigation ────────────────────────────────────────────────────
@@ -203,7 +357,7 @@ button {
   gap: 18px;
   padding: 22px 14px;
   align-self: stretch;
-  border-right: 1px solid var(--glass-border-soft);
+  border-right: 1px solid var(--border-soft);
 }
 
 .nav-group {
@@ -213,7 +367,7 @@ button {
 }
 
 .nav-group-label {
-  font-size: 10.5px;
+  font-size: 11.5px;
   text-transform: uppercase;
   letter-spacing: 0.09em;
   color: var(--text-faint);
@@ -225,7 +379,7 @@ button {
   border-radius: 11px;
   color: var(--text-dim);
   text-decoration: none;
-  font-size: 14px;
+  font-size: 15px;
   border: 1px solid transparent;
   transition:
     background 0.18s var(--ease),
@@ -234,13 +388,13 @@ button {
 
 .nav-link:hover {
   color: var(--text);
-  background: var(--glass);
+  background: var(--surface);
 }
 
 .nav-link.active {
   color: var(--text);
-  background: var(--glass-strong);
-  border-color: var(--glass-border);
+  background: var(--surface-2);
+  border-color: var(--border);
 }
 
 .topbar-right {
@@ -255,11 +409,11 @@ button {
   align-items: center;
   gap: 7px;
   padding-right: 14px;
-  border-right: 1px solid var(--glass-border-soft);
+  border-right: 1px solid var(--border-soft);
 }
 
 .reviews-label {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -268,11 +422,11 @@ button {
 .reviews-link {
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass);
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text-dim);
   text-decoration: none;
-  font-size: 12px;
+  font-size: 13px;
   transition:
     transform 0.16s var(--ease),
     color 0.16s var(--ease),
@@ -282,7 +436,7 @@ button {
 .reviews-link:hover {
   transform: translateY(-1px);
   color: var(--text);
-  background: var(--glass-strong);
+  background: var(--surface-2);
 }
 
 @media (max-width: 900px) {
@@ -293,22 +447,28 @@ button {
 
 .clock {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
+  gap: 9px;
   line-height: 1.25;
   padding-right: 14px;
-  border-right: 1px solid var(--glass-border-soft);
+  border-right: 1px solid var(--border-soft);
+}
+
+.clock-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .clock-time {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
 }
 
 .clock-zone {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -320,12 +480,12 @@ button {
 }
 
 .who-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
 }
 
 .who-role {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
 }
 
@@ -348,12 +508,12 @@ button {
 }
 
 .page-head h1 {
-  font-size: 26px;
+  font-size: 30px;
 }
 
 .page-sub {
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
   margin-top: 4px;
 }
 
@@ -375,7 +535,7 @@ button {
 .page-head-actions .btn {
   height: var(--action-height);
   padding: 0 14px;
-  font-size: 13px;
+  font-size: 14px;
   border-radius: 10px;
   /* A wrapping label would make one button taller than its neighbours; these
      are short enough to stay on one line and wrap as whole buttons instead. */
@@ -391,13 +551,13 @@ button {
   gap: 8px;
   padding: 10px 18px;
   border-radius: 12px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass);
+  border: 1px solid var(--border);
+  background: var(--surface);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   color: var(--text);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   transition:
     transform 0.18s var(--ease),
     box-shadow 0.18s var(--ease),
@@ -406,7 +566,7 @@ button {
 
 .btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  background: var(--glass-strong);
+  background: var(--surface-2);
   box-shadow: var(--shadow-lift);
 }
 
@@ -420,31 +580,31 @@ button {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: linear-gradient(135deg, var(--accent), var(--accent-light));
   border-color: transparent;
   font-weight: 500;
-  box-shadow: 0 6px 22px rgba(109, 111, 255, 0.4);
+  box-shadow: 0 6px 22px rgb(var(--accent-rgb) / 0.4);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #9a8dff, #5f8aff);
-  box-shadow: 0 14px 34px rgba(109, 111, 255, 0.5);
+  background: linear-gradient(135deg, var(--accent-light), var(--accent));
+  box-shadow: 0 14px 34px rgb(var(--accent-rgb) / 0.5);
 }
 
 .btn-danger {
-  border-color: rgba(255, 92, 114, 0.4);
-  color: #ffb3bd;
+  border-color: rgb(var(--occupied-rgb) / 0.4);
+  color: var(--occupied-ink);
 }
 
 .btn-sm {
   padding: 7px 13px;
-  font-size: 13px;
+  font-size: 14px;
   border-radius: 10px;
 }
 
 .btn-ghost {
   background: transparent;
-  border-color: var(--glass-border-soft);
+  border-color: var(--border-soft);
 }
 
 /* ── Status dots & pills ───────────────────────────────────────────────────── */
@@ -463,22 +623,22 @@ button {
 
 .dot-free {
   background: var(--free);
-  box-shadow: 0 0 10px rgba(55, 214, 122, 0.75);
+  box-shadow: 0 0 10px rgb(var(--free-rgb) / 0.75);
 }
 
 .dot-booked {
   background: var(--booked);
-  box-shadow: 0 0 10px rgba(245, 196, 81, 0.75);
+  box-shadow: 0 0 10px rgb(var(--booked-rgb) / 0.75);
 }
 
 .dot-occupied {
   background: var(--occupied);
-  box-shadow: 0 0 10px rgba(255, 92, 114, 0.75);
+  box-shadow: 0 0 10px rgb(var(--occupied-rgb) / 0.75);
 }
 
 .dot-cleaning {
   background: var(--cleaning);
-  box-shadow: 0 0 10px rgba(79, 195, 247, 0.75);
+  box-shadow: 0 0 10px rgb(var(--cleaning-rgb) / 0.75);
 }
 
 .pill {
@@ -487,16 +647,16 @@ button {
   gap: 7px;
   padding: 4px 11px;
   border-radius: 999px;
-  font-size: 12px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid var(--glass-border-soft);
+  font-size: 13px;
+  background: rgb(var(--lift-rgb) / 0.07);
+  border: 1px solid var(--border-soft);
   white-space: nowrap;
 }
 
 .pill-cleaning {
-  color: #b6e6ff;
-  border-color: rgba(79, 195, 247, 0.34);
-  background: rgba(79, 195, 247, 0.12);
+  color: var(--cleaning-ink);
+  border-color: rgb(var(--cleaning-rgb) / 0.34);
+  background: rgb(var(--cleaning-rgb) / 0.12);
 }
 
 /* ── Unit grid ─────────────────────────────────────────────────────────────── */
@@ -505,7 +665,7 @@ button {
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-dim);
   margin-bottom: 20px;
 }
@@ -546,7 +706,7 @@ button {
 .unit-card:hover,
 .unit-card:focus-within {
   transform: translateY(-4px);
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: rgb(var(--lift-rgb) / 0.28);
   box-shadow: var(--shadow-lift);
 }
 
@@ -595,7 +755,7 @@ button {
 }
 
 .unit-meta {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   margin-top: 3px;
 }
@@ -605,12 +765,12 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-dim);
 }
 
 .unit-guest {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -620,12 +780,12 @@ button {
 
 .unit-dates {
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .unit-empty {
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
   font-style: italic;
 }
 
@@ -639,7 +799,7 @@ button {
 }
 
 .money {
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--text-dim);
 }
 
@@ -649,7 +809,7 @@ button {
 }
 
 .money-due {
-  color: #ffc9d0;
+  color: var(--occupied-ink);
 }
 
 /* ── Calendar ──────────────────────────────────────────────────────────────── */
@@ -662,7 +822,7 @@ button {
 }
 
 .cal-month {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
   min-width: 168px;
   text-align: center;
@@ -677,7 +837,7 @@ button {
 
 .cal-dow {
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
   padding-bottom: 4px;
   text-transform: uppercase;
@@ -687,14 +847,14 @@ button {
 .cal-day {
   aspect-ratio: 1;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--glass-border-soft);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-soft);
+  background: rgb(var(--lift-rgb) / 0.03);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-dim);
   transition:
     transform 0.16s var(--ease),
@@ -703,7 +863,7 @@ button {
 
 .cal-day:hover {
   transform: translateY(-2px);
-  border-color: var(--glass-border);
+  border-color: var(--border);
 }
 
 .cal-day.is-empty {
@@ -713,19 +873,19 @@ button {
 
 .cal-day.is-today {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(139, 124, 255, 0.45);
+  box-shadow: 0 0 0 1px rgb(var(--accent-rgb) / 0.45);
 }
 
 .cal-day[data-status='booked'] {
-  background: rgba(245, 196, 81, 0.16);
-  border-color: rgba(245, 196, 81, 0.34);
-  color: #ffe6ac;
+  background: rgb(var(--booked-rgb) / 0.16);
+  border-color: rgb(var(--booked-rgb) / 0.34);
+  color: var(--booked-ink);
 }
 
 .cal-day[data-status='occupied'] {
-  background: rgba(255, 92, 114, 0.16);
-  border-color: rgba(255, 92, 114, 0.34);
-  color: #ffc2ca;
+  background: rgb(var(--occupied-rgb) / 0.16);
+  border-color: rgb(var(--occupied-rgb) / 0.34);
+  color: var(--occupied-ink);
 }
 
 /* ── Detail layout ─────────────────────────────────────────────────────────── */
@@ -755,7 +915,7 @@ button {
 }
 
 .panel-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   margin-bottom: 14px;
   display: flex;
@@ -765,7 +925,7 @@ button {
 
 .panel-title .count {
   margin-left: auto;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   font-weight: 400;
 }
@@ -782,7 +942,7 @@ button {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .pay-row span:first-child {
@@ -796,14 +956,14 @@ button {
 
 .pay-row.total {
   padding-top: 10px;
-  border-top: 1px solid var(--glass-border-soft);
+  border-top: 1px solid var(--border-soft);
   font-weight: 600;
 }
 
 .pay-bar {
   height: 7px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(var(--lift-rgb) / 0.08);
   overflow: hidden;
   margin: 14px 0 4px;
 }
@@ -811,7 +971,7 @@ button {
 .pay-bar-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--free), #7ee2a8);
+  background: linear-gradient(90deg, var(--free), var(--free-ink));
   transition: width 0.4s var(--ease);
 }
 
@@ -829,8 +989,8 @@ button {
   gap: 12px;
   padding: 11px 14px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--glass-border-soft);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-soft);
+  background: rgb(var(--lift-rgb) / 0.03);
   cursor: pointer;
   text-align: left;
   width: 100%;
@@ -842,24 +1002,24 @@ button {
 
 .check-item:hover:not(:disabled) {
   transform: translateY(-2px);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--glass-border);
+  background: rgb(var(--lift-rgb) / 0.06);
+  border-color: var(--border);
 }
 
 .check-item.done {
-  border-color: rgba(79, 195, 247, 0.3);
-  background: rgba(79, 195, 247, 0.09);
+  border-color: rgb(var(--cleaning-rgb) / 0.3);
+  background: rgb(var(--cleaning-rgb) / 0.09);
 }
 
 .check-box {
   width: 19px;
   height: 19px;
   border-radius: 6px;
-  border: 1.5px solid var(--glass-border);
+  border: 1.5px solid var(--border);
   display: grid;
   place-items: center;
   flex: none;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--bg-0);
   transition: background 0.16s var(--ease);
 }
@@ -870,7 +1030,7 @@ button {
 }
 
 .check-label {
-  font-size: 14px;
+  font-size: 15px;
   flex: 1;
 }
 
@@ -880,7 +1040,7 @@ button {
 }
 
 .check-by {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
   white-space: nowrap;
 }
@@ -895,7 +1055,7 @@ button {
 }
 
 .field label {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-dim);
 }
 
@@ -904,11 +1064,11 @@ button {
   width: 100%;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  background: rgb(var(--lift-rgb) / 0.05);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   outline: none;
   transition:
     border-color 0.18s var(--ease),
@@ -922,7 +1082,7 @@ button {
 .field input:focus,
 .field select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(139, 124, 255, 0.2);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.2);
 }
 
 .field select option {
@@ -970,8 +1130,8 @@ button {
   place-items: center;
   font-size: 25px;
   margin-bottom: 18px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: 0 8px 28px rgba(139, 124, 255, 0.45);
+  background: linear-gradient(135deg, var(--accent), var(--accent-light));
+  box-shadow: 0 8px 28px rgb(var(--accent-rgb) / 0.45);
 }
 
 .login-card h1 {
@@ -990,14 +1150,14 @@ button {
 
 .pin-input {
   letter-spacing: 0.42em;
-  font-size: 17px !important;
+  font-size: 18px !important;
 }
 
 .hint {
   margin-top: 22px;
   padding-top: 16px;
-  border-top: 1px solid var(--glass-border-soft);
-  font-size: 11.5px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 12.5px;
   color: var(--text-faint);
   line-height: 1.7;
 }
@@ -1007,18 +1167,18 @@ button {
 .alert {
   padding: 11px 15px;
   border-radius: 12px;
-  font-size: 13px;
+  font-size: 14px;
   margin-bottom: 14px;
-  border: 1px solid rgba(255, 92, 114, 0.36);
-  background: rgba(255, 92, 114, 0.13);
-  color: #ffc2ca;
+  border: 1px solid rgb(var(--occupied-rgb) / 0.36);
+  background: rgb(var(--occupied-rgb) / 0.13);
+  color: var(--occupied-ink);
 }
 
 .empty-state {
   padding: 52px 24px;
   text-align: center;
   color: var(--text-faint);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .empty-state .big {
@@ -1036,7 +1196,7 @@ button {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  border: 2.5px solid rgba(255, 255, 255, 0.14);
+  border: 2.5px solid rgb(var(--lift-rgb) / 0.14);
   border-top-color: var(--accent);
   animation: spin 0.75s linear infinite;
 }
@@ -1056,7 +1216,7 @@ button {
   display: grid;
   place-items: center;
   padding: 22px;
-  background: rgba(6, 4, 18, 0.62);
+  background: var(--scrim);
   backdrop-filter: blur(7px);
   -webkit-backdrop-filter: blur(7px);
   animation: fade 0.2s var(--ease);
@@ -1103,7 +1263,7 @@ button {
   gap: 7px;
   color: var(--text-dim);
   text-decoration: none;
-  font-size: 13px;
+  font-size: 14px;
   margin-bottom: 14px;
   transition: color 0.16s var(--ease);
 }
@@ -1116,7 +1276,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 11px;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .info-row {
@@ -1153,7 +1313,7 @@ button {
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   transition:
     background 0.18s var(--ease),
     color 0.18s var(--ease),
@@ -1162,20 +1322,20 @@ button {
 
 .tab:hover {
   color: var(--text);
-  background: var(--glass);
+  background: var(--surface);
   transform: translateY(-1px);
 }
 
 .tab.active {
   color: var(--text);
-  background: var(--glass-strong);
-  border-color: var(--glass-border);
+  background: var(--surface-2);
+  border-color: var(--border);
 }
 
 .tab-count {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(var(--lift-rgb) / 0.08);
   border-radius: 999px;
   padding: 1px 7px;
 }
@@ -1227,11 +1387,11 @@ button {
 .chip {
   padding: 8px 15px;
   border-radius: 999px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass);
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   transition:
     transform 0.16s var(--ease),
     background 0.16s var(--ease),
@@ -1241,14 +1401,14 @@ button {
 .chip:hover {
   transform: translateY(-2px);
   color: var(--text);
-  background: var(--glass-strong);
+  background: var(--surface-2);
 }
 
 .chip.active {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: linear-gradient(135deg, var(--accent), var(--accent-light));
   border-color: transparent;
   color: var(--text);
-  box-shadow: 0 6px 18px rgba(109, 111, 255, 0.36);
+  box-shadow: 0 6px 18px rgb(var(--accent-rgb) / 0.36);
 }
 
 .filters-dates {
@@ -1256,18 +1416,18 @@ button {
   align-items: center;
   gap: 8px;
   margin-left: auto;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-faint);
 }
 
 .filters-dates input {
   padding: 8px 12px;
   border-radius: 11px;
-  border: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  background: rgb(var(--lift-rgb) / 0.05);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   outline: none;
 }
 
@@ -1276,15 +1436,15 @@ button {
 }
 
 .pill-paid {
-  color: #b6f3cf;
-  border-color: rgba(55, 214, 122, 0.34);
-  background: rgba(55, 214, 122, 0.13);
+  color: var(--free-ink);
+  border-color: rgb(var(--free-rgb) / 0.34);
+  background: rgb(var(--free-rgb) / 0.13);
 }
 
 .pill-due {
-  color: #ffc2ca;
-  border-color: rgba(255, 92, 114, 0.34);
-  background: rgba(255, 92, 114, 0.13);
+  color: var(--occupied-ink);
+  border-color: rgb(var(--occupied-rgb) / 0.34);
+  background: rgb(var(--occupied-rgb) / 0.13);
 }
 
 .card-action {
@@ -1310,13 +1470,13 @@ button {
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-dim);
   margin-bottom: 9px;
 }
 
 .stat-value {
-  font-size: 27px;
+  font-size: 32px;
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.15;
@@ -1324,7 +1484,7 @@ button {
 
 .stat-foot {
   margin-top: 9px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   display: flex;
   align-items: center;
@@ -1334,7 +1494,7 @@ button {
 .meter {
   height: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(var(--lift-rgb) / 0.08);
   overflow: hidden;
   margin-top: 12px;
 }
@@ -1342,7 +1502,7 @@ button {
 .meter-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+  background: linear-gradient(90deg, var(--accent-light), var(--accent));
   transition: width 0.4s var(--ease);
 }
 
@@ -1355,14 +1515,23 @@ button {
 }
 
 /* ── Chart ─────────────────────────────────────────────────────────────────
-   Two series only: categorical slots 1 (blue) and 2 (orange), stepped for a
-   dark surface and validated for contrast and colour-vision separation.       */
+   Two series only, kept far apart in both hue and lightness so they survive
+   colour-vision differences and a greyscale printout. Each theme gets its own
+   pair: the dark-surface values wash out on white.                            */
 
-:root {
-  --series-rooms: #3987e5;
-  --series-restaurant: #d95926;
-  --chart-grid: rgba(255, 255, 255, 0.07);
-  --chart-baseline: rgba(255, 255, 255, 0.16);
+:root,
+:root[data-theme='night'] {
+  --series-rooms: #4a90d9;
+  --series-restaurant: #d97438;
+  --chart-grid: rgba(243, 239, 230, 0.08);
+  --chart-baseline: rgba(243, 239, 230, 0.18);
+}
+
+:root[data-theme='day'] {
+  --series-rooms: #2a6ba8;
+  --series-restaurant: #b4551f;
+  --chart-grid: rgba(35, 40, 31, 0.09);
+  --chart-baseline: rgba(35, 40, 31, 0.2);
 }
 
 .swatch {
@@ -1388,7 +1557,7 @@ button {
 .chart-legend {
   display: flex;
   gap: 18px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-dim);
   margin-bottom: 18px;
 }
@@ -1409,7 +1578,7 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
   padding-bottom: 2px;
@@ -1447,7 +1616,7 @@ button {
 }
 
 .chart-value {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
   margin-bottom: 6px;
   font-variant-numeric: tabular-nums;
@@ -1494,7 +1663,7 @@ button {
   transform: translateX(-50%);
   padding: 11px 14px;
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  font-size: 13px;
   white-space: nowrap;
   z-index: 5;
   pointer-events: none;
@@ -1524,7 +1693,7 @@ button {
 .chart-tip-row.total {
   margin-top: 6px;
   padding-top: 7px;
-  border-top: 1px solid var(--glass-border-soft);
+  border-top: 1px solid var(--border-soft);
 }
 
 .chart-labels {
@@ -1537,7 +1706,7 @@ button {
 .chart-labels span {
   flex: 1;
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
   text-transform: capitalize;
 }
@@ -1550,7 +1719,7 @@ button {
   padding: 44px 20px;
   text-align: center;
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 /* ── Data table ────────────────────────────────────────────────────────────── */
@@ -1558,23 +1727,23 @@ button {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13.5px;
+  font-size: 14.5px;
 }
 
 .data-table th {
   text-align: left;
   font-weight: 500;
-  font-size: 11.5px;
+  font-size: 12.5px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-faint);
   padding: 0 12px 10px 0;
-  border-bottom: 1px solid var(--glass-border-soft);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .data-table td {
   padding: 11px 12px 11px 0;
-  border-bottom: 1px solid var(--glass-border-soft);
+  border-bottom: 1px solid var(--border-soft);
   color: var(--text-dim);
 }
 
@@ -1609,18 +1778,18 @@ button {
 .notice {
   padding: 13px 16px;
   border-radius: 12px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
   margin-bottom: 16px;
-  border: 1px solid rgba(55, 214, 122, 0.32);
-  background: rgba(55, 214, 122, 0.11);
-  color: #c8f5da;
+  border: 1px solid rgb(var(--free-rgb) / 0.32);
+  background: rgb(var(--free-rgb) / 0.11);
+  color: var(--free-ink);
 }
 
 .notice-warn {
-  border-color: rgba(245, 196, 81, 0.34);
-  background: rgba(245, 196, 81, 0.11);
-  color: #ffe6ac;
+  border-color: rgb(var(--booked-rgb) / 0.34);
+  background: rgb(var(--booked-rgb) / 0.11);
+  color: var(--booked-ink);
 }
 
 .notice code {
@@ -1629,7 +1798,7 @@ button {
   padding: 2px 8px;
   border-radius: 7px;
   background: rgba(0, 0, 0, 0.28);
-  font-size: 12px;
+  font-size: 13px;
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
 }
 
@@ -1639,7 +1808,7 @@ button {
 }
 
 .setting-icon {
-  font-size: 17px;
+  font-size: 18px;
   line-height: 1.3;
   flex: none;
 }
@@ -1656,7 +1825,7 @@ button {
 }
 
 .setting-hint {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   line-height: 1.5;
 }
@@ -1665,8 +1834,8 @@ button {
   width: 38px;
   height: 22px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.13);
-  border: 1px solid var(--glass-border-soft);
+  background: rgb(var(--lift-rgb) / 0.13);
+  border: 1px solid var(--border-soft);
   flex: none;
   padding: 2px;
   display: flex;
@@ -1674,7 +1843,7 @@ button {
 }
 
 .switch.on {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: linear-gradient(135deg, var(--accent), var(--accent-light));
   border-color: transparent;
 }
 
@@ -1682,7 +1851,7 @@ button {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--on-accent);
   transition: transform 0.18s var(--ease);
 }
 
@@ -1695,9 +1864,9 @@ button {
   padding: 16px;
   border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.24);
-  border: 1px solid var(--glass-border-soft);
+  border: 1px solid var(--border-soft);
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
-  font-size: 12.5px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: var(--text-dim);
   white-space: pre-wrap;
@@ -1726,7 +1895,7 @@ button {
 .search-icon {
   position: absolute;
   left: 14px;
-  font-size: 16px;
+  font-size: 17px;
   color: var(--text-faint);
   pointer-events: none;
 }
@@ -1735,13 +1904,13 @@ button {
   width: 100%;
   padding: 11px 38px 11px 38px;
   border-radius: 12px;
-  border: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  background: rgb(var(--lift-rgb) / 0.05);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   outline: none;
   transition:
     border-color 0.18s var(--ease),
@@ -1754,7 +1923,7 @@ button {
 
 .search input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(139, 124, 255, 0.2);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.2);
 }
 
 .search input::-webkit-search-cancel-button {
@@ -1768,18 +1937,18 @@ button {
   height: 22px;
   border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgb(var(--lift-rgb) / 0.12);
   color: var(--text-dim);
   cursor: pointer;
   line-height: 1;
-  font-size: 15px;
+  font-size: 16px;
   display: grid;
   place-items: center;
   transition: background 0.16s var(--ease);
 }
 
 .search-clear:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgb(var(--lift-rgb) / 0.2);
   color: var(--text);
 }
 
@@ -1790,7 +1959,7 @@ button {
 }
 
 .chip-count {
-  font-size: 11px;
+  font-size: 12px;
   padding: 1px 6px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.22);
@@ -1800,17 +1969,17 @@ button {
 
 .chip-sm {
   padding: 5px 11px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .result-line {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   margin-bottom: 12px;
 }
 
 .field-hint {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text-faint);
   line-height: 1.5;
 }
@@ -1820,11 +1989,11 @@ button {
 .charge-row {
   position: relative;
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .charge-row span:first-child {
-  color: #ffd9a8;
+  color: var(--booked-ink);
 }
 
 .charge-remove {
@@ -1850,13 +2019,13 @@ button {
 }
 
 .charge-remove:hover {
-  background: rgba(255, 92, 114, 0.2);
-  color: #ffc2ca;
+  background: rgb(var(--occupied-rgb) / 0.2);
+  color: var(--occupied-ink);
 }
 
 .pay-row.subtotal {
   padding-top: 9px;
-  border-top: 1px dashed var(--glass-border-soft);
+  border-top: 1px dashed var(--border-soft);
 }
 
 .deposit-box {
@@ -1866,24 +2035,24 @@ button {
   margin-top: 16px;
   padding: 13px 15px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(79, 195, 247, 0.28);
-  background: rgba(79, 195, 247, 0.09);
+  border: 1px solid rgb(var(--cleaning-rgb) / 0.28);
+  background: rgb(var(--cleaning-rgb) / 0.09);
 }
 
 .deposit-label {
-  font-size: 13px;
-  color: #b6e6ff;
+  font-size: 14px;
+  color: var(--cleaning-ink);
 }
 
 .deposit-hint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
   margin-top: 2px;
 }
 
 .deposit-value {
   margin-left: auto;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -1892,10 +2061,10 @@ button {
   margin-left: 8px;
   padding: 1px 7px;
   border-radius: 999px;
-  font-size: 10.5px;
-  background: rgba(139, 124, 255, 0.2);
-  border: 1px solid rgba(139, 124, 255, 0.35);
-  color: #d7d0ff;
+  font-size: 11.5px;
+  background: rgb(var(--accent-rgb) / 0.2);
+  border: 1px solid rgb(var(--accent-rgb) / 0.35);
+  color: var(--text-dim);
 }
 
 /* ── Group booking ─────────────────────────────────────────────────────────── */
@@ -1909,8 +2078,8 @@ button {
 
 .pill-current {
   border-color: var(--accent);
-  background: rgba(139, 124, 255, 0.18);
-  color: #ded8ff;
+  background: rgb(var(--accent-rgb) / 0.18);
+  color: var(--text);
 }
 
 .picker {
@@ -1921,12 +2090,12 @@ button {
   overflow-y: auto;
   padding: 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--glass-border-soft);
+  border: 1px solid var(--border-soft);
   background: rgba(0, 0, 0, 0.18);
 }
 
 .picker-title {
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-faint);
@@ -1942,10 +2111,10 @@ button {
 .picker-item {
   padding: 7px 12px;
   border-radius: 9px;
-  border: 1px solid var(--glass-border-soft);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-soft);
+  background: rgb(var(--lift-rgb) / 0.04);
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
   transition:
     transform 0.16s var(--ease),
@@ -1956,13 +2125,13 @@ button {
 .picker-item:hover {
   transform: translateY(-2px);
   color: var(--text);
-  border-color: var(--glass-border);
+  border-color: var(--border);
 }
 
 .picker-item.active {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: linear-gradient(135deg, var(--accent), var(--accent-light));
   border-color: transparent;
-  color: #fff;
+  color: var(--on-accent);
 }
 
 /* Busy right now — still selectable, since the group may be for later dates. */
@@ -1979,12 +2148,12 @@ button {
 }
 
 .guest-name {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 600;
 }
 
 .guest-phone {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-faint);
   margin-top: 2px;
 }
@@ -1998,18 +2167,18 @@ button {
 .mini-stat {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--glass-border-soft);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-soft);
+  background: rgb(var(--lift-rgb) / 0.04);
 }
 
 .mini-stat-value {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .mini-stat-label {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
   margin-top: 3px;
 }
@@ -2018,11 +2187,11 @@ button {
   width: 100%;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  background: rgb(var(--lift-rgb) / 0.05);
   color: var(--text);
   font: inherit;
-  font-size: 13.5px;
+  font-size: 14.5px;
   line-height: 1.6;
   resize: vertical;
   outline: none;
@@ -2030,7 +2199,7 @@ button {
 
 .notes-area:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(139, 124, 255, 0.2);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.2);
 }
 
 .notes-foot {
@@ -2041,7 +2210,7 @@ button {
 }
 
 .notes-saved {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--free);
 }
 
@@ -2057,17 +2226,17 @@ button {
   gap: 12px;
   padding: 11px 14px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--glass-border-soft);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-soft);
+  background: rgb(var(--lift-rgb) / 0.03);
 }
 
 .stay-unit {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
 }
 
 .stay-dates {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   margin-top: 2px;
 }
@@ -2075,12 +2244,12 @@ button {
 .stay-money {
   margin-left: auto;
   text-align: right;
-  font-size: 13px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
 
 .stay-status {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text-faint);
 }
 
@@ -2097,8 +2266,8 @@ button {
   margin: 0;
   border-radius: var(--radius-sm);
   overflow: hidden;
-  border: 1px solid var(--glass-border-soft);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-soft);
+  background: rgb(var(--lift-rgb) / 0.03);
 }
 
 .photo img {
@@ -2110,13 +2279,13 @@ button {
 
 .photo-placeholder {
   height: 96px;
-  background: linear-gradient(100deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.09));
+  background: linear-gradient(100deg, rgb(var(--lift-rgb) / 0.04), rgb(var(--lift-rgb) / 0.09));
 }
 
 .photo figcaption {
   position: relative;
   padding: 7px 9px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   line-height: 1.4;
 }
 
@@ -2127,15 +2296,15 @@ button {
 
 /* Kind is spelled out in the label; the colour only reinforces it. */
 .kind-damage {
-  color: #ffc2ca;
+  color: var(--occupied-ink);
 }
 
 .kind-before {
-  color: #ffe6ac;
+  color: var(--booked-ink);
 }
 
 .kind-after {
-  color: #b6f3cf;
+  color: var(--free-ink);
 }
 
 .kind-other {
@@ -2155,13 +2324,13 @@ button {
   border-radius: 50%;
   border: none;
   background: rgba(0, 0, 0, 0.55);
-  color: #ffc2ca;
+  color: var(--occupied-ink);
   cursor: pointer;
   line-height: 1;
 }
 
 .photo-remove:hover {
-  background: rgba(255, 92, 114, 0.35);
+  background: rgb(var(--occupied-rgb) / 0.35);
 }
 
 /* ── Occupancy forecast ────────────────────────────────────────────────────── */
@@ -2184,8 +2353,8 @@ button {
   position: relative;
   height: 68px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--glass-border-soft);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-soft);
+  background: rgb(var(--lift-rgb) / 0.04);
   overflow: hidden;
   display: flex;
   align-items: flex-end;
@@ -2197,7 +2366,7 @@ button {
 .forecast-bar-fill {
   position: absolute;
   inset: auto 0 0 0;
-  background: linear-gradient(180deg, rgba(139, 124, 255, 0.55), rgba(77, 124, 255, 0.75));
+  background: linear-gradient(180deg, rgb(var(--accent-rgb) / 0.55), rgb(var(--accent-light-rgb) / 0.75));
   transition: height 0.35s var(--ease);
 }
 
@@ -2206,33 +2375,33 @@ button {
   z-index: 1;
   width: 100%;
   padding: 4px 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 /* No rooms left: flagged by colour and by the zero already in the column. */
 .forecast-day.is-full .forecast-bar {
-  border-color: rgba(255, 92, 114, 0.5);
+  border-color: rgb(var(--occupied-rgb) / 0.5);
 }
 
 .forecast-day.is-full .forecast-bar-fill {
-  background: linear-gradient(180deg, rgba(255, 92, 114, 0.5), rgba(255, 92, 114, 0.8));
+  background: linear-gradient(180deg, rgb(var(--occupied-rgb) / 0.5), rgb(var(--occupied-rgb) / 0.8));
 }
 
 .forecast-day.is-today .forecast-bar {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(139, 124, 255, 0.45);
+  box-shadow: 0 0 0 1px rgb(var(--accent-rgb) / 0.45);
 }
 
 .forecast-date {
-  font-size: 12px;
+  font-size: 13px;
   margin-top: 5px;
   font-variant-numeric: tabular-nums;
 }
 
 .forecast-dow {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--text-faint);
 }
 
@@ -2249,7 +2418,7 @@ button {
 }
 
 .weekday-count {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
 }
 
@@ -2258,7 +2427,7 @@ button {
   height: 8px;
   min-width: 90px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgb(var(--lift-rgb) / 0.07);
   overflow: hidden;
 }
 
@@ -2280,7 +2449,7 @@ button {
 }
 
 .weekday-table tr.is-weakest td {
-  background: rgba(255, 92, 114, 0.08);
+  background: rgb(var(--occupied-rgb) / 0.08);
 }
 
 .weekday-table tr.is-weakest td:first-child {
@@ -2572,12 +2741,12 @@ button {
 /* ── Cleaning SLA ──────────────────────────────────────────────────────────── */
 
 .sla {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
 }
 
 .sla-over {
-  color: #ffc2ca;
+  color: var(--occupied-ink);
   font-weight: 500;
 }
 
@@ -2588,8 +2757,8 @@ button {
 /* A unit past the SLA is called out by border, glow and stripe together —
    never colour alone, since the elapsed time is spelled out beside it. */
 .unit-card.is-overdue {
-  border-color: rgba(255, 92, 114, 0.55);
-  box-shadow: 0 0 0 1px rgba(255, 92, 114, 0.28), var(--shadow);
+  border-color: rgb(var(--occupied-rgb) / 0.55);
+  box-shadow: 0 0 0 1px rgb(var(--occupied-rgb) / 0.28), var(--shadow);
   --stripe: var(--occupied);
 }
 
@@ -2603,13 +2772,13 @@ button {
   padding: 14px 15px 2px;
   margin-bottom: 14px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(245, 196, 81, 0.32);
-  background: rgba(245, 196, 81, 0.09);
+  border: 1px solid rgb(var(--booked-rgb) / 0.32);
+  background: rgb(var(--booked-rgb) / 0.09);
 }
 
 .cancel-note {
   display: block;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text-faint);
   margin-top: 2px;
 }
@@ -2620,9 +2789,9 @@ button {
   margin-bottom: 16px;
   padding: 13px 15px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--glass-border-soft);
+  border: 1px solid var(--border-soft);
   background: rgba(0, 0, 0, 0.22);
-  font-size: 12.5px;
+  font-size: 13.5px;
   max-height: 190px;
   overflow-y: auto;
 }
@@ -2633,18 +2802,18 @@ button {
 
 .field input[type='file'] {
   padding: 9px 12px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .field input[type='file']::file-selector-button {
   margin-right: 12px;
   padding: 6px 13px;
   border-radius: 9px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass);
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13.5px;
   cursor: pointer;
 }
 
@@ -2666,8 +2835,8 @@ button {
   flex-wrap: wrap;
   padding: var(--row-pad);
   border-radius: var(--row-radius);
-  border: 1px solid var(--glass-border-soft);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-soft);
+  background: rgb(var(--lift-rgb) / 0.03);
   transition:
     transform 0.16s var(--ease),
     border-color 0.16s var(--ease);
@@ -2675,7 +2844,7 @@ button {
 
 .row-card:hover {
   transform: translateY(-2px);
-  border-color: var(--glass-border);
+  border-color: var(--border);
 }
 
 /* Disabled accounts and closed waitlist entries stay listed — history
@@ -2689,7 +2858,7 @@ button {
 }
 
 .row-title {
-  font-size: 14.5px;
+  font-size: 15.5px;
   font-weight: 500;
   display: flex;
   align-items: center;
@@ -2698,7 +2867,7 @@ button {
 }
 
 .row-sub {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   margin-top: 3px;
   font-variant-numeric: tabular-nums;
@@ -2706,7 +2875,7 @@ button {
 
 .row-when {
   margin-left: auto;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -2723,18 +2892,18 @@ button {
 .row-actions .btn {
   height: var(--action-height);
   padding: 0 13px;
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
 .row-card.is-overdue {
-  border-color: rgba(255, 92, 114, 0.45);
+  border-color: rgb(var(--occupied-rgb) / 0.45);
 }
 
 .tag-off {
-  background: rgba(255, 92, 114, 0.18);
-  border-color: rgba(255, 92, 114, 0.35);
-  color: #ffc2ca;
+  background: rgb(var(--occupied-rgb) / 0.18);
+  border-color: rgb(var(--occupied-rgb) / 0.35);
+  color: var(--occupied-ink);
 }
 
 @media (max-width: 640px) {
@@ -2766,18 +2935,18 @@ button {
 
 .tile:hover {
   transform: translateY(-3px);
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: rgb(var(--lift-rgb) / 0.28);
   box-shadow: var(--shadow-lift);
 }
 
 .tile-label {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-dim);
   margin-bottom: 9px;
 }
 
 .tile-value {
-  font-size: 27px;
+  font-size: 32px;
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.15;
@@ -2787,7 +2956,7 @@ button {
 }
 
 .tile-of {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 400;
   color: var(--text-faint);
   letter-spacing: 0;
@@ -2798,7 +2967,7 @@ button {
 .tile-foot {
   margin-top: auto;
   padding-top: 9px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
 }
 
@@ -2810,7 +2979,7 @@ button {
 }
 
 .dash-empty {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-faint);
   padding: 6px 0 2px;
 }
@@ -2840,14 +3009,14 @@ button {
 .audit-when {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--text-faint);
 }
 
 .audit-role,
 .audit-guest {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
   margin-top: 2px;
 }
@@ -2861,7 +3030,7 @@ button {
 }
 
 .pager-info {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
@@ -2895,6 +3064,27 @@ button {
 
 /* Below the sidebar's comfortable width it becomes a horizontal strip above
    the content, group labels inline with their links. */
+/* The header carries more than it used to — an alert bell, the sun dial, a
+   theme toggle — and at phone width the row simply does not fit. It wraps
+   onto a second line rather than hiding anything: who is signed in and what
+   time it is at the hotel both matter on a shared device. */
+@media (max-width: 760px) {
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 10px;
+    padding: 10px 14px;
+    gap: 12px;
+  }
+
+  .topbar-right {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+}
+
 @media (max-width: 860px) {
   .shell-body {
     flex-direction: column;
@@ -2909,12 +3099,13 @@ button {
     gap: 8px 20px;
     padding: 12px 18px;
     border-right: none;
-    border-bottom: 1px solid var(--glass-border-soft);
+    border-bottom: 1px solid var(--border-soft);
   }
 
   .nav-group {
     flex-direction: row;
     align-items: center;
+    flex-wrap: wrap;
     gap: 4px;
   }
 
@@ -2975,7 +3166,7 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
 }
 
@@ -2983,11 +3174,11 @@ button {
   height: var(--action-height);
   padding: 0 10px;
   border-radius: 10px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass);
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   color-scheme: dark;
 }
 
@@ -3042,10 +3233,11 @@ button {
   position: sticky;
   left: 0;
   z-index: 3;
-  /* Opaque, not glass: the bars scroll underneath it. */
-  background: #191036;
+  /* Opaque on purpose: the bars scroll underneath it, and a translucent
+     surface would let them show through the room number. */
+  background: var(--surface-opaque);
   padding: 0 10px 0 2px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   text-align: left;
   height: 100%;
@@ -3054,7 +3246,7 @@ button {
 }
 
 .tl-corner {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -3084,12 +3276,12 @@ button {
 }
 
 .tl-day-num {
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 600;
 }
 
 .tl-day-dow {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-faint);
 }
 
@@ -3106,9 +3298,9 @@ button {
    on that date. */
 .tl-cell {
   height: calc(var(--tl-row-h) - 8px);
-  border: 1px solid var(--glass-border-soft);
+  border: 1px solid var(--border-soft);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgb(var(--lift-rgb) / 0.02);
   cursor: pointer;
   padding: 0;
   transition:
@@ -3117,7 +3309,7 @@ button {
 }
 
 .tl-cell:hover {
-  background: rgba(139, 124, 255, 0.22);
+  background: rgb(var(--accent-rgb) / 0.22);
   border-color: var(--accent);
 }
 
@@ -3128,11 +3320,11 @@ button {
 }
 
 .tl-cell.is-weekend {
-  background: rgba(245, 196, 81, 0.05);
+  background: rgb(var(--booked-rgb) / 0.05);
 }
 
 .tl-cell.is-today {
-  border-color: rgba(139, 124, 255, 0.5);
+  border-color: rgb(var(--accent-rgb) / 0.5);
 }
 
 /* One booking, one bar — placed in the same grid area as the cells it covers,
@@ -3148,8 +3340,8 @@ button {
   padding: 0 8px;
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
-  color: #0d0a22;
+  font-size: 14px;
+  color: var(--on-status);
   font-weight: 500;
   white-space: nowrap;
   transition:
@@ -3168,7 +3360,6 @@ button {
 
 .tl-bar[data-status='occupied'] {
   background: var(--occupied);
-  color: #2a0710;
 }
 
 .tl-bar-label {
@@ -3202,8 +3393,8 @@ button {
   padding: 3px;
   gap: 3px;
   border-radius: 10px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass);
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .view-btn {
@@ -3211,7 +3402,7 @@ button {
   background: none;
   color: var(--text-dim);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   padding: 0 12px;
   border-radius: 8px;
   cursor: pointer;
@@ -3227,7 +3418,7 @@ button {
 
 .view-btn.active {
   color: var(--text);
-  background: var(--glass-strong);
+  background: var(--surface-2);
 }
 
 @media (max-width: 640px) {
@@ -3260,21 +3451,21 @@ button {
   height: var(--action-height);
   padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 92, 114, 0.5);
-  background: rgba(255, 92, 114, 0.16);
+  border: 1px solid rgb(var(--occupied-rgb) / 0.5);
+  background: rgb(var(--occupied-rgb) / 0.16);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
   animation: alert-pulse 1.6s var(--ease) infinite;
 }
 
 .alert-bell:hover {
-  background: rgba(255, 92, 114, 0.26);
+  background: rgb(var(--occupied-rgb) / 0.26);
 }
 
 .alert-bell-icon {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1;
 }
 
@@ -3288,12 +3479,12 @@ button {
 @keyframes alert-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 92, 114, 0.55);
-    border-color: rgba(255, 92, 114, 0.5);
+    box-shadow: 0 0 0 0 rgb(var(--occupied-rgb) / 0.55);
+    border-color: rgb(var(--occupied-rgb) / 0.5);
   }
   50% {
-    box-shadow: 0 0 0 7px rgba(255, 92, 114, 0);
-    border-color: rgba(255, 92, 114, 0.95);
+    box-shadow: 0 0 0 7px rgb(var(--occupied-rgb) / 0);
+    border-color: rgb(var(--occupied-rgb) / 0.95);
   }
 }
 
@@ -3312,7 +3503,7 @@ button {
      page, and at 6% white the cards behind it read straight through the text —
      the one list that has to be legible at a glance was the least legible
      thing on screen. */
-  background: rgba(21, 14, 52, 0.97);
+  background: var(--panel-float);
   backdrop-filter: blur(24px) saturate(140%);
   -webkit-backdrop-filter: blur(24px) saturate(140%);
 }
@@ -3322,7 +3513,7 @@ button {
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
-  font-size: 12px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-faint);
@@ -3332,7 +3523,7 @@ button {
   margin-left: auto;
   height: 26px;
   padding: 0 10px;
-  font-size: 12px;
+  font-size: 13px;
   text-transform: none;
   letter-spacing: 0;
 }
@@ -3352,8 +3543,8 @@ button {
   gap: 10px;
   padding: 10px 11px;
   border-radius: var(--row-radius);
-  border: 1px solid var(--glass-border-soft);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-soft);
+  background: rgb(var(--lift-rgb) / 0.05);
   line-height: 1.35;
 }
 
@@ -3371,7 +3562,7 @@ button {
 }
 
 .alert-icon {
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.3;
 }
 
@@ -3382,7 +3573,7 @@ button {
 
 .alert-title {
   display: block;
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 500;
   color: var(--text);
   text-decoration: none;
@@ -3395,7 +3586,7 @@ button {
 
 .alert-detail {
   margin-top: 3px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
 }
 
@@ -3404,8 +3595,8 @@ button {
   margin-right: 7px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 10.5px;
+  background: rgb(var(--lift-rgb) / 0.08);
+  font-size: 11.5px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -3415,11 +3606,11 @@ button {
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  border: 1px solid var(--glass-border-soft);
+  border: 1px solid var(--border-soft);
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1;
 }
 
@@ -3452,7 +3643,136 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .alert-bell {
     animation: none;
-    box-shadow: 0 0 0 2px rgba(255, 92, 114, 0.5);
-    border-color: rgba(255, 92, 114, 0.95);
+    box-shadow: 0 0 0 2px rgb(var(--occupied-rgb) / 0.5);
+    border-color: rgb(var(--occupied-rgb) / 0.95);
   }
 }
+
+/* ── Sun dial ──────────────────────────────────────────────────────────────
+   The one place this interface raises its voice. Everything else is
+   restrained, so a single expressive element reads as intent rather than
+   decoration.
+
+   The arc is the hotel's daylight, drawn from real sunrise and sunset for the
+   gorge. The lit portion is how much of it has gone.                        */
+
+.sun-dial {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  overflow: visible;
+}
+
+.sun-track,
+.sun-progress {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.sun-track {
+  stroke: var(--border);
+  stroke-width: 2;
+}
+
+.sun-progress {
+  stroke: var(--gold);
+  stroke-width: 2.5;
+  /* Redrawn every half minute; the easing is what turns those steps into a
+     creep. Long, because the sun has all day to get anywhere. */
+  transition: stroke-dasharray 1.2s var(--ease);
+}
+
+.sun-dot {
+  fill: var(--gold);
+  stroke: var(--bg-0);
+  stroke-width: 1.5;
+  transition:
+    cx 1.2s var(--ease),
+    cy 1.2s var(--ease);
+  filter: drop-shadow(0 0 4px var(--gold));
+}
+
+.moon-dot {
+  fill: var(--text-faint);
+  opacity: 0.7;
+}
+
+.sun-dial.is-night .sun-progress {
+  stroke: var(--border);
+}
+
+/* ── Theme toggle ─────────────────────────────────────────────────────────── */
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--action-height);
+  height: var(--action-height);
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition:
+    color 0.18s var(--ease),
+    border-color 0.18s var(--ease),
+    background 0.18s var(--ease);
+}
+
+.theme-toggle:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: var(--surface-2);
+}
+
+.theme-toggle svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+/* The moon is a solid shape rather than an outline. */
+.theme-toggle svg path {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* ── Route transition ─────────────────────────────────────────────────────
+   A short fade and a few pixels of rise as each page arrives. 150ms: enough
+   to register as a change of place, too brief to wait for.                  */
+
+@keyframes route-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.content {
+  animation: route-in 0.15s var(--ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content {
+    animation: none;
+  }
+
+  /* The sun still moves — it has to, it is the information — but it arrives
+     rather than travels. */
+  .sun-progress,
+  .sun-dot {
+    transition: none;
+  }
+}
+
+/* The paper sheet keeps its own black-on-white palette in both themes: it is a
+   document, and a receipt handed to a guest does not follow the app's mood.
+   That is why the colours in that section are literal rather than tokens. */

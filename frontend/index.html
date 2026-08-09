@@ -4,8 +4,36 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0a0718" />
+    <meta name="theme-color" content="#12151a" />
     <title>Taura PMS</title>
+
+    <!--
+      The theme is applied before the first paint. Read from React instead and
+      a night-theme user gets a white flash on every load, which at a reception
+      desk after dark is worse than it sounds.
+    -->
+    <script>
+      ;(function () {
+        try {
+          var saved = localStorage.getItem('taura_pms_theme')
+          document.documentElement.dataset.theme = saved === 'day' ? 'day' : 'night'
+        } catch (e) {
+          document.documentElement.dataset.theme = 'night'
+        }
+      })()
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      Two variable faces: Fraunces for titles, big numbers and the clock, Inter
+      for everything dense. Only the weights actually used are requested, and
+      display=swap means text is readable while they load rather than invisible.
+    -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
     <div id="root"></div>

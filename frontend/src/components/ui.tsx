@@ -1,5 +1,15 @@
 import type { ReactNode } from 'react'
+import { useCountUp } from '../useCountUp'
 import type { UnitStatus } from '../types'
+
+/**
+ * A whole number that rolls up to its value once, as the page arrives.
+ * Reserved for the dashboard's headline figures — see useCountUp for why it
+ * does not re-animate on every change.
+ */
+export function CountUp({ value }: { value: number }) {
+  return <>{Math.round(useCountUp(value))}</>
+}
 
 export function StatusDot({ status }: { status: UnitStatus | 'cleaning' }) {
   return <span className={`dot dot-${status}`} />

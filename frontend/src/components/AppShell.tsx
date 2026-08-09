@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
 import AlertCenter from './AlertCenter'
 import AlmatyClock from './AlmatyClock'
 import ReviewsLink from './ReviewsLink'
+import ThemeToggle from './ThemeToggle'
 import { unlockSound } from '../sound'
 import { useAlerts } from '../useAlerts'
 import { ROLE_LABELS, type Role } from '../types'
@@ -53,6 +54,7 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 
 export default function AppShell() {
   const { user, logout } = useAuth()
+  const location = useLocation()
 
   // Browsers refuse to make a sound until the page has been interacted with.
   // One silent unlock on the first click or keypress after login is enough for
@@ -97,6 +99,7 @@ export default function AppShell() {
           />
           <ReviewsLink />
           <AlmatyClock />
+          <ThemeToggle />
           <div className="who">
             <div className="who-name">{user.name}</div>
             <div className="who-role">{ROLE_LABELS[user.role]}</div>
@@ -127,7 +130,10 @@ export default function AppShell() {
           ))}
         </nav>
 
-        <main className="content">
+        {/* Keyed on the path so React remounts it per route, which is what
+            restarts the fade. The animation itself is CSS, and stops dead
+            under prefers-reduced-motion. */}
+        <main className="content" key={location.pathname}>
           <Outlet />
         </main>
       </div>

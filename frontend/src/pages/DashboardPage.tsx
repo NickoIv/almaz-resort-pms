@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
-import { Alert, Spinner, StatusDot } from '../components/ui'
+import { Alert, CountUp, Spinner, StatusDot } from '../components/ui'
 import { describeAudit, type AuditEntry } from '../audit'
 import { elapsedLabel, percent, todayIso } from '../format'
 import type { CleaningOverview, CleaningUnit, Unit } from '../types'
@@ -97,7 +97,7 @@ export default function DashboardPage() {
         <Link className="tile glass" to="/rooms">
           <div className="tile-label">Занято номеров</div>
           <div className="tile-value">
-            {stats.busy}
+            <CountUp value={stats.busy} />
             <span className="tile-of">из {stats.rooms}</span>
           </div>
           <div className="meter">
@@ -110,7 +110,9 @@ export default function DashboardPage() {
 
         <Link className="tile glass" to="/cleaning">
           <div className="tile-label">Требуют уборки</div>
-          <div className="tile-value">{waiting.length}</div>
+          <div className="tile-value">
+            <CountUp value={waiting.length} />
+          </div>
           <div className="tile-foot">
             {stats.overdue > 0 ? (
               <span className="sla-over">
@@ -124,13 +126,17 @@ export default function DashboardPage() {
 
         <Link className="tile glass" to="/rooms">
           <div className="tile-label">Заезды сегодня</div>
-          <div className="tile-value">{stats.arrivals}</div>
+          <div className="tile-value">
+            <CountUp value={stats.arrivals} />
+          </div>
           <div className="tile-foot">выездов: {stats.departures}</div>
         </Link>
 
         <Link className="tile glass" to="/waitlist">
           <div className="tile-label">Лист ожидания</div>
-          <div className="tile-value">{data.waitlist.open}</div>
+          <div className="tile-value">
+            <CountUp value={data.waitlist.open} />
+          </div>
           <div className="tile-foot">
             {data.waitlist.open > 0 ? 'ждут свободных дат' : 'никто не ждёт'}
           </div>
