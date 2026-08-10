@@ -14,6 +14,7 @@ import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
 import { almatyMonth, dateRange, money, timeRange } from '../format'
 import { CANCEL_REASON_LABELS, type CancelReason } from '../cancellation'
 import {
+  PAYMENT_METHOD_LABELS,
   STATUS_LABELS,
   UNIT_TYPE_LABELS,
   type Calendar,
@@ -433,9 +434,21 @@ export default function UnitDetailPage() {
                             <span>
                               {payment.paid_at.slice(0, 16).replace('T', ' ')}
                               {payment.group_id && <span className="tag">групповой</span>}
+                              {/* The name is the point of this list. Payments
+                                  recorded before it was captured have none, and
+                                  say so rather than being attributed to whoever
+                                  looks most likely. */}
+                              {payment.received_by_name ? (
+                                <span className="field-hint"> принял: {payment.received_by_name}</span>
+                              ) : (
+                                payment.method !== 'adjustment' && (
+                                  <span className="field-hint"> принявший не записан</span>
+                                )
+                              )}
                             </span>
                             <span>
-                              {money(payment.amount, active.currency)} · {payment.method}
+                              {money(payment.amount, active.currency)} ·{' '}
+                              {PAYMENT_METHOD_LABELS[payment.method] ?? payment.method}
                             </span>
                           </div>
                         ))}

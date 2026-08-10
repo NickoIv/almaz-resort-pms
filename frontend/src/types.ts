@@ -152,6 +152,19 @@ export type CleaningOverview = {
   units: CleaningUnit[]
 }
 
+/**
+ * How a payment reads in Russian. `adjustment` is written by the server when an
+ * admin corrects the prepaid figure outright — nobody handed anything over, and
+ * calling it a payment method would put money in a till that never saw any.
+ */
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: 'наличные',
+  card: 'карта',
+  kaspi: 'Kaspi',
+  transfer: 'перевод',
+  adjustment: 'корректировка',
+}
+
 export type Payment = {
   id: number
   booking_id: number
@@ -160,6 +173,12 @@ export type Payment = {
   paid_at: string
   /** Present when the instalment was part of a combined group payment. */
   group_id: number | null
+  /** Who physically took the money. Null on rows written before this existed. */
+  received_by: number | null
+  received_by_name: string | null
+  /** Who entered it — always an admin, since only admins may record payments. */
+  recorded_by: number | null
+  recorded_by_name: string | null
 }
 
 export type Analytics = {

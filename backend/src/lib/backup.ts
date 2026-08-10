@@ -43,7 +43,19 @@ export const BACKUP_TABLES = [
   },
   {
     name: 'payments',
-    columns: ['id', 'booking_id', 'amount', 'method', 'paid_at', 'group_id'],
+    // received_by / recorded_by are listed here on purpose: this array is the
+    // whole of what a backup carries, so a column missing from it is a column
+    // silently dropped on the next restore.
+    columns: [
+      'id',
+      'booking_id',
+      'amount',
+      'method',
+      'paid_at',
+      'group_id',
+      'received_by',
+      'recorded_by',
+    ],
   },
   {
     name: 'charges',

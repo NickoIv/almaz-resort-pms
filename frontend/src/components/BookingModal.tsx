@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api'
+import { useAuth } from '../auth'
 import { Alert, Modal } from './ui'
 import { addDaysIso, todayIso } from '../format'
 import { CANCEL_REASONS, CANCEL_REASON_LABELS, needsNote, type CancelReason } from '../cancellation'
@@ -10,6 +11,7 @@ import {
   DEFAULT_CURRENCY,
   type Booking,
   type Currency,
+  type StaffMember,
   type UnitStatus,
   type UnitType,
   type WaitlistEntry,
@@ -60,6 +62,8 @@ export default function BookingModal({
   const defaultFrom = hourly ? `${start}T12:00` : start
   const defaultTo = hourly ? `${start}T16:00` : end
 
+  const { user } = useAuth()
+
   const [guestName, setGuestName] = useState(booking?.guest_name ?? '')
   const [guestPhone, setGuestPhone] = useState(booking?.guest_phone ?? '')
   const [dateFrom, setDateFrom] = useState(toInput(booking?.date_from, hourly, defaultFrom))
@@ -71,6 +75,20 @@ export default function BookingModal({
   const [currency, setCurrency] = useState<Currency>(
     (booking?.currency as Currency) ?? DEFAULT_CURRENCY
   )
+
+  // A prepayment is a real payment, so it carries the same two facts: by what
+  // means, and into whose hands. Neither is guessed — the method starts empty
+  // and the server refuses a payment without one.
+  const [paymentMethod, setPaymentMethod] = useState('')
+  const [receivedBy, setReceivedBy] = useState<string>(String(user?.id ?? ''))
+  const [staff, setStaff] = useState<StaffMember[]>([])
+
+  useEffect(() => {
+    if (!canSetPrice) return
+    api<StaffMember[]>('/staff')
+      .then((rows) => setStaff(rows.filter((member) => member.is_active)))
+      .catch(() => setStaff([]))
+  }, [canSetPrice])
 
   const [cancelReason, setCancelReason] = useState<CancelReason>('checked_out')
   const [cancelNote, setCancelNote] = useState('')
@@ -136,6 +154,12 @@ export default function BookingModal({
                   prepaid_amount: Number(prepaid || 0),
                   deposit_amount: Number(deposit || 0),
                   currency,
+                  ...(Number(prepaid) > 0
+                    ? {
+                        payment_method: paymentMethod,
+                        received_by: Number(receivedBy) || undefined,
+                      }
+                    : {}),
                 }
               : {}),
           },
@@ -360,6 +384,48 @@ export default function BookingModal({
                 />
               </div>
             </div>
+
+            {/* Only when there is money to account for. A prepayment lands in
+                the ledger as a real payment, so it needs the same two answers
+                every other payment needs — by what means, and into whose hands.
+                Asking on a booking with no prepayment would be two empty fields
+                on every screen for the sake of the occasional one. */}
+            {!booking && Number(prepaid) > 0 && (
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="pay-method">Способ предоплаты</label>
+                  <select
+                    id="pay-method"
+                    value={paymentMethod}
+                    onChange={(event) => setPaymentMethod(event.target.value)}
+                    required
+                  >
+                    <option value="" disabled>
+                      Выберите способ
+                    </option>
+                    <option value="cash">Наличные</option>
+                    <option value="card">Карта</option>
+                    <option value="kaspi">Kaspi</option>
+                    <option value="transfer">Перевод</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="pay-received-by">Кто принял</label>
+                  <select
+                    id="pay-received-by"
+                    value={receivedBy}
+                    onChange={(event) => setReceivedBy(event.target.value)}
+                  >
+                    {staff.length === 0 && user && <option value={user.id}>{user.name}</option>}
+                    {staff.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
             <div className="field-row">
               <div className="field">
                 <label htmlFor="deposit">Депозит / залог</label>

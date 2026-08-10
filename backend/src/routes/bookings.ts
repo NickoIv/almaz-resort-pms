@@ -6,6 +6,7 @@ import { readJson } from '../lib/body'
 import { resetChecklist } from '../lib/cleaning'
 import { writeAudit } from '../lib/audit'
 import { chargesSumSql, remainingOf } from '../lib/money'
+import { ADJUSTMENT_METHOD, assertPaymentMethod, resolveReceivedBy } from '../lib/payment'
 import { cleanName, cleanOptional } from '../lib/text'
 import { CANCEL_REASONS, isCancelReason } from '../lib/cancellation'
 import { findWaitlistMatches } from './waitlist'
@@ -166,6 +167,15 @@ bookings.post('/', canBook, async (c) => {
   const prepaid = money ? Number(body.prepaid_amount ?? 0) : 0
   const deposit = money ? Number(body.deposit_amount ?? 0) : 0
 
+  // Validated here, before the booking row exists, and not down beside the
+  // INSERT that uses them. D1 runs these as separate statements, so a rejection
+  // after the booking was written leaves the row behind holding the dates — the
+  // admin corrects the payment method, tries again, and collides with their own
+  // half-made booking.
+  const prepaymentMethod = prepaid > 0 ? assertPaymentMethod(body.payment_method) : null
+  const prepaymentReceivedBy =
+    prepaid > 0 ? await resolveReceivedBy(c.env.DB, body.received_by, staff.sub) : null
+
   const created = await c.env.DB.prepare(
     `INSERT INTO bookings
        (unit_id, guest_name, guest_phone, date_from, date_to, status,
@@ -193,9 +203,10 @@ bookings.post('/', canBook, async (c) => {
   // there too, or the money is invisible to every revenue report.
   if (prepaid > 0) {
     await c.env.DB.prepare(
-      `INSERT INTO payments (booking_id, amount, method, paid_at) VALUES (?, ?, ?, ${SQL_NOW})`
+      `INSERT INTO payments (booking_id, amount, method, received_by, recorded_by, paid_at)
+       VALUES (?, ?, ?, ?, ?, ${SQL_NOW})`
     )
-      .bind(created.id, prepaid, String(body.payment_method ?? 'cash'))
+      .bind(created.id, prepaid, prepaymentMethod, prepaymentReceivedBy, staff.sub)
       .run()
   }
 
@@ -428,7 +439,8 @@ bookings.patch('/group/:groupId/payment', requireRole('admin'), async (c) => {
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new HTTPException(400, { message: 'Сумма оплаты должна быть больше нуля' })
   }
-  const method = String(body.method ?? 'cash')
+  const method = assertPaymentMethod(body.method)
+  const receivedBy = await resolveReceivedBy(c.env.DB, body.received_by, staff.sub)
 
   const { results: groupBookings } = await c.env.DB.prepare(
     `${BOOKING_SELECT} WHERE b.group_id = ? ORDER BY b.id`
@@ -468,9 +480,9 @@ bookings.patch('/group/:groupId/payment', requireRole('admin'), async (c) => {
     )
     statements.push(
       c.env.DB.prepare(
-        `INSERT INTO payments (booking_id, amount, method, group_id, paid_at)
-         VALUES (?, ?, ?, ?, ${SQL_NOW})`
-      ).bind(row.id, part, method, groupId)
+        `INSERT INTO payments (booking_id, amount, method, group_id, received_by, recorded_by, paid_at)
+         VALUES (?, ?, ?, ?, ?, ?, ${SQL_NOW})`
+      ).bind(row.id, part, method, groupId, receivedBy, staff.sub)
     )
   })
 
@@ -610,7 +622,9 @@ bookings.patch('/:id/payment', requireRole('admin'), async (c) => {
 
   // A `payment` block records a new instalment and adds it to the prepaid total;
   // `prepaid_amount` sets the figure outright (a correction).
-  const payment = body.payment as { amount?: unknown; method?: unknown } | undefined
+  const payment = body.payment as
+    | { amount?: unknown; method?: unknown; received_by?: unknown }
+    | undefined
   const paymentAmount = payment ? Number(payment.amount ?? 0) : 0
 
   let prepaid =
@@ -629,22 +643,30 @@ bookings.patch('/:id/payment', requireRole('admin'), async (c) => {
 
   if (paymentAmount > 0) {
     statements.push(
-      c.env.DB.prepare(`INSERT INTO payments (booking_id, amount, method, paid_at) VALUES (?, ?, ?, ${SQL_NOW})`).bind(
+      c.env.DB.prepare(
+        `INSERT INTO payments (booking_id, amount, method, received_by, recorded_by, paid_at)
+         VALUES (?, ?, ?, ?, ?, ${SQL_NOW})`
+      ).bind(
         id,
         paymentAmount,
-        String(payment?.method ?? 'cash')
+        assertPaymentMethod(payment?.method),
+        await resolveReceivedBy(c.env.DB, payment?.received_by, staff.sub),
+        staff.sub
       )
     )
   } else if (prepaid !== existing.prepaid_amount) {
     // The admin corrected the figure outright rather than adding an instalment.
     // Book the difference so the ledger keeps matching `prepaid_amount` — the
     // delta may be negative, which is a refund or a correction.
+    //
+    // No method is asked for: nobody handed anything over, so it is booked as
+    // an adjustment and attributed to whoever made the correction. Calling it
+    // cash would put money in a till that never saw any.
     statements.push(
-      c.env.DB.prepare(`INSERT INTO payments (booking_id, amount, method, paid_at) VALUES (?, ?, ?, ${SQL_NOW})`).bind(
-        id,
-        prepaid - existing.prepaid_amount,
-        'adjustment'
-      )
+      c.env.DB.prepare(
+        `INSERT INTO payments (booking_id, amount, method, received_by, recorded_by, paid_at)
+         VALUES (?, ?, ?, NULL, ?, ${SQL_NOW})`
+      ).bind(id, prepaid - existing.prepaid_amount, ADJUSTMENT_METHOD, staff.sub)
     )
   }
 
@@ -741,8 +763,17 @@ bookings.get('/:id/payments', requireRole('admin'), async (c) => {
   const id = Number(c.req.param('id'))
   if (!Number.isInteger(id)) throw new HTTPException(400, { message: 'Invalid booking id' })
 
+  // The names, not the ids: this list is read to answer "who has this money",
+  // and an id sends the reader to another screen to find out.
   const { results } = await c.env.DB.prepare(
-    'SELECT id, booking_id, amount, method, paid_at, group_id FROM payments WHERE booking_id = ? ORDER BY paid_at DESC, id DESC'
+    `SELECT p.id, p.booking_id, p.amount, p.method, p.paid_at, p.group_id,
+            p.received_by, rec.name AS received_by_name,
+            p.recorded_by, ent.name AS recorded_by_name
+       FROM payments p
+       LEFT JOIN staff_users rec ON rec.id = p.received_by
+       LEFT JOIN staff_users ent ON ent.id = p.recorded_by
+      WHERE p.booking_id = ?
+      ORDER BY p.paid_at DESC, p.id DESC`
   )
     .bind(id)
     .all()
