@@ -9,24 +9,31 @@ import { isWhatsAppConfigured, sendWhatsAppMessage, WhatsAppNotConfigured } from
 import type { Bindings } from '../types'
 
 /**
- * External delivery is on.
+ * External delivery is off — because the channel turned out to be unavailable,
+ * not because it is unwanted.
  *
- * It was switched off for a day (2026-08-09) on the reasoning that staff are in
- * the app for the whole shift and already see their work on the Cleaning page,
- * the recreation units, the alert centre and the dashboard's digest panel. The
- * hotel reversed that on 2026-08-10 and wants the WhatsApp digest back.
+ * The hotel did ask for the WhatsApp digest back on 2026-08-10, and it was
+ * switched on. It then could not be supplied: Green API's free tier caps an
+ * instance at three chats and allows one instance per account, the account's
+ * one instance belongs to another project, and the hotel will not take a paid
+ * subscription. So the switch went back off the same day rather than leave
+ * production advertising a channel that answers "не настроен" forever.
  *
- * This is the single switch for the whole feature: the cron's send, the
- * "Отправить тест" button, the channel chips and the credential warnings all
- * follow it — the last two because the settings response carries it as
- * `external_delivery` and the page reads the server rather than hardcoding a
- * decision. Both branches are covered by tests, so switching it off again is
- * one edit and stays honest.
+ * What the hotel actually wanted — every member of staff notified personally —
+ * is now served by Web Push, which needs no third party's quota. See
+ * lib/webpush.ts and lib/push.ts.
+ *
+ * Nothing here was deleted. This remains the single switch for the whole
+ * feature: the cron's send, the "Отправить тест" button, the channel chips and
+ * the credential warnings all follow it, the last two because the settings
+ * response carries it as `external_delivery` and the page reads the server
+ * rather than hardcoding a decision. Both positions are covered by tests, so
+ * if a Green API instance ever exists, turning it on is one edit.
  *
  * Typed `boolean` on purpose: as a literal type the guards elsewhere narrow to
- * dead code and the off-path stops being type-checked.
+ * dead code and the unused path stops being type-checked.
  */
-export const EXTERNAL_DELIVERY_ENABLED: boolean = true
+export const EXTERNAL_DELIVERY_ENABLED: boolean = false
 
 export type DeliveryResult = {
   channel: 'whatsapp' | 'telegram'

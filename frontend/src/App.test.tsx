@@ -1249,8 +1249,9 @@ describe('§14 manual "send to cleaning"', () => {
   })
 })
 
-// Delivery is on in production. These pin the page to the server's flag in
-// both positions, so switching it off again stays a one-line server change.
+// These pin the page to the server's flag in both positions, so whichever way
+// the decision goes it stays a one-line server change. Staff notifications
+// themselves no longer depend on it — see §15.
 describe('§14 the settings page follows the server delivery flag', () => {
   const SETTINGS = (over: Record<string, unknown> = {}) => ({
     notifications: {
