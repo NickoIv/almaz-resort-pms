@@ -3588,11 +3588,34 @@ button {
 /* The one place the app scrolls sideways on purpose: 30 columns will not fit a
    phone, and squeezing them to fit would make every bar unreadable. Contained
    here, so the page itself never moves. */
+/* The board is its own scrolling pane, in both directions.
+
+   It used to scroll the page vertically, which meant the date header scrolled
+   away with it: by the time rooms 108–114 were on screen the columns had no
+   labels at all, and on the way up the header slid under the translucent
+   topbar and was legible through it — the dates showing over the app's own
+   chrome. A planning board without visible column headers is a grid of
+   rectangles, so both axes are frozen here: room names to the left, dates to
+   the top. */
 .timeline-scroll {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: calc(100vh - 260px);
+  /* Enough that the pane never collapses to a couple of rows on a short
+     window, even though that means the page scrolls as well. */
+  min-height: 320px;
   scrollbar-width: thin;
   margin: 0 -4px;
   padding: 0 4px 4px;
+}
+
+/* Sticks to the pane, not the viewport: `overflow` on the ancestor makes this
+   the scrollport it is positioned against. Opaque, because rows pass beneath
+   it and a translucent header is how the mess above started. */
+.tl-head {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--surface-opaque);
 }
 
 .timeline {
@@ -3688,9 +3711,16 @@ button {
 
 /* An empty night: the click target that opens the booking form for that room
    on that date. */
+/* A day cell is a control: it is the thing you press and drag across to make a
+   booking, and the thing you count along to find a date. Its edge was
+   `--border-soft`, which measures **1.25:1 night / 1.22:1 day** against the
+   panel — reported, accurately, as "разметку плохо видно". A boundary you have
+   to perceive wants 3:1, and `--border-strong` is the token that exists for
+   exactly this case ("controls whose edge carries meaning"): 3.21:1 and
+   3.63:1. The board is called a шахматка; it should look like one. */
 .tl-cell {
   height: calc(var(--tl-row-h) - 8px);
-  border: 1px solid var(--border-soft);
+  border: 1px solid var(--border-strong);
   border-radius: 7px;
   background: rgb(var(--lift-rgb) / 0.02);
   cursor: pointer;
@@ -3711,8 +3741,11 @@ button {
   outline-offset: 2px;
 }
 
+/* Weekends, at a tint that can actually be told from a weekday: 0.05 measured
+   1.05:1, which is the same colour. This is a background difference rather than
+   a control boundary, so it does not need 3:1 — it needs to be visible. */
 .tl-cell.is-weekend {
-  background: rgb(var(--booked-rgb) / 0.05);
+  background: rgb(var(--booked-rgb) / 0.16);
 }
 
 /* Today is marked in the header, where it is read once. A full outline on
