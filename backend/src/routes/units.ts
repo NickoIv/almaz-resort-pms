@@ -135,8 +135,8 @@ units.get('/', async (c) => {
  *
  * For answering a phone call: "do you have anything on Friday?". Counts what
  * is already booked, nothing predictive. A night is occupied when a booking
- * covers it, with checkout day free again — the same rule the room calendar
- * uses, so the two can never disagree.
+ * covers it, with checkout day free again — the same rule `occupiesDay` below
+ * applies to the month grid, so the two can never disagree.
  */
 units.get('/forecast', async (c) => {
   const staff = c.get('staff')
@@ -218,6 +218,27 @@ function isoDay(year: number, month: number, day: number): string {
 }
 
 /**
+ * Does this booking take up the given day?
+ *
+ * The end is **exclusive**, which is the same rule `assertNoOverlap` enforces
+ * and the same one the planning board draws: a stay of 15→18 occupies the
+ * nights of the 15th, 16th and 17th, and the room is free again on the morning
+ * of the 18th. The month grid used `date_to >= day` and so shaded the checkout
+ * day busy — every stay looked a day longer than it was, and a day that could
+ * be sold, and *was* sellable through the booking form, looked taken.
+ *
+ * Plain string comparison gives exactly the datetime semantics, because ISO
+ * strings sort correctly and a bare date is a prefix of a datetime. That is what
+ * keeps hourly units right: a gazebo booked 15th 13:00 → 15th 18:00 has
+ * `date_to` of `2027-03-15 18:00`, which is greater than `2027-03-15`, so its
+ * one day stays occupied. An exclusive rule applied to dates alone would have
+ * emptied the restaurant calendar completely.
+ */
+function occupiesDay(booking: { date_from: string; date_to: string }, day: string): boolean {
+  return booking.date_from.slice(0, 10) <= day && booking.date_to > day
+}
+
+/**
  * GET /api/units/:id/calendar?month=YYYY-MM
  * Returns one entry per day of the month with the status that colours it.
  */
@@ -250,7 +271,7 @@ units.get('/:id/calendar', async (c) => {
             ${chargesSumSql('b')} AS charges_total
      FROM bookings b
      WHERE unit_id = ? AND status <> 'free'
-       AND date(date_from) <= date(?) AND date(date_to) >= date(?)
+       AND date(date_from) <= date(?) AND date_to > ?
      ORDER BY date_from`
   )
     .bind(id, last, first)
@@ -260,9 +281,10 @@ units.get('/:id/calendar', async (c) => {
 
   const days = Array.from({ length: total }, (_, index) => {
     const date = isoDay(year, monthIndex, index + 1)
-    const booking = results.find(
-      (b) => b.date_from.slice(0, 10) <= date && b.date_to.slice(0, 10) >= date
-    )
+    // With the end exclusive, a turnover day matches only the arriving booking,
+    // so the name on the cell is the guest who is actually in the room that
+    // night rather than the one who left that morning.
+    const booking = results.find((b) => occupiesDay(b, date))
     return {
       date,
       status: (booking?.status ?? 'free') as BookingStatus,
