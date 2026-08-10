@@ -107,6 +107,7 @@ export default function RoomTimeline({
   onOpenRoom,
   onNewBooking,
   onEditBooking,
+  onPrintBooking,
   reloadKey = 0,
 }: {
   onOpenRoom: (unitId: number) => void
@@ -117,6 +118,12 @@ export default function RoomTimeline({
    */
   onNewBooking: (unitId: number, from: string, to: string, unitName: string) => void
   onEditBooking: (unitId: number, booking: TimelineBooking, unitName: string) => void
+  /**
+   * A bar is the one place in the app where any booking can be picked, not just
+   * the one a unit happens to be running today — which is what makes it the way
+   * in to printing an arbitrary booking's confirmation.
+   */
+  onPrintBooking: (booking: TimelineBooking, unitName: string) => void
   /** Bumped by the page after a save, to pull fresh bars. */
   reloadKey?: number
 }) {
@@ -531,6 +538,16 @@ export default function RoomTimeline({
               }}
             >
               Изменить бронь
+            </button>
+            <button
+              className="btn btn-sm"
+              onClick={() => {
+                const { room, booking } = popover
+                setPopover(null)
+                onPrintBooking(booking, room.unit_name)
+              }}
+            >
+              Печать брони
             </button>
             <button
               className="btn btn-sm"

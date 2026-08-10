@@ -10,6 +10,7 @@ import MonthCalendar from '../components/MonthCalendar'
 import PaymentModal from '../components/PaymentModal'
 import PhotoGallery from '../components/PhotoGallery'
 import ReceiptSheet from '../components/ReceiptSheet'
+import UnitSheet from '../components/UnitSheet'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
 import { almatyMonth, dateRange, money, timeRange } from '../format'
 import { CANCEL_REASON_LABELS, type CancelReason } from '../cancellation'
@@ -62,6 +63,7 @@ export default function UnitDetailPage() {
   const [showCharge, setShowCharge] = useState(false)
   const [showGuest, setShowGuest] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
+  const [showUnitSheet, setShowUnitSheet] = useState(false)
   const [sendingToCleaning, setSendingToCleaning] = useState(false)
 
   const load = useCallback(async () => {
@@ -192,6 +194,12 @@ export default function UnitDetailPage() {
           </div>
         </div>
         <div className="page-head-actions">
+          {/* Always available, unlike the receipt: "what is booked in here" is
+              a question worth printing precisely when the object is empty
+              today. */}
+          <button className="btn btn-sm" onClick={() => setShowUnitSheet(true)}>
+            Печать по объекту
+          </button>
           {isAdmin && active && (
             <>
               <button className="btn btn-sm" onClick={() => setShowReceipt(true)}>
@@ -502,6 +510,7 @@ export default function UnitDetailPage() {
           onClose={() => setShowReceipt(false)}
         />
       )}
+      {showUnitSheet && <UnitSheet unit={unit} onClose={() => setShowUnitSheet(false)} />}
     </>
   )
 }

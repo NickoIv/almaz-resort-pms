@@ -1702,3 +1702,217 @@ describe('§19 a saved booking is read back before the form closes', () => {
     expect(calls.some((call) => call.path === '/api/bookings/91/verify')).toBe(false)
   })
 })
+
+describe('§20 printing from a unit, a booking or a person', () => {
+  const ROOM = makeUnit({
+    id: 5,
+    name: '105',
+    category: 'комфорт',
+    status: 'occupied',
+    current_booking: {
+      id: 42,
+      guest_name: 'Асель Жумабаева',
+      guest_phone: '+77073148820',
+      date_from: '2026-08-07',
+      date_to: '2026-08-10',
+      status: 'occupied',
+      is_paid: false,
+      total_amount: 240000,
+      prepaid_amount: 120000,
+      deposit_amount: 0,
+      charges_amount: 0,
+      remaining_amount: 120000,
+      currency: 'KZT',
+    },
+  })
+
+  const UNIT_BOOKINGS = [
+    {
+      id: 42,
+      guest_name: 'Асель Жумабаева',
+      guest_phone: '+77073148820',
+      date_from: '2026-08-07',
+      date_to: '2026-08-10',
+      status: 'occupied',
+      is_paid: false,
+      verified_at: '2026-08-07 11:00',
+      total_amount: 240000,
+      prepaid_amount: 120000,
+      charges_amount: 0,
+      remaining_amount: 120000,
+      currency: 'KZT',
+    },
+    {
+      id: 43,
+      guest_name: 'Ерлан Сатыбалдиев',
+      guest_phone: '+77015550000',
+      date_from: '2026-08-20',
+      date_to: '2026-08-22',
+      status: 'booked',
+      is_paid: true,
+      verified_at: null,
+      total_amount: 80000,
+      prepaid_amount: 80000,
+      charges_amount: 0,
+      remaining_amount: 0,
+      currency: 'KZT',
+    },
+  ]
+
+  const HISTORY = {
+    phone: '+77073148820',
+    guest_name: 'Асель Жумабаева',
+    total_stays: 2,
+    past_stays: 1,
+    outstanding_debt: 120000,
+    lifetime_spend: 300000,
+    notes: 'Просит номер подальше от лифта',
+    notes_updated_at: '2026-08-01 10:00',
+    stays: [
+      {
+        booking_id: 42,
+        unit_name: '105',
+        unit_type: 'room' as const,
+        date_from: '2026-08-07',
+        date_to: '2026-08-10',
+        status: 'occupied' as const,
+        total_amount: 240000,
+        charges_amount: 0,
+        prepaid_amount: 120000,
+        deposit_amount: 0,
+        remaining_amount: 120000,
+        currency: 'KZT',
+      },
+    ],
+  }
+
+  const SETTINGS = {
+    notifications: {},
+    telegram_configured: false,
+    text: { hotel_name: 'Taura', hotel_details: 'Алматы, ул. Пример 1' },
+  }
+
+  function unitRoutes() {
+    return {
+      ...baseRoutes('admin', [ROOM]),
+      'GET /api/settings': SETTINGS,
+      'GET /api/units/5': ROOM,
+      'GET /api/units/5/calendar': CALENDAR,
+      'GET /api/bookings': UNIT_BOOKINGS,
+      'GET /api/bookings/42/payments': [],
+      'GET /api/bookings/42/charges': [],
+      'GET /api/guests/': HISTORY,
+    }
+  }
+
+  it('prints an object with what is booked in it, phones and balances', async () => {
+    signIn('admin')
+    mockApi(unitRoutes())
+    renderApp(<App />, { route: '/rooms/5' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Печать по объекту' }))
+    const sheet = (await screen.findByText(/брони на 30 дней/)).closest('.print-sheet')!
+    const q = within(sheet as HTMLElement)
+
+    // Hotel identity from settings, as on every other sheet.
+    expect(q.getByText('Taura')).toBeInTheDocument()
+    expect(q.getByText('Алматы, ул. Пример 1')).toBeInTheDocument()
+
+    // Both bookings, with the phone numbers this sheet exists to carry.
+    expect(q.getByText('Асель Жумабаева')).toBeInTheDocument()
+    expect(q.getByText('Ерлан Сатыбалдиев')).toBeInTheDocument()
+    expect(q.getByText('+77015550000')).toBeInTheDocument()
+
+    // Five nights across the two stays, counted rather than left to the reader.
+    expect(q.getByText(/занято 5 ночей/)).toBeInTheDocument()
+
+    // The unchecked one is called out — this is the sheet read before arrival,
+    // the last moment a wrong date can still be caught.
+    expect(q.getByText('не проверена')).toBeInTheDocument()
+  })
+
+  it('prints a person with their stays, debt and the staff notes', async () => {
+    signIn('admin')
+    mockApi(unitRoutes())
+    renderApp(<App />, { route: '/rooms/5' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'История гостя →' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Печать карты гостя' }))
+
+    const sheet = (await screen.findByText(/Карта гостя/)).closest('.print-sheet')!
+    const q = within(sheet as HTMLElement)
+
+    expect(q.getByText('+77073148820')).toBeInTheDocument()
+    expect(q.getByText('Просит номер подальше от лифта')).toBeInTheDocument()
+    expect(q.getByText(/бронь №42/)).toBeInTheDocument()
+    expect(q.getByText('Долг по всем броням')).toBeInTheDocument()
+
+    // Notes are written for colleagues, so the page says whose document it is
+    // rather than leaving that to whoever picks it up off the printer.
+    expect(q.getByText(/служебный документ/)).toBeInTheDocument()
+  })
+
+  it('prints any booking picked off the board, not just today’s', async () => {
+    const TIMELINE = {
+      from: '2026-08-09',
+      days: 7,
+      max_days: 30,
+      dates: ['2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13',
+              '2026-08-14', '2026-08-15'],
+      rooms: [
+        {
+          unit_id: 5,
+          unit_name: '105',
+          category: 'комфорт',
+          capacity: 2,
+          bookings: [
+            {
+              id: 42,
+              guest_name: 'Асель Жумабаева',
+              guest_phone: '+77073148820',
+              status: 'occupied' as const,
+              date_from: '2026-08-10',
+              date_to: '2026-08-13',
+              total_amount: 240000,
+              prepaid_amount: 120000,
+              deposit_amount: 0,
+              charges_amount: 0,
+              remaining_amount: 120000,
+              currency: 'KZT',
+            },
+          ],
+        },
+      ],
+    }
+
+    signIn('admin')
+    mockApi({
+      ...baseRoutes('admin', [ROOM]),
+      'GET /api/settings': SETTINGS,
+      'GET /api/rooms/timeline': TIMELINE,
+      'GET /api/bookings/42/charges': [
+        { id: 1, booking_id: 42, reason: 'Поздний выезд', amount: 18000,
+          created_at: '2026-08-12', created_by_name: 'Нурлан' },
+      ],
+      'GET /api/bookings/42/payments': [
+        { id: 1, booking_id: 42, amount: 120000, method: 'kaspi', paid_at: '2026-08-10 12:00',
+          group_id: null, received_by: 3, received_by_name: 'Ержан Тулеуов',
+          recorded_by: 1, recorded_by_name: 'Нурлан Абдразаков' },
+      ],
+    })
+    renderApp(<App />, { route: '/rooms' })
+
+    await waitFor(() => expect(document.querySelector('.tl-bar')).toBeTruthy())
+    await userEvent.click(document.querySelector('.tl-bar') as HTMLElement)
+    await userEvent.click(await screen.findByRole('button', { name: 'Печать брони' }))
+
+    const sheet = (await screen.findByText(/Счёт-акт по брони №42/)).closest('.print-sheet')!
+    const q = within(sheet as HTMLElement)
+
+    // The charge and the payment were fetched for this booking alone.
+    expect(q.getByText(/Поздний выезд/)).toBeInTheDocument()
+    // In Russian, not the raw column value — a guest reads this line.
+    expect(q.getByText(/Kaspi/)).toBeInTheDocument()
+    expect(q.getByText(/принял\(а\) Ержан Тулеуов/)).toBeInTheDocument()
+  })
+})

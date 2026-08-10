@@ -3,7 +3,14 @@ import { api } from '../api'
 import { Spinner } from './ui'
 import { dateRange, money, timeRange } from '../format'
 import { CANCEL_REASON_LABELS, type CancelReason } from '../cancellation'
-import { UNIT_TYPE_LABELS, type Booking, type Charge, type Payment, type Unit } from '../types'
+import {
+  PAYMENT_METHOD_LABELS,
+  UNIT_TYPE_LABELS,
+  type Booking,
+  type Charge,
+  type Payment,
+  type UnitType,
+} from '../types'
 
 type TextSettings = { hotel_name: string; hotel_details: string }
 
@@ -25,7 +32,13 @@ export default function ReceiptSheet({
   payments,
   onClose,
 }: {
-  unit: Unit
+  /**
+   * Only what appears on the paper. Narrower than `Unit` on purpose: the sheet
+   * is now reachable from a bar on the planning board, where all that is known
+   * about the object is its name and kind — demanding a whole Unit would have
+   * meant a fetch for two strings already on screen.
+   */
+  unit: { name: string; type: UnitType }
   booking: Booking
   charges: Charge[]
   payments: Payment[]
@@ -165,7 +178,14 @@ export default function ReceiptSheet({
                   {payments.map((payment) => (
                     <tr key={payment.id}>
                       <td>
-                        {payment.paid_at.slice(0, 16).replace('T', ' ')} · {payment.method}
+                        {payment.paid_at.slice(0, 16).replace('T', ' ')} ·{' '}
+                        {/* In Russian, and not the raw code: this line is read
+                            by a guest, and «kaspi» / «adjustment» are column
+                            values, not words. */}
+                        {PAYMENT_METHOD_LABELS[payment.method] ?? payment.method}
+                        {payment.received_by_name && (
+                          <span className="receipt-sub">принял(а) {payment.received_by_name}</span>
+                        )}
                       </td>
                       <td className="num">{money(payment.amount, currency)}</td>
                     </tr>

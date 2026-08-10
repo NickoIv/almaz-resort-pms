@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
+import GuestSheet from './GuestSheet'
 import { Alert, Modal, Spinner } from './ui'
 import { dateRange, money } from '../format'
 import { STATUS_LABELS, type GuestHistory } from '../types'
@@ -21,6 +22,7 @@ export default function GuestHistoryModal({
   const [notes, setNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
   const [savedAt, setSavedAt] = useState(false)
+  const [showSheet, setShowSheet] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -43,6 +45,10 @@ export default function GuestHistoryModal({
         method: 'PUT',
         body: { notes },
       })
+      // Kept in step with the textarea so the printed sheet shows what is
+      // actually recorded — and, equally, so unsaved typing never prints as if
+      // it were.
+      setData((prev) => (prev ? { ...prev, notes } : prev))
       setSavedAt(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось сохранить')
@@ -62,6 +68,13 @@ export default function GuestHistoryModal({
           <div className="guest-head">
             <div className="guest-name">{data.guest_name ?? 'Неизвестный гость'}</div>
             <div className="guest-phone">{data.phone}</div>
+            <button
+              type="button"
+              className="btn btn-sm card-action"
+              onClick={() => setShowSheet(true)}
+            >
+              Печать карты гостя
+            </button>
           </div>
 
           <div className="mini-stats">
@@ -138,6 +151,10 @@ export default function GuestHistoryModal({
               ))}
             </div>
           )}
+          {/* Over the modal rather than instead of it: the sheet is a preview
+              of a printout, and closing it puts the reader back where they
+              were rather than at the top of the page. */}
+          {showSheet && <GuestSheet data={data} onClose={() => setShowSheet(false)} />}
         </>
       ) : null}
     </Modal>

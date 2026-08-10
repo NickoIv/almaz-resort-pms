@@ -4,11 +4,12 @@ import { api } from '../api'
 import { useAuth } from '../auth'
 import BookingModal from '../components/BookingModal'
 import GroupBookingModal from '../components/GroupBookingModal'
+import ReceiptSheet from '../components/ReceiptSheet'
 import RoomTimeline from '../components/RoomTimeline'
 import UnitCard from '../components/UnitCard'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
 import { matchesQuery } from '../search'
-import type { Booking, TimelineBooking, Unit, UnitStatus } from '../types'
+import type { Booking, Charge, Payment, TimelineBooking, Unit, UnitStatus } from '../types'
 
 type StatusFilter = UnitStatus | 'all' | 'cleaning'
 
@@ -69,6 +70,16 @@ export default function RoomsPage() {
   } | null>(null)
   // Bumped after a save so the board pulls fresh bars without a full remount.
   const [boardVersion, setBoardVersion] = useState(0)
+  // The booking being printed, with the two lists the receipt needs. Fetched on
+  // demand rather than carried by the board: charges and payments are wanted
+  // for one booking at a time, and pulling them for every bar would cost two
+  // requests per stay to answer a question nobody asked.
+  const [printing, setPrinting] = useState<{
+    unitName: string
+    booking: Booking
+    charges: Charge[]
+    payments: Payment[]
+  } | null>(null)
 
   const chooseView = useCallback((next: View) => {
     setView(next)
@@ -88,6 +99,17 @@ export default function RoomsPage() {
   }, [])
 
   useEffect(load, [load])
+
+  /** Pull what the receipt needs for one booking, then show the sheet. */
+  const openReceipt = useCallback(async (booking: Booking, unitName: string) => {
+    // Both endpoints are admin-only. An empty list is the honest fallback for
+    // anyone else — the sheet then prints the rate alone rather than refusing.
+    const [charges, payments] = await Promise.all([
+      api<Charge[]>(`/bookings/${booking.id}/charges`).catch(() => []),
+      api<Payment[]>(`/bookings/${booking.id}/payments`).catch(() => []),
+    ])
+    setPrinting({ unitName, booking, charges, payments })
+  }, [])
 
   const counts = useMemo(
     () => ({
@@ -160,6 +182,9 @@ export default function RoomsPage() {
           }
           onEditBooking={(unitId, booking: TimelineBooking, unitName) =>
             setEditing({ unitId, unitName, booking })
+          }
+          onPrintBooking={(booking: TimelineBooking, unitName) =>
+            void openReceipt(booking, unitName)
           }
         />
       ) : (
@@ -278,6 +303,17 @@ export default function RoomsPage() {
             setBoardVersion((v) => v + 1)
             load()
           }}
+        />
+      )}
+
+      {/* Printed from a bar, so the object is always a room. */}
+      {printing && (
+        <ReceiptSheet
+          unit={{ name: printing.unitName, type: 'room' }}
+          booking={printing.booking}
+          charges={printing.charges}
+          payments={printing.payments}
+          onClose={() => setPrinting(null)}
         />
       )}
     </>

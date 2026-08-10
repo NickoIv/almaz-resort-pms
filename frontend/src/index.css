@@ -2250,7 +2250,13 @@ button {
 
 /* ── Guest history ─────────────────────────────────────────────────────────── */
 
+/* The name and phone read as one block, with the print action pushed to the
+   far edge — it acts on the whole guest, not on the line it sits beside. */
 .guest-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-bottom: 16px;
 }
 
@@ -2743,6 +2749,30 @@ button {
   border-top: 1px solid #ccc;
 }
 
+/* Staff notes on the guest sheet. Boxed because they are the one part of that
+   page written by a colleague rather than by the ledger, and the reader needs
+   to see that at a glance. */
+.sheet-notes {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  border-left: 3px solid #111;
+  background: #f4f4f4;
+}
+
+.sheet-notes p {
+  margin: 4px 0 0;
+  color: #222;
+  white-space: pre-wrap;
+}
+
+.sheet-foot {
+  margin-top: 22px;
+  padding-top: 10px;
+  border-top: 1px solid #ccc;
+  font-size: 11px;
+  color: #777;
+}
+
 @media print {
   /* Show only the sheet. Hiding by visibility rather than display keeps the
      layout intact, which display:none on ancestors would collapse. */
@@ -2753,6 +2783,16 @@ button {
   .print-sheet,
   .print-sheet * {
     visibility: visible;
+  }
+
+  /* Ink is not the same as paper. The rule above keeps the page behind the
+     sheet from printing, but it still occupies its full height, so a receipt
+     opened from a room came out after two blank sides of A4 and the cleaning
+     sheet after one. Everything that is not on the path to the sheet is
+     collapsed outright: ancestors are kept (they contain it), the sheet and its
+     contents are kept, and nothing else takes up room. */
+  body *:not(:has(.print-sheet)):not(.print-sheet):not(.print-sheet *) {
+    display: none !important;
   }
 
   .no-print {
@@ -2782,6 +2822,29 @@ button {
     background: none;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+  }
+
+  /* The guest sheet is opened from inside the history modal, so it inherits the
+     backdrop's fixed centred grid and the dialog's 448px / 90vh box. Left
+     alone, a sheet taller than the screen was centred on the viewport — it
+     began 171px *above* the top of the first page, and the rest was clipped by
+     the modal's own scroll. Both are neutralised so the sheet gets the paper. */
+  .modal-backdrop {
+    position: static;
+    display: block;
+    padding: 0;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    animation: none;
+  }
+
+  .modal {
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    animation: none;
   }
 
   .print-sheet {
