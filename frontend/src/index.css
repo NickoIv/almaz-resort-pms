@@ -2360,6 +2360,30 @@ button {
   color: var(--text-faint);
 }
 
+/* ── Booking read back for checking ────────────────────────────────────────── */
+
+/* Framed rather than left bare, because the point of the card is that these
+   lines are the thing being examined — running them straight into the modal
+   body makes them read as a footnote to the form that produced them. */
+.verify-facts {
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  background: rgb(var(--lift-rgb) / 0.03);
+}
+
+.verify-facts .info-row span:last-child {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The balance is what the guest will be asked for at the desk, so it is read
+   as a total rather than as one more line. */
+.verify-remaining {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  font-weight: 600;
+}
+
 /* ── Photo documentation ───────────────────────────────────────────────────── */
 
 .photo-grid {

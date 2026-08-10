@@ -31,12 +31,22 @@ type BookingRow = {
   cancel_reason: string | null
   cancel_note: string | null
   cancelled_at: string | null
+  verified_at: string | null
+  verified_by: number | null
+  verified_by_name?: string | null
 }
 
 const BOOKING_STATUSES: BookingStatus[] = ['free', 'booked', 'occupied']
 
-/** Always read bookings through this so the extra-charge total comes with them. */
-const BOOKING_SELECT = `SELECT b.*, ${chargesSumSql('b')} AS charges_total FROM bookings b`
+/**
+ * Always read bookings through this so the extra-charge total comes with them,
+ * and so does the name of whoever checked the booking — an id would send the
+ * reader to another screen to find out who that was.
+ */
+const BOOKING_SELECT = `SELECT b.*, ${chargesSumSql('b')} AS charges_total,
+    ver.name AS verified_by_name
+  FROM bookings b
+  LEFT JOIN staff_users ver ON ver.id = b.verified_by`
 
 function serializeBooking(row: BookingRow, withMoney: boolean) {
   return {
@@ -52,6 +62,10 @@ function serializeBooking(row: BookingRow, withMoney: boolean) {
     cancel_reason: row.cancel_reason,
     cancel_note: row.cancel_note,
     cancelled_at: row.cancelled_at,
+    // Shared with every role: a waiter reading a booking should be able to see
+    // that nobody has checked it, which is the whole point of recording it.
+    verified_at: row.verified_at,
+    verified_by_name: row.verified_by_name ?? null,
     is_paid: remainingOf(row.total_amount, row.charges_total ?? 0, row.prepaid_amount) <= 0,
     ...(withMoney
       ? {
@@ -678,6 +692,50 @@ bookings.patch('/:id/payment', requireRole('admin'), async (c) => {
 
   await writeAudit(c.env.DB, staff.sub, 'booking.payment', 'bookings', id)
   return c.json(serializeBooking(updated!, true))
+})
+
+/**
+ * POST /api/bookings/:id/verify — someone read the finished booking back and
+ * says it matches what the guest asked for.
+ *
+ * Only the **first** check is kept. Pressing again on a booking that is already
+ * verified changes nothing and returns the existing stamp: the fact worth
+ * holding is that a booking was checked once and by whom, and letting a later
+ * press overwrite it would quietly rename whoever actually did the checking.
+ * A correction after that is an edit, and edits already have their own audit
+ * trail.
+ */
+bookings.post('/:id/verify', canBook, async (c) => {
+  const staff = c.get('staff')
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) throw new HTTPException(400, { message: 'Invalid booking id' })
+
+  const existing = await c.env.DB.prepare(`${BOOKING_SELECT} WHERE b.id = ?`)
+    .bind(id)
+    .first<BookingRow>()
+  if (!existing) throw new HTTPException(404, { message: 'Booking not found' })
+
+  const unit = await loadUnit(c.env.DB, existing.unit_id)
+  assertUnitTypeAllowed(staff.role, unit.type)
+
+  const money = canSeeMoney(staff.role)
+  if (existing.verified_at) return c.json(serializeBooking(existing, money))
+
+  await c.env.DB.prepare(
+    `UPDATE bookings SET verified_at = ${SQL_NOW}, verified_by = ? WHERE id = ?`
+  )
+    .bind(staff.sub, id)
+    .run()
+
+  // Re-read rather than RETURNING *: the charge total and the verifier's name
+  // are joined on, and a bare row would report the balance as if there were no
+  // extra charges.
+  const updated = await c.env.DB.prepare(`${BOOKING_SELECT} WHERE b.id = ?`)
+    .bind(id)
+    .first<BookingRow>()
+
+  await writeAudit(c.env.DB, staff.sub, 'booking.verify', 'bookings', id)
+  return c.json(serializeBooking(updated!, money))
 })
 
 /**

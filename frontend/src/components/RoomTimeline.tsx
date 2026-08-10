@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { Alert, Spinner } from './ui'
-import { addDaysIso, money, shortDate, todayIso } from '../format'
+import { addDaysIso, daysBetween, money, pluralRu, shortDate, todayIso } from '../format'
 import { STATUS_LABELS } from '../types'
 import type { RoomTimeline as Timeline, TimelineBooking, TimelineRoom } from '../types'
 
@@ -36,13 +36,6 @@ export function rangeLabel(from: string, days: number): string {
   return fm - 1 === lm
     ? `${fd} — ${ld} ${MONTHS_SHORT[lm]}`
     : `${fd} ${MONTHS_SHORT[fm - 1]} — ${ld} ${MONTHS_SHORT[lm]}`
-}
-
-/** Whole days between two YYYY-MM-DD strings. */
-function daysBetween(from: string, to: string): number {
-  const [fy, fm, fd] = from.split('-').map(Number)
-  const [ty, tm, td] = to.split('-').map(Number)
-  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000)
 }
 
 type Placed = {
@@ -117,9 +110,13 @@ export default function RoomTimeline({
   reloadKey = 0,
 }: {
   onOpenRoom: (unitId: number) => void
-  /** Half-open, like the rest of the app: `to` is the checkout morning. */
-  onNewBooking: (unitId: number, from: string, to: string) => void
-  onEditBooking: (unitId: number, booking: TimelineBooking) => void
+  /**
+   * Half-open, like the rest of the app: `to` is the checkout morning. The room
+   * name travels with the id because the board already has it — the page would
+   * otherwise have to find it in a separate fetch that may not have landed.
+   */
+  onNewBooking: (unitId: number, from: string, to: string, unitName: string) => void
+  onEditBooking: (unitId: number, booking: TimelineBooking, unitName: string) => void
   /** Bumped by the page after a save, to pull fresh bars. */
   reloadKey?: number
 }) {
@@ -222,7 +219,12 @@ export default function RoomTimeline({
       }
       setClash(null)
       // The end date is the morning after the last night selected.
-      onNewBooking(drag.unitId, data.dates[dragRange.lo], addDaysIso(data.dates[dragRange.hi], 1))
+      onNewBooking(
+        drag.unitId,
+        data.dates[dragRange.lo],
+        addDaysIso(data.dates[dragRange.hi], 1),
+        data.rooms.find((room) => room.unit_id === drag.unitId)?.unit_name ?? ''
+      )
     }
 
     // A cancelled pointer is not a choice. On a phone the browser fires
@@ -465,7 +467,7 @@ export default function RoomTimeline({
             ? 'Промежуток пересекается с существующей бронью'
             : `${shortDate(data.dates[dragRange.lo])} — ${shortDate(
                 addDaysIso(data.dates[dragRange.hi], 1)
-              )} · ${nights} ${nights === 1 ? 'ночь' : nights < 5 ? 'ночи' : 'ночей'}`}
+              )} · ${nights} ${pluralRu(nights, ['ночь', 'ночи', 'ночей'])}`}
         </div>
       )}
 
@@ -525,7 +527,7 @@ export default function RoomTimeline({
               onClick={() => {
                 const { room, booking } = popover
                 setPopover(null)
-                onEditBooking(room.unit_id, booking)
+                onEditBooking(room.unit_id, booking, room.unit_name)
               }}
             >
               Изменить бронь

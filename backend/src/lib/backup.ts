@@ -36,9 +36,14 @@ export const BACKUP_TABLES = [
   },
   {
     name: 'bookings',
+    // Everything the row holds, not just the fields a booking is created with.
+    // Why a booking ended, and whether anyone checked it, are exactly the facts
+    // a restore is called on to settle — and a column missing from this array is
+    // a column silently dropped the next time one runs.
     columns: [
       'id', 'unit_id', 'guest_name', 'guest_phone', 'date_from', 'date_to', 'status',
       'total_amount', 'prepaid_amount', 'deposit_amount', 'currency', 'created_at', 'group_id',
+      'cancel_reason', 'cancel_note', 'cancelled_at', 'verified_at', 'verified_by',
     ],
   },
   {

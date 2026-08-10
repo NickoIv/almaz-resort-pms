@@ -52,14 +52,21 @@ export default function RoomsPage() {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [showGroup, setShowGroup] = useState(false)
   const [view, setView] = useState<View>(storedView)
-  // Set when nights are dragged on the board: which room, and the range.
+  // Set when nights are dragged on the board: which room, and the range. The
+  // name comes with it so the verification card can name the room even before
+  // the card-grid fetch has landed.
   const [newBooking, setNewBooking] = useState<{
     unitId: number
+    unitName: string
     from: string
     to: string
   } | null>(null)
   // Set when a bar on the board is opened for editing.
-  const [editing, setEditing] = useState<{ unitId: number; booking: Booking } | null>(null)
+  const [editing, setEditing] = useState<{
+    unitId: number
+    unitName: string
+    booking: Booking
+  } | null>(null)
   // Bumped after a save so the board pulls fresh bars without a full remount.
   const [boardVersion, setBoardVersion] = useState(0)
 
@@ -148,9 +155,11 @@ export default function RoomsPage() {
         <RoomTimeline
           reloadKey={boardVersion}
           onOpenRoom={(unitId) => navigate(`/rooms/${unitId}`)}
-          onNewBooking={(unitId, from, to) => setNewBooking({ unitId, from, to })}
-          onEditBooking={(unitId, booking: TimelineBooking) =>
-            setEditing({ unitId, booking })
+          onNewBooking={(unitId, from, to, unitName) =>
+            setNewBooking({ unitId, unitName, from, to })
+          }
+          onEditBooking={(unitId, booking: TimelineBooking, unitName) =>
+            setEditing({ unitId, unitName, booking })
           }
         />
       ) : (
@@ -239,13 +248,17 @@ export default function RoomsPage() {
         <BookingModal
           unitId={newBooking.unitId}
           unitType="room"
+          unitName={newBooking.unitName}
           booking={null}
           canSetPrice={isAdmin}
           initialFrom={newBooking.from}
           initialTo={newBooking.to}
           onClose={() => setNewBooking(null)}
+          // Refresh only. Closing is onClose's job, and folding it in here shut
+          // the form the moment it saved — which took the verification card and
+          // the freed-dates waitlist prompt down with it, before either could be
+          // read.
           onSaved={() => {
-            setNewBooking(null)
             setBoardVersion((v) => v + 1)
             load()
           }}
@@ -257,11 +270,11 @@ export default function RoomsPage() {
         <BookingModal
           unitId={editing.unitId}
           unitType="room"
+          unitName={editing.unitName}
           booking={editing.booking}
           canSetPrice={isAdmin}
           onClose={() => setEditing(null)}
           onSaved={() => {
-            setEditing(null)
             setBoardVersion((v) => v + 1)
             load()
           }}

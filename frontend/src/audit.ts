@@ -26,6 +26,7 @@ const ACTION_LABELS: Record<string, string> = {
   'booking.create': 'Создана бронь',
   'booking.quick': 'Быстрая бронь',
   'booking.payment': 'Внесена оплата',
+  'booking.verify': 'Бронь проверена',
   'booking.group.create': 'Создана групповая бронь',
   'booking.group.payment': 'Оплата по группе',
   'charge.create': 'Начисление добавлено',

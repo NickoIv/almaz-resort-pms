@@ -136,6 +136,29 @@ export function addDaysIso(iso: string, days: number): string {
     .toISOString()
     .slice(0, 10)
 }
+/** Whole days between two YYYY-MM-DD strings. For a stay, that is its nights. */
+export function daysBetween(from: string, to: string): number {
+  const [fy, fm, fd] = from.slice(0, 10).split('-').map(Number)
+  const [ty, tm, td] = to.slice(0, 10).split('-').map(Number)
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000)
+}
+
+/**
+ * Russian plural agreement: pluralRu(2, ['ночь', 'ночи', 'ночей']) -> 'ночи'.
+ *
+ * The naive `n === 1 ? … : n < 5 ? … : …` gets 21 and 11 wrong in opposite
+ * directions — 21 takes the singular and 11 does not — and a booking is exactly
+ * where a stray «21 ночей» is read as the app not knowing what it is doing.
+ */
+export function pluralRu(count: number, forms: [string, string, string]): string {
+  const n = Math.abs(count) % 100
+  if (n >= 11 && n <= 14) return forms[2]
+  const last = n % 10
+  if (last === 1) return forms[0]
+  if (last >= 2 && last <= 4) return forms[1]
+  return forms[2]
+}
+
 /** 95 -> "1 ч 35 мин"; under an hour stays in minutes. */
 export function elapsedLabel(minutes: number): string {
   const safe = Math.max(0, Math.round(minutes))

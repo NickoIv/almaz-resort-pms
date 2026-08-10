@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
+import BookingVerifyCard from './BookingVerifyCard'
 import { Alert, Modal } from './ui'
 import { addDaysIso, todayIso } from '../format'
 import { CANCEL_REASONS, CANCEL_REASON_LABELS, needsNote, type CancelReason } from '../cancellation'
@@ -21,6 +22,12 @@ type Props = {
   unitId: number
   /** Needed so a clash can be turned into a waitlist entry of the right type. */
   unitType: UnitType
+  /**
+   * Shown on the verification card. Optional because the id is enough to book;
+   * the name is only needed when the booking is read back to a person, and
+   * "Номер 107" is what they can check against — an id is not.
+   */
+  unitName?: string
   booking: Booking | null
   canSetPrice: boolean
   /** Recreation units are sold by the hour, so the form switches to date+time. */
@@ -49,6 +56,7 @@ function toApi(value: string, hourly: boolean): string {
 export default function BookingModal({
   unitId,
   unitType,
+  unitName,
   booking,
   canSetPrice,
   hourly = false,
@@ -95,15 +103,32 @@ export default function BookingModal({
 
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  /**
+   * The booking this form has just written, held so it can be read back for
+   * checking. Once it is set the form is editing that booking rather than
+   * making a new one — «Исправить» must correct what was saved, not save a
+   * second copy of it.
+   */
+  const [created, setCreated] = useState<Booking | null>(null)
+  /** True while the card has been sent back to the form to be corrected. */
+  const [fixing, setFixing] = useState(false)
   // Set when the API refuses the dates as taken; turns the form into a
   // waitlist offer rather than a dead end.
   const [clash, setClash] = useState(false)
   const [waitlisted, setWaitlisted] = useState(false)
   const [matches, setMatches] = useState<WaitlistEntry[]>([])
 
+  /**
+   * The booking this form is working on: the one it was opened with, or the one
+   * it has just created and is now correcting. Everything below asks this rather
+   * than the prop, so a correction made from the verification card lands on the
+   * saved booking instead of writing a second one beside it.
+   */
+  const target = booking ?? created
+
   // Going to 'free' from an active booking is either a checkout or a
   // cancellation; the API requires a reason to tell them apart.
-  const ending = !!booking && booking.status !== 'free' && status === 'free'
+  const ending = !!target && target.status !== 'free' && status === 'free'
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -119,9 +144,10 @@ export default function BookingModal({
         ...(ending ? { cancel_reason: cancelReason, cancel_note: cancelNote || null } : {}),
       }
 
-      if (booking) {
-        const result = await api<{ waitlist_matches?: WaitlistEntry[] }>(
-          `/bookings/${booking.id}`,
+      let saved: Booking
+      if (target) {
+        const result = await api<Booking & { waitlist_matches?: WaitlistEntry[] }>(
+          `/bookings/${target.id}`,
           { method: 'PATCH', body: payload }
         )
         // Freeing dates is exactly when someone turned away should be called.
@@ -130,9 +156,10 @@ export default function BookingModal({
           onSaved()
           return
         }
+        saved = result
         // Dates/status and money live on separate endpoints, so save money after.
         if (canSetPrice) {
-          await api(`/bookings/${booking.id}/payment`, {
+          saved = await api<Booking>(`/bookings/${target.id}/payment`, {
             method: 'PATCH',
             body: {
               total_amount: Number(total || 0),
@@ -143,7 +170,7 @@ export default function BookingModal({
           })
         }
       } else {
-        await api('/bookings', {
+        saved = await api<Booking>('/bookings', {
           method: 'POST',
           body: {
             ...payload,
@@ -166,6 +193,16 @@ export default function BookingModal({
         })
       }
       onSaved()
+
+      // A booking made here is read back before the form closes; one corrected
+      // here is read back again, because a correction is exactly the moment a
+      // second mistake gets in. Editing a booking that already existed keeps the
+      // old behaviour — it was checked when it was made.
+      if (!booking) {
+        setCreated(saved)
+        setFixing(false)
+        return
+      }
       onClose()
     } catch (err) {
       // 409 means the unit is taken for those dates — the one case where the
@@ -247,8 +284,30 @@ export default function BookingModal({
     )
   }
 
+  // Saved, and now shown back for checking. The form is still mounted behind
+  // this — «Исправить» returns to it with everything still typed in.
+  if (created && !fixing) {
+    return (
+      <Modal title="Проверьте бронь" onClose={onClose}>
+        <BookingVerifyCard
+          booking={created}
+          unitName={unitName}
+          unitType={unitType}
+          hourly={hourly}
+          canSeeMoney={canSetPrice}
+          paymentMethod={paymentMethod}
+          receivedByName={
+            staff.find((member) => String(member.id) === receivedBy)?.name ?? user?.name
+          }
+          onFix={() => setFixing(true)}
+          onDone={onClose}
+        />
+      </Modal>
+    )
+  }
+
   return (
-    <Modal title={booking ? `Бронь #${booking.id}` : 'Новая бронь'} onClose={onClose}>
+    <Modal title={target ? `Бронь #${target.id}` : 'Новая бронь'} onClose={onClose}>
       <form onSubmit={handleSubmit}>
         {error && <Alert>{error}</Alert>}
 
@@ -389,8 +448,14 @@ export default function BookingModal({
                 the ledger as a real payment, so it needs the same two answers
                 every other payment needs — by what means, and into whose hands.
                 Asking on a booking with no prepayment would be two empty fields
-                on every screen for the sake of the occasional one. */}
-            {!booking && Number(prepaid) > 0 && (
+                on every screen for the sake of the occasional one.
+
+                Gone once the booking exists, including while correcting one
+                just made: the payment row is already written, and changing it
+                is a correction that goes through the payment endpoint. Leaving
+                the selectors up would offer a choice that no longer travels
+                anywhere. */}
+            {!target && Number(prepaid) > 0 && (
               <div className="field-row">
                 <div className="field">
                   <label htmlFor="pay-method">Способ предоплаты</label>

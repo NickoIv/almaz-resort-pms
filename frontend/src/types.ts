@@ -32,6 +32,13 @@ export type Booking = {
   cancel_reason?: string | null
   cancel_note?: string | null
   cancelled_at?: string | null
+  /**
+   * When someone read the finished booking back and confirmed it, and who.
+   * Null means nobody has — including on every booking made before the check
+   * existed, which is why it is not treated as a warning on its own.
+   */
+  verified_at?: string | null
+  verified_by_name?: string | null
   /** Money fields are present only for the admin role. */
   total_amount?: number
   prepaid_amount?: number

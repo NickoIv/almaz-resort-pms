@@ -1544,3 +1544,161 @@ describe('§18 the section list collapses on a phone', () => {
     ).toHaveAttribute('aria-expanded', 'false')
   })
 })
+
+describe('§19 a saved booking is read back before the form closes', () => {
+  const EMPTY_BOARD = {
+    from: '2026-08-09',
+    days: 7,
+    max_days: 30,
+    dates: ['2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13',
+            '2026-08-14', '2026-08-15'],
+    rooms: [{ unit_id: 6, unit_name: '104', category: 'standard', capacity: 2, bookings: [] }],
+  }
+
+  type Call = { method: string; path: string; body: Record<string, unknown> }
+
+  /** The booking the server would have written, built from what was sent. */
+  function saved(body: Record<string, unknown>, over: Record<string, unknown> = {}) {
+    const total = Number(body.total_amount ?? 0)
+    const prepaid = Number(body.prepaid_amount ?? 0)
+    return {
+      id: 91,
+      unit_id: 6,
+      guest_name: body.guest_name,
+      guest_phone: body.guest_phone,
+      date_from: body.date_from,
+      date_to: body.date_to,
+      status: body.status,
+      is_paid: total <= prepaid,
+      verified_at: null,
+      verified_by_name: null,
+      total_amount: total,
+      prepaid_amount: prepaid,
+      deposit_amount: Number(body.deposit_amount ?? 0),
+      charges_amount: 0,
+      remaining_amount: total - prepaid,
+      currency: 'KZT',
+      ...over,
+    }
+  }
+
+  function routes(calls: Call[]) {
+    const record = (method: string, path: string) => (_url: string, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {}
+      calls.push({ method, path, body })
+      return path.endsWith('/verify')
+        ? { ...saved(latest(calls)), verified_at: '2026-08-09 16:20', verified_by_name: STAFF.admin.name }
+        : saved(latest(calls))
+    }
+    // The stubs echo whatever was last sent with a body, so a correction shows
+    // up in the card exactly as the server would have returned it.
+    const latest = (all: Call[]) =>
+      [...all].reverse().find((call) => Object.keys(call.body).length > 0)?.body ?? {}
+
+    return {
+      ...baseRoutes('admin', []),
+      'GET /api/rooms/timeline': EMPTY_BOARD,
+      'GET /api/staff': [{ ...STAFF.admin, is_active: true }],
+      'POST /api/bookings': record('POST', '/api/bookings'),
+      'PATCH /api/bookings/91': record('PATCH', '/api/bookings/91'),
+      'PATCH /api/bookings/91/payment': record('PATCH', '/api/bookings/91/payment'),
+      'POST /api/bookings/91/verify': record('POST', '/api/bookings/91/verify'),
+    }
+  }
+
+  /** Board → drag three nights → fill the form → save. */
+  async function bookThreeNights(calls: Call[], { prepaid = '50000' } = {}) {
+    signIn('admin')
+    mockApi(routes(calls))
+    renderApp(<App />, { route: '/rooms' })
+    await screen.findByRole('heading', { name: 'Номера' })
+    await waitFor(() => expect(document.querySelector('.tl-cell')).toBeTruthy())
+
+    const cells = [...document.querySelectorAll('.tl-cell')]
+    fireEvent.pointerDown(cells[1], { pointerType: 'mouse' })
+    for (const cell of cells.slice(2, 4)) fireEvent.pointerEnter(cell, { pointerType: 'mouse' })
+    fireEvent.pointerUp(window)
+
+    await screen.findByRole('heading', { name: 'Новая бронь' })
+    await userEvent.type(screen.getByLabelText('Гость'), 'Асель Жумабаева')
+    fireEvent.change(screen.getByLabelText('Сумма'), { target: { value: '200000' } })
+    fireEvent.change(screen.getByLabelText('Предоплата'), { target: { value: prepaid } })
+    if (prepaid !== '0') {
+      fireEvent.change(screen.getByLabelText('Способ предоплаты'), { target: { value: 'kaspi' } })
+    }
+    await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
+  }
+
+  it('shows the booking back instead of closing, with what was actually written', async () => {
+    const calls: Call[] = []
+    await bookThreeNights(calls)
+
+    const card = await screen.findByRole('heading', { name: 'Проверьте бронь' })
+    expect(card).toBeInTheDocument()
+
+    const modal = document.querySelector('.modal') as HTMLElement
+    // The room by its name, not the id the form worked with.
+    expect(within(modal).getByText('104')).toBeInTheDocument()
+    expect(within(modal).getByText('Асель Жумабаева')).toBeInTheDocument()
+    // Three nights, counted rather than left for the reader to subtract.
+    expect(within(modal).getByText(/3 ночи/)).toBeInTheDocument()
+    // How the prepayment arrived and whose hands it went into.
+    expect(within(modal).getByText(/Kaspi/)).toBeInTheDocument()
+    expect(within(modal).getByText(new RegExp(STAFF.admin.name))).toBeInTheDocument()
+    expect(within(modal).getByText(/150 000/)).toBeInTheDocument()
+  })
+
+  it('records the check against whoever pressed it', async () => {
+    const calls: Call[] = []
+    await bookThreeNights(calls)
+
+    await screen.findByRole('heading', { name: 'Проверьте бронь' })
+    await userEvent.click(screen.getByRole('button', { name: 'Проверено' }))
+
+    await waitFor(() =>
+      expect(calls.some((call) => call.path === '/api/bookings/91/verify')).toBe(true)
+    )
+    // And the form is done with — the booking was checked, not merely saved.
+    await waitFor(() => expect(document.querySelector('.modal')).toBeNull())
+  })
+
+  it('corrects the booking it just made rather than saving a second one', async () => {
+    const calls: Call[] = []
+    await bookThreeNights(calls)
+
+    await screen.findByRole('heading', { name: 'Проверьте бронь' })
+    await userEvent.click(screen.getByRole('button', { name: 'Исправить' }))
+
+    // Back in the form, still holding everything that was typed.
+    expect(await screen.findByRole('heading', { name: 'Бронь #91' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Гость')).toHaveValue('Асель Жумабаева')
+
+    fireEvent.change(screen.getByLabelText('Сумма'), { target: { value: '300000' } })
+    await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
+
+    // One booking, patched — not two bookings for the same three nights.
+    await waitFor(() =>
+      expect(calls.filter((call) => call.path === '/api/bookings')).toHaveLength(1)
+    )
+    expect(calls.some((call) => call.path === '/api/bookings/91/payment')).toBe(true)
+
+    // And read back again: a correction is where a second mistake gets in.
+    await screen.findByRole('heading', { name: 'Проверьте бронь' })
+    expect(
+      within(document.querySelector('.modal') as HTMLElement).getByText(/250 000/)
+    ).toBeInTheDocument()
+  })
+
+  it('lets the card be dismissed unchecked, and says so by leaving no stamp', async () => {
+    const calls: Call[] = []
+    await bookThreeNights(calls)
+
+    await screen.findByRole('heading', { name: 'Проверьте бронь' })
+    await userEvent.click(document.querySelector('.modal-backdrop') as HTMLElement)
+
+    await waitFor(() => expect(document.querySelector('.modal')).toBeNull())
+    // The booking is saved either way; what is absent is the claim that anyone
+    // checked it, which is exactly what the column is for.
+    expect(calls.some((call) => call.path === '/api/bookings/91/verify')).toBe(false)
+  })
+})

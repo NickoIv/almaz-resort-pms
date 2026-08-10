@@ -468,6 +468,7 @@ export default function UnitDetailPage() {
         <BookingModal
           unitId={unit.id}
           unitType={unit.type}
+          unitName={unit.name}
           booking={active ?? null}
           canSetPrice={isAdmin}
           hourly={!isRoom}
