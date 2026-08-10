@@ -29,7 +29,12 @@ export default function WeekdayBreakdown({ weekdays }: { weekdays: Analytics['we
 
   return (
     <>
-      <table className="data-table weekday-table">
+      {/* Five columns do not fit a phone: the table came out 5px wider than a
+          390px screen, which tips the *whole page* into sideways scrolling —
+          every other element drifts with it. Inside its own scroll container
+          the table slides on its own and the page stays put. */}
+      <div className="table-scroll">
+        <table className="data-table weekday-table">
         <thead>
           <tr>
             <th>День недели</th>
@@ -69,7 +74,8 @@ export default function WeekdayBreakdown({ weekdays }: { weekdays: Analytics['we
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
 
       {weakest && totalRevenue > 0 && (
         <div className="field-hint" style={{ marginTop: 12 }}>

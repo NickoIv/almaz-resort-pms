@@ -3171,6 +3171,64 @@ button {
 }
 
 @media (max-width: 640px) {
+  /* ── Fingers, not a mouse ────────────────────────────────────────────────
+     The two control heights are 40 and 32. Thirty-two is comfortable to click
+     and small to tap: an audit at 390px found 112 controls under 36px on the
+     rooms page alone, and a missed tap on a phone costs a whole interaction,
+     not a small correction. So on a phone the small size *is* the normal size
+     — one height rather than two, which is a simplification of the scale and
+     not a third size smuggled into it. Set on the token so everything built
+     from it follows: header actions, row actions, chips, toggles. */
+  :root {
+    --control-h-sm: 40px;
+    /* The bell, the theme toggle and the board's toolbar all size from this
+       one. Raising it here is what stops the two controls a person reaches for
+       most — "did something happen" and "go to today" — from being the two
+       smallest things on the screen. */
+    --action-height: 40px;
+  }
+
+  /* The planning board is a grid, not a list of buttons, so its cells are
+     sized to fit a week across rather than to be tapped comfortably — 38px a
+     row, which leaves a 30px cell. Forty-six gives a 38px cell: the difference
+     between a night a thumb lands on and one it misses, at a cost of 112px
+     down a board that is scrolled anyway.
+
+     The `:root` prefix is load-bearing. This media block sits *above* the
+     .timeline-panel rule in the file, and a plain `.timeline-panel` here would
+     have equal specificity, lose on source order, and silently do nothing —
+     which is exactly what it did on the first attempt. */
+  :root .timeline-panel {
+    --tl-row-h: 46px;
+  }
+
+  /* Pill filters — «Неделя», «Месяц», the analytics ranges. Padding-sized, so
+     they never picked up either height token. */
+  .chip {
+    min-height: var(--control-h-sm);
+  }
+
+  /* A date field is a control like any other; the browser gives it no height
+     of its own. */
+  input[type='date'] {
+    min-height: var(--control-h-sm);
+  }
+
+  /* Built without the token — a text button in a segmented control. It sat at
+     22px, the smallest target in the app. */
+  .view-btn {
+    min-height: 36px;
+    padding: 0 12px;
+  }
+
+  /* The "все →" links inside panel titles were 16px tall. Padding buys the
+     hit area without changing how they look. */
+  .panel-title .count a {
+    display: inline-block;
+    padding: 10px 4px;
+    margin: -10px -4px;
+  }
+
   /* On a phone the section list is put behind a button.
      As a wrapped strip it ran to five rows and pushed the page itself below
      the fold, so opening Уборка meant scrolling past every other section to
