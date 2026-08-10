@@ -2261,3 +2261,73 @@ describe('§25 the board says when it is not showing today', () => {
     expect(screen.getByRole('button', { name: 'Сегодня' })).toHaveClass('btn-ghost')
   })
 })
+
+describe('§26 the phone gets its sections under a thumb', () => {
+  /** jsdom has no matchMedia; the shell asks it whether we are on a phone. */
+  function atPhoneWidth(isPhone: boolean) {
+    vi.stubGlobal(
+      'matchMedia',
+      (query: string) =>
+        ({
+          matches: isPhone,
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList
+    )
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('gives the admin the four pages of the day, plus a way to the rest', async () => {
+    atPhoneWidth(true)
+    signIn('admin')
+    mockApi(baseRoutes('admin'))
+    renderApp(<App />, { route: '/rooms' })
+
+    const tabs = await screen.findByRole('navigation', { name: 'Основные разделы' })
+    const labels = [...tabs.querySelectorAll('.mobile-tab-label')].map((e) => e.textContent)
+    // «Отдых», not «Зона отдыха»: five labels share 390px, and a tab reading
+    // «Зона отд…» looks like a fault rather than a shortening.
+    expect(labels).toEqual(['Сводка', 'Номера', 'Отдых', 'Уборка', 'Ещё'])
+  })
+
+  it('gives a housekeeper her own page and her own notifications', async () => {
+    atPhoneWidth(true)
+    signIn('housekeeper')
+    mockApi(baseRoutes('housekeeper'))
+    renderApp(<App />, { route: '/cleaning' })
+
+    const tabs = await screen.findByRole('navigation', { name: 'Основные разделы' })
+    const labels = [...tabs.querySelectorAll('.mobile-tab-label')].map((e) => e.textContent)
+    // Notifications are switched on per phone, so she has to reach them
+    // herself — and she has one work page, so there is room.
+    expect(labels).toEqual(['Уборка', 'Сигналы', 'Ещё'])
+  })
+
+  it('is not in the DOM at all on a desktop, so nothing is announced twice', async () => {
+    atPhoneWidth(false)
+    signIn('admin')
+    mockApi(baseRoutes('admin'))
+    renderApp(<App />, { route: '/rooms' })
+
+    await screen.findByRole('link', { name: 'Номера' })
+    expect(screen.queryByRole('navigation', { name: 'Основные разделы' })).not.toBeInTheDocument()
+    // And exactly one link per destination.
+    expect(screen.getAllByRole('link', { name: 'Номера' })).toHaveLength(1)
+  })
+
+  it('moves the account controls into the menu on a phone, not onto both', async () => {
+    atPhoneWidth(true)
+    signIn('admin')
+    mockApi(baseRoutes('admin'))
+    renderApp(<App />, { route: '/rooms' })
+
+    await screen.findByRole('navigation', { name: 'Основные разделы' })
+    // One «Выйти», and it is inside the menu sheet rather than the topbar.
+    const exits = screen.getAllByRole('button', { name: 'Выйти' })
+    expect(exits).toHaveLength(1)
+    expect(exits[0].closest('.sidebar')).not.toBeNull()
+    expect(document.querySelector('.topbar .who')).toBeNull()
+  })
+})

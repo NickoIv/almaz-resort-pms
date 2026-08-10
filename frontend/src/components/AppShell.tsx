@@ -55,9 +55,78 @@ const NAV_GROUPS: NavGroup[] = [
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   isActive ? 'nav-link active' : 'nav-link'
 
+/**
+ * The sections that get a tab at the bottom of a phone.
+ *
+ * Only what someone is in all shift. Everything else lives behind «Ещё»,
+ * which is the whole point: moving between the pages of the actual work used
+ * to mean reaching the top of the screen, opening the menu, scrolling it and
+ * tapping — with the page jumping 639px underneath. Four destinations at most,
+ * because a fifth makes the labels too narrow to read at 390px.
+ */
+const TAB_ICONS: Record<string, string> = {
+  '/': '◈',
+  '/rooms': '▦',
+  '/restaurant': '☂',
+  '/cleaning': '✦',
+  '/notifications': '◔',
+}
+
+/**
+ * Shorter names for the bar, where five labels share 390px. Only where the
+ * full one does not fit — a tab that says «Зона отд…» is worse than one that
+ * says «Отдых», because a truncation looks like a fault.
+ */
+const TAB_LABELS: Record<string, string> = { '/restaurant': 'Отдых', '/notifications': 'Сигналы' }
+
+function primaryTabs(role: Role): NavItem[] {
+  const work = NAV_GROUPS[0].items.filter((item) => item.roles.includes(role))
+  const dashboard: NavItem[] =
+    role === 'admin' ? [{ to: '/', label: 'Сводка', roles: ['admin'] }] : []
+  // Housekeepers and waiters have one work page each, so notifications — the
+  // one thing they must reach on their own phone — earns the second tab.
+  const own: NavItem[] =
+    role === 'admin'
+      ? []
+      : [{ to: '/notifications', label: 'Уведомления', roles: [role] }]
+  return [...dashboard, ...work, ...own].slice(0, 4)
+}
+
+/**
+ * Whether we are at phone width.
+ *
+ * The account controls have to *move* between the topbar and the menu sheet
+ * rather than exist in both and be hidden with CSS: two copies means a screen
+ * reader announcing two «Выйти» buttons and two review links, and a test
+ * finding both. CSS cannot move an element, so this is the one thing the
+ * layout asks JavaScript about.
+ */
+const PHONE_QUERY = '(max-width: 640px)'
+
+/** Guarded: jsdom has no matchMedia, and a throw here takes the whole shell
+ *  down rather than degrading to the desktop layout. */
+function phoneNow(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia(PHONE_QUERY).matches
+    : false
+}
+
+function useIsPhone(): boolean {
+  const [isPhone, setIsPhone] = useState(phoneNow)
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+    const query = window.matchMedia(PHONE_QUERY)
+    const update = () => setIsPhone(query.matches)
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+  return isPhone
+}
+
 export default function AppShell() {
   const { user, logout } = useAuth()
   const location = useLocation()
+  const isPhone = useIsPhone()
 
   /**
    * Whether the nav is open on a phone.
@@ -127,16 +196,22 @@ export default function AppShell() {
             onAcknowledge={acknowledge}
             onAcknowledgeAll={acknowledgeAll}
           />
-          <ReviewsLink />
           <AlmatyClock />
-          <ThemeToggle />
-          <div className="who">
-            <div className="who-name">{user.name}</div>
-            <div className="who-role">{ROLE_LABELS[user.role]}</div>
-          </div>
-          <button className="btn btn-sm btn-ghost" onClick={logout}>
-            Выйти
-          </button>
+          {/* On a phone these move into the menu sheet — see useIsPhone. They
+              cost a third of a 153px topbar and are touched once a shift. */}
+          {!isPhone && (
+            <>
+              <ReviewsLink />
+              <ThemeToggle />
+              <div className="who">
+                <div className="who-name">{user.name}</div>
+                <div className="who-role">{ROLE_LABELS[user.role]}</div>
+              </div>
+              <button className="btn btn-sm btn-ghost" onClick={logout}>
+                Выйти
+              </button>
+            </>
+          )}
         </div>
       </header>
 
@@ -158,6 +233,25 @@ export default function AppShell() {
               ))}
             </div>
           ))}
+
+          {/* Who you are, how it looks, and the way out — moved off the phone's
+              topbar, where they cost a third of its 153px and were read once a
+              shift. */}
+          {isPhone && (
+          <div className="nav-account">
+            <div className="who">
+              <div className="who-name">{user.name}</div>
+              <div className="who-role">{ROLE_LABELS[user.role]}</div>
+            </div>
+            <div className="nav-account-actions">
+              <ThemeToggle />
+              <ReviewsLink />
+              <button className="btn btn-sm" onClick={logout}>
+                Выйти
+              </button>
+            </div>
+          </div>
+          )}
         </nav>
 
         {/* Keyed on the path so React remounts it per route, which is what
@@ -167,6 +261,39 @@ export default function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      {/* Phone only, and rendered rather than merely hidden: above 640px the
+          sidebar is always on screen, and a second set of links to the same
+          places would be read out twice by a screen reader. */}
+      {isPhone && (
+      <nav className="mobile-tabs" aria-label="Основные разделы">
+        {primaryTabs(user.role).map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.to === '/'}
+            className={({ isActive }) => `mobile-tab ${isActive ? 'active' : ''}`}
+          >
+            <span className="mobile-tab-icon" aria-hidden="true">
+              {TAB_ICONS[item.to] ?? '•'}
+            </span>
+            <span className="mobile-tab-label">{TAB_LABELS[item.to] ?? item.label}</span>
+          </NavLink>
+        ))}
+        <button
+          type="button"
+          className={`mobile-tab ${navOpen ? 'active' : ''}`}
+          aria-expanded={navOpen}
+          aria-controls="app-nav"
+          onClick={() => setNavOpen((open) => !open)}
+        >
+          <span className="mobile-tab-icon" aria-hidden="true">
+            ☰
+          </span>
+          <span className="mobile-tab-label">Ещё</span>
+        </button>
+      </nav>
+      )}
     </div>
   )
 }
