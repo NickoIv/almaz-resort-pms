@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
 import AlertCenter from './AlertCenter'
@@ -59,6 +59,17 @@ export default function AppShell() {
   const { user, logout } = useAuth()
   const location = useLocation()
 
+  /**
+   * Whether the nav is open on a phone.
+   *
+   * Above 640px this does nothing: the sidebar is a column on a desktop and a
+   * horizontal strip on a tablet, and both are always visible. At phone width
+   * that strip wrapped onto five rows and pushed the actual page below the
+   * fold — someone opening Уборка had to scroll past every other section to
+   * reach their own work.
+   */
+  const [navOpen, setNavOpen] = useState(false)
+
   // Browsers refuse to make a sound until the page has been interacted with.
   // One silent unlock on the first click or keypress after login is enough for
   // the rest of the session; { once: true } takes the listener straight back
@@ -73,6 +84,9 @@ export default function AppShell() {
     }
   }, [])
 
+  // Following a link should put the page back, not leave the menu covering it.
+  useEffect(() => setNavOpen(false), [location.pathname])
+
   // Hooks must run before the early return, so the role is read defensively.
   const { alerts, acknowledge, acknowledgeAll } = useAlerts()
 
@@ -86,6 +100,19 @@ export default function AppShell() {
   return (
     <div className="shell">
       <header className="topbar">
+        {/* Phone only — see the media query. Kept in the DOM at every width so
+            the button's state is not lost when the viewport is resized. */}
+        <button
+          type="button"
+          className="nav-toggle"
+          aria-expanded={navOpen}
+          aria-controls="app-nav"
+          aria-label={navOpen ? 'Скрыть разделы' : 'Показать разделы'}
+          onClick={() => setNavOpen((open) => !open)}
+        >
+          <span aria-hidden="true">{navOpen ? '✕' : '☰'}</span>
+        </button>
+
         <div className="brand">
           <span className="brand-mark">◈</span>
           <span>
@@ -114,7 +141,7 @@ export default function AppShell() {
       </header>
 
       <div className="shell-body">
-        <nav className="sidebar" aria-label="Разделы">
+        <nav id="app-nav" className={`sidebar ${navOpen ? 'open' : ''}`} aria-label="Разделы">
           {user.role === 'admin' && (
             <NavLink to="/" end className={linkClass}>
               Сводка

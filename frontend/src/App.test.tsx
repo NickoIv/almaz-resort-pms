@@ -1494,3 +1494,53 @@ describe('§17 login lockout reaches the person', () => {
     expect(screen.getByText(/через 5 мин/)).toBeInTheDocument()
   })
 })
+
+/**
+ * The phone navigation toggle.
+ *
+ * jsdom applies no media queries, so what is testable here is the state, not
+ * the visibility — and the state is the part with a bug worth catching:
+ * a menu that stayed open after you tapped a link would cover the page you
+ * just asked for.
+ */
+describe('§18 the section list collapses on a phone', () => {
+  const routes = {
+    'GET /api/auth/me': { user: STAFF.admin },
+    'GET /api/units': [makeUnit()],
+    'GET /api/cleaning': { sla_minutes: 60, units: [] },
+    'GET /api/alerts': { sla_minutes: 60, booking_window_hours: 8, alerts: [] },
+    'GET /api/settings': { notifications: {}, telegram_configured: false },
+    'GET /api/analytics/summary': {},
+    'GET /api/units/forecast': { total_units: 14, days: [] },
+    'GET /api/settings/preview': { empty: true, sections: 0, text: '' },
+  }
+
+  it('starts closed and opens on demand', async () => {
+    signIn('admin')
+    mockApi(routes)
+    renderApp(<App />, { route: '/rooms' })
+
+    const toggle = await screen.findByRole('button', { name: 'Показать разделы' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    await userEvent.click(toggle)
+    expect(
+      await screen.findByRole('button', { name: 'Скрыть разделы' })
+    ).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('gets out of the way once a section is chosen', async () => {
+    signIn('admin')
+    mockApi(routes)
+    renderApp(<App />, { route: '/rooms' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Показать разделы' }))
+    const nav = screen.getByRole('navigation', { name: 'Разделы' })
+    await userEvent.click(within(nav).getByRole('link', { name: 'Уборка' }))
+
+    // Back to closed, so the page just navigated to is actually visible.
+    expect(
+      await screen.findByRole('button', { name: 'Показать разделы' })
+    ).toHaveAttribute('aria-expanded', 'false')
+  })
+})

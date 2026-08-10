@@ -3148,7 +3148,69 @@ button {
   }
 }
 
+/* The nav toggle. Hidden by default and revealed only at phone width, where
+   the horizontal strip above stops fitting — see the 640px block below. */
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+}
+
+.nav-toggle:hover {
+  background: var(--surface-2);
+}
+
 @media (max-width: 640px) {
+  /* On a phone the section list is put behind a button.
+     As a wrapped strip it ran to five rows and pushed the page itself below
+     the fold, so opening Уборка meant scrolling past every other section to
+     reach the work. Collapsed, the content starts at the top and the nav is
+     one tap away. */
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .sidebar.open {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 16px 16px;
+  }
+
+  /* Back to a column: the whole point is that each destination is its own
+     row, big enough to hit with a thumb. */
+  .sidebar.open .nav-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+  }
+
+  .sidebar.open .nav-group + .nav-group {
+    margin-top: 12px;
+  }
+
+  .sidebar.open .nav-group-label {
+    padding: 0 8px 4px;
+  }
+
+  .sidebar.open .nav-link {
+    padding: 12px 12px;
+  }
+
   .content {
     padding: 16px 16px;
   }
@@ -3893,10 +3955,31 @@ button {
 }
 
 @media (max-width: 760px) {
-  /* On a phone the heading strip is too tight for it to be anything but
-     noise behind the title. */
+  /* On a phone it stops being a texture behind the title — there is no room
+     for that — and becomes a horizon line under it instead. Full width, out of
+     the flex flow so it spans the whole head rather than sitting beside the
+     text, and anchored to the bottom edge so the peaks land clear of the
+     heading. It is the one piece of the place itself in the interface; hiding
+     it on the device most of the staff actually use meant nobody saw it. */
+  .page-head.has-ridge {
+    padding-bottom: 58px;
+  }
+
   .ridge-dashboard {
-    display: none;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: auto;
+    /* The viewBox is 1200×220, and preserveAspectRatio letterboxes rather than
+       stretches — so at 40px tall the drawing was only ~220px wide and floated
+       in the middle of the page. Roughly one fifth of the available width is
+       what makes the line actually reach both edges. Distorting it with
+       preserveAspectRatio="none" would have been the other option, and a
+       squashed mountain looks like a mistake. */
+    height: 64px;
+    /* Brighter than on a desktop: at this size the line is short, and at the
+       old 0.22 it read as a smudge rather than as mountains. */
+    opacity: 0.5;
   }
 }
 
