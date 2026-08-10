@@ -21,6 +21,7 @@ import photoRoutes from './routes/photos'
 import pushRoutes from './routes/push'
 import staffRoutes from './routes/staff'
 import waitlistRoutes from './routes/waitlist'
+import { pruneLoginAttempts } from './lib/login-guard'
 import { pruneDeliveries, sweepAndPush } from './lib/push'
 import { vapidKeysOf } from './lib/webpush'
 import type { AppEnv, Bindings } from './types'
@@ -249,8 +250,11 @@ async function scheduled(_event: ScheduledController, env: Bindings): Promise<vo
   if (due.prune) {
     try {
       await pruneDeliveries(env.DB)
+      // Invented phone numbers each leave a row behind; this is what stops a
+      // flood of them growing the table for as long as someone keeps sending.
+      await pruneLoginAttempts(env.DB)
     } catch (error) {
-      console.error('push delivery prune failed', error)
+      console.error('nightly prune failed', error)
     }
   }
 }

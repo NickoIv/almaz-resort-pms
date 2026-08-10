@@ -1461,3 +1461,36 @@ describe('§15 notifications page', () => {
     expect(screen.queryByText(/приезд гостей/)).not.toBeInTheDocument()
   })
 })
+
+/**
+ * The login screen's half of brute-force protection.
+ *
+ * The server does the work; what matters here is that its answer reaches the
+ * person. A lockout that surfaced as a generic "неверный телефон или PIN"
+ * would send someone hunting for a typo through a wait they cannot shorten.
+ */
+describe('§17 login lockout reaches the person', () => {
+  it('shows the wait the server asked for, rather than a generic refusal', async () => {
+    // mockApi answers 200 to everything, and the status code is the point here,
+    // so fetch is stubbed directly for this one case.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/api/auth/login')) {
+        return new Response(
+          JSON.stringify({ error: 'Слишком много попыток входа. Повторите через 5 мин.' }),
+          { status: 429, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+      return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })
+    })
+
+    renderApp(<App />, { route: '/login' })
+
+    await userEvent.type(screen.getByLabelText('Телефон'), '+77011112233')
+    await userEvent.type(screen.getByLabelText('PIN-код'), '0000')
+    await userEvent.click(screen.getByRole('button', { name: 'Войти' }))
+
+    expect(await screen.findByText(/Слишком много попыток входа/)).toBeInTheDocument()
+    expect(screen.getByText(/через 5 мин/)).toBeInTheDocument()
+  })
+})
