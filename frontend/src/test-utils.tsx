@@ -97,6 +97,6 @@ export function useCardView(): void {
 
 /** Puts a token in storage so AuthProvider restores a session via /auth/me. */
 export function signIn(role: Role) {
-  localStorage.setItem('almaz_pms_token', `test-token-${role}`)
+  localStorage.setItem('taura_pms_token', `test-token-${role}`)
   return STAFF[role]
 }

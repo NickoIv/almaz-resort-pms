@@ -4,6 +4,13 @@ import { Alert, Modal } from './ui'
 
 const CONFIRMATION = 'ВОССТАНОВИТЬ'
 
+/**
+ * Backup markers this build will open, newest first. Must stay in step with
+ * `BACKUP_FORMAT` / `LEGACY_BACKUP_FORMATS` in the Worker — a file the server
+ * would accept but this screen refuses can never be uploaded at all.
+ */
+const BACKUP_FORMATS = ['taura-pms-backup', 'almaz-resort-pms-backup']
+
 type BackupPreview = {
   exported_at?: string
   exported_at_almaty?: string
@@ -51,7 +58,10 @@ export default function RestoreModal({
     setFileName(chosen.name)
     try {
       const parsed = JSON.parse(await chosen.text())
-      if (parsed?.format !== 'almaz-resort-pms-backup') {
+      // Both markers, and the old one for good: every backup written before the
+      // project took the hotel's name carries it, including the daily snapshots
+      // nobody made by hand. The server checks the same two.
+      if (!BACKUP_FORMATS.includes(parsed?.format)) {
         setError('Это не резервная копия Taura PMS')
         return
       }

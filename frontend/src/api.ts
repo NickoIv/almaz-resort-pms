@@ -5,15 +5,35 @@
  */
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
-const TOKEN_KEY = 'almaz_pms_token'
+const TOKEN_KEY = 'taura_pms_token'
+
+/**
+ * What the key was called before the project took the hotel's own name.
+ *
+ * Read once, on the first request after an update, and then cleared. Renaming
+ * the key outright would have signed out everyone who was logged in — the
+ * session survives in storage, and a browser that cannot find it simply shows
+ * the PIN screen again as though the session had expired.
+ */
+const LEGACY_TOKEN_KEY = 'almaz_pms_token'
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+  const current = localStorage.getItem(TOKEN_KEY)
+  if (current) return current
+
+  const legacy = localStorage.getItem(LEGACY_TOKEN_KEY)
+  if (!legacy) return null
+  localStorage.setItem(TOKEN_KEY, legacy)
+  localStorage.removeItem(LEGACY_TOKEN_KEY)
+  return legacy
 }
 
 export function setToken(token: string | null): void {
   if (token) localStorage.setItem(TOKEN_KEY, token)
   else localStorage.removeItem(TOKEN_KEY)
+  // Signing out must clear both, or the legacy key would hand the old session
+  // straight back on the next call.
+  if (!token) localStorage.removeItem(LEGACY_TOKEN_KEY)
 }
 
 export class ApiError extends Error {

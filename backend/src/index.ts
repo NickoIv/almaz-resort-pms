@@ -30,7 +30,7 @@ const app = new Hono<AppEnv>()
 
 app.use('/api/*', cors())
 
-app.get('/api/health', (c) => c.json({ ok: true, service: 'almaz-resort-pms-api' }))
+app.get('/api/health', (c) => c.json({ ok: true, service: 'taura-pms-api' }))
 
 // Public: login lives here, /auth/me guards itself.
 app.route('/api/auth', authRoutes)

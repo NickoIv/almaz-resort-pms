@@ -9,7 +9,22 @@ import { SQL_NOW } from './time'
  * without this app running at all (see the README).
  */
 
-export const BACKUP_FORMAT = 'almaz-resort-pms-backup'
+export const BACKUP_FORMAT = 'taura-pms-backup'
+
+/**
+ * What the marker said before the project took the hotel's own name.
+ *
+ * Restore accepts it and always will. Every backup written until 2026-08-10
+ * carries it — including the daily KV snapshots, which are the copies that
+ * matter, because they are the ones nobody made on purpose and nobody will
+ * think to convert. A rename that rejects them turns the safety net into a
+ * folder of unreadable files at the exact moment it is needed.
+ */
+export const LEGACY_BACKUP_FORMATS = ['almaz-resort-pms-backup']
+
+export function isKnownBackupFormat(value: unknown): boolean {
+  return value === BACKUP_FORMAT || LEGACY_BACKUP_FORMATS.includes(value as string)
+}
 
 /**
  * Bump when the *shape* of the file changes, not when the database schema
@@ -196,7 +211,7 @@ export function assertValidBackup(file: unknown): asserts file is BackupFile {
   if (!candidate || typeof candidate !== 'object') {
     throw new RestoreError('Файл повреждён или не является JSON-объектом')
   }
-  if (candidate.format !== BACKUP_FORMAT) {
+  if (!isKnownBackupFormat(candidate.format)) {
     throw new RestoreError(
       `Это не резервная копия Taura PMS (format: ${String(candidate.format)})`
     )

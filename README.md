@@ -3,10 +3,19 @@
 Booking and management system (PMS) for **Taura**, a hotel and restaurant recreation area at
 ул. Алма-Арасан, 4а, **Almaty, Kazakhstan**.
 
-> The Cloudflare project, Worker, repository and backup format identifier still carry the
-> original `almaz-resort-pms` name. Those are infrastructure identifiers, not the business
-> name — renaming them would mint new URLs and invalidate every existing backup file, so
-> they are deliberately left alone.
+> The app, the Worker and the backup format were renamed to **Taura** on 2026-08-10; the old
+> `almaz-resort-pms` addresses no longer serve.
+>
+> Two identifiers deliberately keep the old name, and are not oversights to "fix":
+>
+> - the **D1 database** `almaz_resort_pms_db` — D1 has no rename, so a new name means a new
+>   database and copying every row into it. That risks the only copy of the hotel's data to
+>   change a string that appears in no interface and on no printout.
+> - the **git repository** — GitHub redirects the old URL, but the remote on every clone
+>   would still need re-pointing, and the repo name is seen by nobody but its two developers.
+>
+> Restore still accepts backup files written under the old `almaz-resort-pms-backup` marker,
+> and always will: every daily snapshot taken before the rename carries it.
 
 The complex consists of:
 
@@ -20,8 +29,8 @@ housekeeping and analytics.
 
 | | |
 | --- | --- |
-| **App** | https://almaz-resort-pms.pages.dev |
-| **API** | https://almaz-resort-pms-api.nickru777.workers.dev |
+| **App** | https://taura-pms.pages.dev |
+| **API** | https://taura-pms-api.nickru777.workers.dev |
 
 ## Modules
 
@@ -185,7 +194,7 @@ deleted booking is gone unless there is a snapshot, so this project keeps two:
 Automatic snapshots go to **Workers KV** (binding `BACKUPS`), chosen because it
 works on the free plan with no card. R2 is supported too and takes priority
 whenever it is bound — enable R2 in the dashboard, run
-`npx wrangler r2 bucket create almaz-resort-pms-backups`, then uncomment the
+`npx wrangler r2 bucket create taura-pms-backups`, then uncomment the
 `[[r2_buckets]]` block in `wrangler.toml`. Nothing else changes; KV's 25 MiB
 per-value ceiling is the reason to move once the database grows (the job logs a
 warning past 20 MiB).
@@ -232,16 +241,16 @@ backup too large for the UI path. Everything below runs from `backend/`.
 ```bash
 npx wrangler kv key list --binding BACKUPS --remote --prefix daily/
 # with R2 instead:
-npx wrangler r2 object list almaz-resort-pms-backups --prefix daily/
+npx wrangler r2 object list taura-pms-backups --prefix daily/
 ```
 
 **2. Pull one down**
 
 ```bash
-npx wrangler kv key get --binding BACKUPS --remote   "daily/almaz-pms-backup-2026-08-08T04-15-00Z.json" > backup.json
+npx wrangler kv key get --binding BACKUPS --remote   "daily/taura-pms-backup-2026-08-08T04-15-00Z.json" > backup.json
 
 # with R2 instead:
-npx wrangler r2 object get almaz-resort-pms-backups/daily/<name>.json --file backup.json
+npx wrangler r2 object get taura-pms-backups/daily/<name>.json --file backup.json
 ```
 
 **3. Rebuild the schema if the database is gone**
@@ -392,15 +401,15 @@ npx wrangler deploy
 
 # 4. Pages project
 cd ../frontend
-npx wrangler pages project create almaz-resort-pms --production-branch main
+npx wrangler pages project create taura-pms --production-branch main
 ```
 
 ### Deploying by hand
 
 ```bash
 cd backend  && npx wrangler deploy
-cd frontend && VITE_API_URL=https://almaz-resort-pms-api.nickru777.workers.dev npm run build
-npx wrangler pages deploy dist --project-name almaz-resort-pms --branch main
+cd frontend && VITE_API_URL=https://taura-pms-api.nickru777.workers.dev npm run build
+npx wrangler pages deploy dist --project-name taura-pms --branch main
 ```
 
 `VITE_API_URL` is baked in at build time; without it the app calls a same-origin
@@ -430,7 +439,7 @@ the deploy steps rather than failing.
 
 > The Pages project was created through Wrangler, so it is a direct-upload project
 > and the deploy runs through the workflow above. To use Cloudflare's own Git
-> integration instead, connect the repo under **Workers & Pages → almaz-resort-pms
+> integration instead, connect the repo under **Workers & Pages → taura-pms
 > → Settings → Builds**, set the build command to `npm run build`, the output
 > directory to `dist`, the root directory to `frontend`, and add `VITE_API_URL` as
 > a build environment variable.

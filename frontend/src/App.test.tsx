@@ -725,7 +725,7 @@ describe('§10 review profile links', () => {
       ...baseRoutes('admin'),
       'GET /api/settings': withUrls({
         reviews_2gis_url: 'https://2gis.kz/almaty/firm/123',
-        reviews_google_url: 'https://g.page/almaz',
+        reviews_google_url: 'https://g.page/taura',
       }),
     })
     renderApp(<App />, { route: '/rooms' })
@@ -735,7 +735,7 @@ describe('§10 review profile links', () => {
     expect(twoGis).toHaveAttribute('href', 'https://2gis.kz/almaty/firm/123')
     // Opened without leaking the PMS URL to the review site.
     expect(twoGis).toHaveAttribute('rel', expect.stringContaining('noreferrer'))
-    expect(screen.getByRole('link', { name: 'Google' })).toHaveAttribute('href', 'https://g.page/almaz')
+    expect(screen.getByRole('link', { name: 'Google' })).toHaveAttribute('href', 'https://g.page/taura')
   })
 
   it('shows only the profile that is configured', async () => {
