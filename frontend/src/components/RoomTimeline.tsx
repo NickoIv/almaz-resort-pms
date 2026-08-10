@@ -228,6 +228,20 @@ export default function RoomTimeline({
   const today = todayIso()
 
   /**
+   * Whether the window on screen contains today.
+   *
+   * Derived from the scale rather than from `from`, because a month window that
+   * starts on the 1st still contains the 10th, and a year contains today
+   * whenever the year matches.
+   */
+  const showsToday =
+    scale === 'year'
+      ? from.slice(0, 4) === today.slice(0, 4)
+      : scale === 'month'
+        ? windowStart.slice(0, 7) === today.slice(0, 7)
+        : today >= windowStart && today < addDaysIso(windowStart, days)
+
+  /**
    * Bring today into view once the window that contains it has loaded.
    *
    * A calendar month starts on the 1st, and the board only ever shows six or
@@ -439,7 +453,20 @@ export default function RoomTimeline({
           >
             ←
           </button>
-          <button className="btn btn-sm btn-ghost" onClick={() => setFrom(today)}>
+          {/*
+            Bright once the board has been navigated away from today, and quiet
+            while it is on today.
+
+            Reported as "почему дата не текущая?" after stepping back a few
+            months: the board was showing exactly what had been asked for, but
+            nothing on screen said so, and the way back was a ghost button that
+            looked like decoration. A control that is the answer to "where am I"
+            should be visible precisely when it is needed.
+          */}
+          <button
+            className={`btn btn-sm ${showsToday ? 'btn-ghost' : 'btn-primary'}`}
+            onClick={() => setFrom(today)}
+          >
             Сегодня
           </button>
           <button

@@ -2192,3 +2192,72 @@ describe('§24 a recreation unit shows its booking without leaving the grid', ()
     expect(screen.queryByRole('button', { name: 'Показать детали брони' })).not.toBeInTheDocument()
   })
 })
+
+describe('§25 the board says when it is not showing today', () => {
+  const TIMELINE = {
+    from: '2026-08-10',
+    days: 7,
+    max_days: 31,
+    dates: ['2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14',
+            '2026-08-15', '2026-08-16'],
+    rooms: [{ unit_id: 5, unit_name: '101', category: 'standard', capacity: 2, bookings: [] }],
+  }
+
+  async function openBoard(calls: string[]) {
+    signIn('admin')
+    mockApi({
+      ...baseRoutes('admin'),
+      'GET /api/rooms/timeline': (url: string) => {
+        calls.push(url)
+        return TIMELINE
+      },
+    })
+    renderApp(<App />, { route: '/rooms' })
+    await screen.findByRole('heading', { name: 'Номера' })
+    await waitFor(() => expect(document.querySelector('.tl-row')).toBeTruthy())
+  }
+
+  it('keeps «Сегодня» quiet while today is on screen', async () => {
+    await openBoard([])
+    expect(screen.getByRole('button', { name: 'Сегодня' })).toHaveClass('btn-ghost')
+  })
+
+  it('makes «Сегодня» the loud control once the board has been stepped away', async () => {
+    const calls: string[] = []
+    await openBoard(calls)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Предыдущий период' }))
+    await waitFor(() => expect(calls.length).toBeGreaterThan(1))
+
+    // The board is showing exactly what was asked for — the point is that the
+    // way back stops looking like decoration. Reported as "почему дата не
+    // текущая?" after stepping back far enough to land in February.
+    const back = screen.getByRole('button', { name: 'Сегодня' })
+    expect(back).toHaveClass('btn-primary')
+    expect(back).not.toHaveClass('btn-ghost')
+  })
+
+  it('goes quiet again when it is pressed', async () => {
+    const calls: string[] = []
+    await openBoard(calls)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Предыдущий период' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Сегодня' })).toHaveClass('btn-primary'))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Сегодня' }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Сегодня' })).toHaveClass('btn-ghost')
+    )
+  })
+
+  it('counts a calendar month containing today as showing today', async () => {
+    const calls: string[] = []
+    await openBoard(calls)
+
+    // The month starts on the 1st and today is the 10th — still "today".
+    await userEvent.click(screen.getByRole('button', { name: 'Месяц' }))
+    await waitFor(() => expect(calls.at(-1)).not.toContain('days=7'))
+
+    expect(screen.getByRole('button', { name: 'Сегодня' })).toHaveClass('btn-ghost')
+  })
+})
