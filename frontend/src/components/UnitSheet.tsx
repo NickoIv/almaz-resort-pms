@@ -62,12 +62,13 @@ export default function UnitSheet({ unit, onClose }: { unit: Unit; onClose: () =
   const withMoney = bookings.some((row) => row.total_amount !== undefined)
 
   return (
-    <div className="sheet-overlay">
+    <div className="sheet-overlay" onClick={onClose} role="presentation">
+      <div onClick={(event) => event.stopPropagation()}>
       <div className="sheet-toolbar no-print">
         <button className="btn btn-sm btn-primary" onClick={() => window.print()} disabled={loading}>
           Печать
         </button>
-        <button className="btn btn-sm btn-ghost" onClick={onClose}>
+        <button className="btn btn-sm" onClick={onClose}>
           Закрыть
         </button>
         <span className="field-hint">Служебный лист — с телефонами гостей и остатками.</span>
@@ -168,6 +169,7 @@ export default function UnitSheet({ unit, onClose }: { unit: Unit; onClose: () =
           <footer className="sheet-foot">Напечатано {todayIso()} · {hotel.hotel_name}</footer>
         </div>
       )}
+      </div>
     </div>
   )
 }

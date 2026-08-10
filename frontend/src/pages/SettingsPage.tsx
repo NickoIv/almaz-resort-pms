@@ -23,7 +23,43 @@ type TextSettings = {
   hotel_details: string
   reviews_2gis_url: string
   reviews_google_url: string
+  invoice_legal_name: string
+  invoice_tax_id: string
+  invoice_legal_address: string
+  invoice_contact: string
+  invoice_bank: string
+  invoice_terms: string
 }
+
+/**
+ * The legal block on the invoice. Every one of these is optional and the
+ * invoice omits an empty line rather than printing a placeholder — a wrong BIN
+ * on a document someone files in their accounts is worse than a missing one,
+ * because a missing line is obvious and a wrong one is not.
+ */
+const INVOICE_FIELDS: {
+  key: keyof TextSettings
+  label: string
+  placeholder: string
+  wide?: boolean
+}[] = [
+  { key: 'invoice_legal_name', label: 'Юридическое лицо', placeholder: 'ТОО «Таура»' },
+  { key: 'invoice_tax_id', label: 'БИН / ИИН', placeholder: '123456789012' },
+  { key: 'invoice_legal_address', label: 'Юридический адрес', placeholder: 'Алматы, ул. …' },
+  { key: 'invoice_contact', label: 'Телефон / e-mail для счетов', placeholder: '+7 … · billing@…' },
+  {
+    key: 'invoice_bank',
+    label: 'Банковские реквизиты',
+    placeholder: 'АО «Банк», IBAN KZ…, БИК …',
+    wide: true,
+  },
+  {
+    key: 'invoice_terms',
+    label: 'Условия оплаты',
+    placeholder: 'Оплата в течение 5 банковских дней с даты выставления счёта.',
+    wide: true,
+  },
+]
 
 type SettingsResponse = {
   notifications: Record<NotificationKey, boolean>
@@ -306,9 +342,36 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="field-hint">
+        <div className="field-hint" style={{ marginBottom: 18 }}>
           Ссылки появятся кнопкой «Отзывы» в шапке — персонал сможет быстро открыть профиль и
           попросить гостя оставить отзыв. Сохраняется при выходе из поля.
+        </div>
+
+        <div className="panel-title" style={{ marginTop: 8 }}>
+          Реквизиты для инвойса
+          <span className="count">печатаются в шапке счёта</span>
+        </div>
+
+        {INVOICE_FIELDS.map((item) => (
+          <div className={item.wide ? 'field' : 'field-row'} key={item.key}>
+            <div className="field">
+              <label htmlFor={item.key}>{item.label}</label>
+              <input
+                id={item.key}
+                value={text?.[item.key] ?? ''}
+                onChange={(event) =>
+                  setText((t) => t && { ...t, [item.key]: event.target.value })
+                }
+                onBlur={() => text && save({ [item.key]: text[item.key] }, item.key)}
+                placeholder={item.placeholder}
+              />
+            </div>
+          </div>
+        ))}
+
+        <div className="field-hint">
+          Пустые поля просто не печатаются — инвойс не подставляет заглушки вместо
+          незаполненных реквизитов.
         </div>
       </section>
 

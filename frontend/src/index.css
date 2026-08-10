@@ -900,6 +900,47 @@ button {
   padding-top: 4px;
 }
 
+/* Booking details on a card, opened by hover or by the "i".
+   A 40px target: on a phone this is the only way in, since there is no hover
+   and pressing the card itself navigates to the unit. */
+.unit-peek-toggle {
+  margin-left: auto;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-style: italic;
+  cursor: pointer;
+  transition: border-color 0.16s var(--ease), color 0.16s var(--ease);
+}
+
+.unit-peek-toggle:hover,
+.unit-card.is-peeking .unit-peek-toggle {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.unit-peek-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.unit-peek {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  font-size: var(--text-sm);
+}
+
+.unit-peek .info-row span:first-child {
+  min-width: 84px;
+}
+
 .money {
   font-size: 13px;
   color: var(--text-dim);
@@ -1506,10 +1547,17 @@ button {
   background: var(--surface-2);
 }
 
+/* The label is `--on-accent`, the colour that exists for exactly this: text
+   sitting on the accent fill. It used to be `--text`, which is the colour for
+   text on the *page* — on the orange gradient that measured 2.31:1 in Taura
+   Night and 2.47:1 in Taura Day, both about half the 4.5:1 floor, and it was
+   reported as "active buttons are hard to see". With `--on-accent` the same
+   gradient measures 6.98:1 and 5.85:1. `.btn-primary` had it right all along;
+   this rule was the odd one out. */
 .chip.active {
   background: linear-gradient(135deg, var(--accent), var(--accent-light));
   border-color: transparent;
-  color: var(--text);
+  color: var(--on-accent);
   box-shadow: 0 6px 18px rgb(var(--accent-rgb) / 0.36);
 }
 
@@ -2364,6 +2412,88 @@ button {
 .stay-status {
   font-size: 13px;
   color: var(--text-faint);
+}
+
+/* ── Invoice ───────────────────────────────────────────────────────────────── */
+
+/* Issuer on the left, document identity on the right — the arrangement every
+   chain hotel's folio uses, because "who is billing me" and "which document is
+   this" are the two things read first and they are read separately. */
+.invoice-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid #111;
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+}
+
+.invoice-head h1 {
+  font-size: 19px;
+  color: #111;
+}
+
+.invoice-issuer {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: #444;
+  line-height: 1.55;
+}
+
+.invoice-id {
+  text-align: right;
+  flex: none;
+}
+
+.invoice-word {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #777;
+}
+
+.invoice-no {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The one number the reader is looking for. */
+.invoice-due td {
+  font-size: 15px;
+}
+
+.invoice-note-row td {
+  border-bottom: 0;
+  padding-top: 0;
+}
+
+.invoice-terms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+  padding: 12px 14px;
+  border: 1px solid #ccc;
+}
+
+.invoice-terms p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #222;
+  white-space: pre-wrap;
+}
+
+@media print {
+  /* Never split the money off its own header row. */
+  .invoice-terms,
+  .receipt-sign {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
 
 /* ── Booking read back for checking ────────────────────────────────────────── */
@@ -4251,8 +4381,13 @@ button {
   color: var(--text);
 }
 
+/* 0.28 and not 0.34: at 0.34 this cell measured 4.41:1 in Taura Day, just under
+   the 4.5:1 floor — the ink is dark there, so a heavier fill closes the gap
+   rather than opening it. Lightening the fill measures 4.74:1 day / 6.32:1
+   night, and it stays plainly distinct from the step below it, which is a
+   different hue rather than a lighter one. */
 .tl-month[data-fill='high'] {
-  background: rgb(var(--booked-rgb) / 0.34);
+  background: rgb(var(--booked-rgb) / 0.28);
   color: var(--booked-ink);
 }
 

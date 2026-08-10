@@ -41,12 +41,13 @@ export default function CleaningSheet({ onClose }: { onClose: () => void }) {
   }, [onClose])
 
   return (
-    <div className="sheet-overlay">
+    <div className="sheet-overlay" onClick={onClose} role="presentation">
+      <div onClick={(event) => event.stopPropagation()}>
       <div className="sheet-toolbar no-print">
         <button className="btn btn-sm btn-primary" onClick={() => window.print()} disabled={!sheet}>
           Печать
         </button>
-        <button className="btn btn-sm btn-ghost" onClick={onClose}>
+        <button className="btn btn-sm" onClick={onClose}>
           Закрыть
         </button>
         <span className="field-hint">
@@ -102,6 +103,7 @@ export default function CleaningSheet({ onClose }: { onClose: () => void }) {
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }

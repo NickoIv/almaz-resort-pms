@@ -624,7 +624,7 @@ describe('§3 housekeeping shift sheet', () => {
   })
 })
 
-describe('§4 check-out receipt', () => {
+describe('§4 the invoice', () => {
   const BOOKED_ROOM = makeUnit({
     id: 5, name: '105', status: 'occupied',
     current_booking: {
@@ -664,10 +664,14 @@ describe('§4 check-out receipt', () => {
     mockApi(routes())
     renderApp(<App />, { route: '/rooms/5' })
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Печать чека' }))
-    const receipt = await screen.findByText(/Счёт-акт по брони №42/)
-    const sheet = receipt.closest('.print-sheet')!
+    await userEvent.click(await screen.findByRole('button', { name: 'Печать инвойса' }))
+    const heading = await screen.findByText('Инвойс')
+    const sheet = heading.closest('.print-sheet')!
     const q = within(sheet as HTMLElement)
+
+    // Numbered and dated, which is what makes it an invoice rather than a till
+    // receipt. The number comes from the booking, so a reprint matches.
+    expect(q.getByText('№ 2026-00042')).toBeInTheDocument()
 
     // Hotel identity comes from settings, not a hard-coded string.
     expect(q.getByText('Taura')).toBeInTheDocument()
@@ -678,7 +682,7 @@ describe('§4 check-out receipt', () => {
     expect(q.getByText('+7 707 314 88 20')).toBeInTheDocument()
 
     // Line items: rate plus each charge by its reason.
-    expect(q.getByText('Проживание')).toBeInTheDocument()
+    expect(q.getByText(/Проживание/)).toBeInTheDocument()
     expect(q.getByText(/Поздний выезд/)).toBeInTheDocument()
     expect(q.getByText(/Испорченное имущество/)).toBeInTheDocument()
 
@@ -706,7 +710,7 @@ describe('§4 check-out receipt', () => {
     renderApp(<App />, { route: '/rooms/6' })
 
     await screen.findByRole('heading', { name: /Номер 106/ })
-    expect(screen.queryByRole('button', { name: 'Печать чека' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Печать инвойса' })).not.toBeInTheDocument()
   })
 })
 
@@ -2026,9 +2030,9 @@ describe('§20 printing from a unit, a booking or a person', () => {
 
     await waitFor(() => expect(document.querySelector('.tl-bar')).toBeTruthy())
     await userEvent.click(document.querySelector('.tl-bar') as HTMLElement)
-    await userEvent.click(await screen.findByRole('button', { name: 'Печать брони' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Печать инвойса' }))
 
-    const sheet = (await screen.findByText(/Счёт-акт по брони №42/)).closest('.print-sheet')!
+    const sheet = (await screen.findByText('Инвойс')).closest('.print-sheet')!
     const q = within(sheet as HTMLElement)
 
     // The charge and the payment were fetched for this booking alone.
@@ -2036,5 +2040,155 @@ describe('§20 printing from a unit, a booking or a person', () => {
     // In Russian, not the raw column value — a guest reads this line.
     expect(q.getByText(/Kaspi/)).toBeInTheDocument()
     expect(q.getByText(/принял\(а\) Ержан Тулеуов/)).toBeInTheDocument()
+  })
+})
+
+describe('§23 a unit with a guest in it can still be booked ahead', () => {
+  const OCCUPIED = makeUnit({
+    id: 5,
+    name: '105',
+    status: 'occupied',
+    current_booking: {
+      id: 42,
+      guest_name: 'Асель Жумабаева',
+      guest_phone: '+77073148820',
+      date_from: '2026-08-07',
+      date_to: '2026-08-12',
+      status: 'occupied',
+      is_paid: false,
+      verified_at: null,
+      total_amount: 240000,
+      prepaid_amount: 120000,
+      deposit_amount: 0,
+      charges_amount: 0,
+      remaining_amount: 120000,
+      currency: 'KZT',
+    },
+  })
+
+  function routes() {
+    return {
+      ...baseRoutes('admin', [OCCUPIED]),
+      'GET /api/units/5': OCCUPIED,
+      'GET /api/units/5/calendar': CALENDAR,
+      'GET /api/bookings/42/payments': [],
+      'GET /api/bookings/42/charges': [],
+      'GET /api/staff': [{ ...STAFF.admin, is_active: true }],
+    }
+  }
+
+  it('offers a new booking as well as editing the current one', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/5' })
+
+    await screen.findByRole('heading', { name: /Номер 105/ })
+    // Both, and they are different acts: one edits the stay running now, the
+    // other takes a reservation for later. There used to be a single button
+    // that became «Изменить бронь» whenever the room was occupied, which left
+    // no way at all to book next week on a room with a guest in it today.
+    expect(screen.getByRole('button', { name: 'Изменить бронь' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Новая бронь' })).toBeInTheDocument()
+  })
+
+  it('opens the new booking empty, starting the morning the guest leaves', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/5' })
+
+    await screen.findByRole('heading', { name: /Номер 105/ })
+    await userEvent.click(screen.getByRole('button', { name: 'Новая бронь' }))
+
+    // A new booking, not booking 42 reopened.
+    expect(await screen.findByRole('heading', { name: 'Новая бронь' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Гость')).toHaveValue('')
+
+    // Defaulting to today would open the form on dates the server always
+    // refuses, because today is taken.
+    const dates = [...document.querySelectorAll('.modal input[type=date]')] as HTMLInputElement[]
+    expect(dates[0].value).toBe('2026-08-12')
+    expect(dates[1].value).toBe('2026-08-13')
+  })
+
+  it('still opens the running stay when that is what was asked for', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/5' })
+
+    await screen.findByRole('heading', { name: /Номер 105/ })
+    await userEvent.click(screen.getByRole('button', { name: 'Изменить бронь' }))
+
+    expect(await screen.findByRole('heading', { name: 'Бронь #42' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Гость')).toHaveValue('Асель Жумабаева')
+  })
+})
+
+describe('§24 a recreation unit shows its booking without leaving the grid', () => {
+  // A sunbed, not a gazebo: «Топчаны» is the tab the page opens on, and a
+  // gazebo fixture is filtered out of it before it ever reaches a card.
+  const SUNBED_BOOKED = makeUnit({
+    id: 20,
+    type: 'sunbed',
+    name: 'Топчан 1',
+    status: 'occupied',
+    current_booking: {
+      id: 77,
+      guest_name: 'Динара Касымова',
+      guest_phone: '+77012223344',
+      date_from: '2026-08-08 13:00',
+      date_to: '2026-08-08 18:00',
+      status: 'occupied',
+      is_paid: false,
+      verified_at: null,
+      total_amount: 45000,
+      prepaid_amount: 5000,
+      deposit_amount: 0,
+      charges_amount: 0,
+      remaining_amount: 40000,
+      currency: 'KZT',
+    },
+  })
+
+  it('opens the details on the card itself when the "i" is pressed', async () => {
+    signIn('admin')
+    mockApi({ ...baseRoutes('admin', [SUNBED_BOOKED]), 'GET /api/units': [SUNBED_BOOKED] })
+    renderApp(<App />, { route: '/restaurant' })
+
+    await screen.findByRole('heading', { name: 'Зона отдыха' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Показать детали брони' }))
+
+    const peek = document.querySelector('.unit-peek') as HTMLElement
+    const q = within(peek)
+    expect(q.getByText('Динара Касымова')).toBeInTheDocument()
+    expect(q.getByText('+77012223344')).toBeInTheDocument()
+    // Sold by the hour, so the clock and not a date range.
+    expect(q.getByText(/13:00 — 18:00/)).toBeInTheDocument()
+    expect(q.getByText(/40 000/)).toBeInTheDocument()
+    // Still on the grid: the page did not navigate to the unit.
+    expect(screen.getByRole('heading', { name: 'Зона отдыха' })).toBeInTheDocument()
+  })
+
+  it('does not follow the reader down the grid once they move away', async () => {
+    signIn('admin')
+    mockApi({ ...baseRoutes('admin', [SUNBED_BOOKED]), 'GET /api/units': [SUNBED_BOOKED] })
+    renderApp(<App />, { route: '/restaurant' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Показать детали брони' }))
+    expect(document.querySelector('.unit-peek')).toBeTruthy()
+
+    // Leaving the card clears the pin as well as the hover, so a panel opened
+    // on one card is not still open behind the next fourteen.
+    await userEvent.unhover(document.querySelector('.unit-card') as HTMLElement)
+    expect(document.querySelector('.unit-peek')).toBeNull()
+  })
+
+  it('offers nothing to open on a unit with no booking', async () => {
+    const free = makeUnit({ id: 21, type: 'sunbed', name: 'Топчан 2', status: 'free' })
+    signIn('admin')
+    mockApi({ ...baseRoutes('admin', [free]), 'GET /api/units': [free] })
+    renderApp(<App />, { route: '/restaurant' })
+
+    await screen.findByRole('heading', { name: 'Зона отдыха' })
+    expect(screen.queryByRole('button', { name: 'Показать детали брони' })).not.toBeInTheDocument()
   })
 })

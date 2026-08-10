@@ -9,10 +9,10 @@ import GuestHistoryModal from '../components/GuestHistoryModal'
 import MonthCalendar from '../components/MonthCalendar'
 import PaymentModal from '../components/PaymentModal'
 import PhotoGallery from '../components/PhotoGallery'
-import ReceiptSheet from '../components/ReceiptSheet'
+import InvoiceSheet from '../components/InvoiceSheet'
 import UnitSheet from '../components/UnitSheet'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
-import { almatyMonth, dateRange, money, timeRange } from '../format'
+import { addDaysIso, almatyMonth, dateRange, money, timeRange, todayIso } from '../format'
 import { CANCEL_REASON_LABELS, type CancelReason } from '../cancellation'
 import {
   PAYMENT_METHOD_LABELS,
@@ -58,11 +58,14 @@ export default function UnitDetailPage() {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Two separate intents: `showBooking` takes a new reservation (which may be
+  // for dates months away), `editBooking` opens the stay that is running now.
   const [showBooking, setShowBooking] = useState(false)
+  const [editBooking, setEditBooking] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
   const [showCharge, setShowCharge] = useState(false)
   const [showGuest, setShowGuest] = useState(false)
-  const [showReceipt, setShowReceipt] = useState(false)
+  const [showInvoice, setShowInvoice] = useState(false)
   const [showUnitSheet, setShowUnitSheet] = useState(false)
   const [sendingToCleaning, setSendingToCleaning] = useState(false)
 
@@ -170,6 +173,16 @@ export default function UnitDetailPage() {
   const isRoom = unit.type === 'room'
   const booking = unit.current_booking ?? unit.next_booking
   const active = unit.current_booking
+
+  /**
+   * Where a new reservation should start.
+   *
+   * The morning the current guest leaves, not today: today is taken, and
+   * offering it as the default made the form open on dates the server was
+   * always going to refuse. Falls back to today when the unit is empty.
+   */
+  const nextFreeDay =
+    active?.date_to && isRoom ? active.date_to.slice(0, 10) : todayIso()
   const rate = active?.total_amount ?? 0
   const chargesTotal = active?.charges_amount ?? 0
   const prepaid = active?.prepaid_amount ?? 0
@@ -202,8 +215,8 @@ export default function UnitDetailPage() {
           </button>
           {isAdmin && active && (
             <>
-              <button className="btn btn-sm" onClick={() => setShowReceipt(true)}>
-                Печать чека
+              <button className="btn btn-sm" onClick={() => setShowInvoice(true)}>
+                Печать инвойса
               </button>
               <button className="btn btn-sm" onClick={() => setShowCharge(true)}>
                 Начислить
@@ -211,11 +224,23 @@ export default function UnitDetailPage() {
               <button className="btn btn-sm" onClick={() => setShowPayment(true)}>
                 Внести оплату
               </button>
+              <button className="btn btn-sm" onClick={() => setEditBooking(true)}>
+                Изменить бронь
+              </button>
             </>
           )}
+          {/*
+            Booking ahead is not editing what is here now.
+
+            These used to be one button that said «Изменить бронь» whenever the
+            unit was occupied, which left no way at all to take a reservation for
+            next week on a room with a guest in it today — the single case a
+            hotel needs most. They are two controls because they are two
+            different acts on two different bookings.
+          */}
           {isAdmin && (
             <button className="btn btn-sm btn-primary" onClick={() => setShowBooking(true)}>
-              {active ? 'Изменить бронь' : 'Новая бронь'}
+              Новая бронь
             </button>
           )}
         </div>
@@ -472,15 +497,32 @@ export default function UnitDetailPage() {
         </div>
       </div>
 
+      {/* A new reservation, even when someone is in the unit today: `booking` is
+          null on purpose, and the dates default to the first night after the
+          current stay ends rather than to today, which is taken. */}
       {showBooking && (
         <BookingModal
           unitId={unit.id}
           unitType={unit.type}
           unitName={unit.name}
-          booking={active ?? null}
+          booking={null}
           canSetPrice={isAdmin}
           hourly={!isRoom}
+          initialFrom={nextFreeDay}
+          initialTo={isRoom ? addDaysIso(nextFreeDay, 1) : undefined}
           onClose={() => setShowBooking(false)}
+          onSaved={refreshAll}
+        />
+      )}
+      {editBooking && active && (
+        <BookingModal
+          unitId={unit.id}
+          unitType={unit.type}
+          unitName={unit.name}
+          booking={active}
+          canSetPrice={isAdmin}
+          hourly={!isRoom}
+          onClose={() => setEditBooking(false)}
           onSaved={refreshAll}
         />
       )}
@@ -501,13 +543,13 @@ export default function UnitDetailPage() {
       {showGuest && booking?.guest_phone && (
         <GuestHistoryModal phone={booking.guest_phone} onClose={() => setShowGuest(false)} />
       )}
-      {showReceipt && active && (
-        <ReceiptSheet
+      {showInvoice && active && (
+        <InvoiceSheet
           unit={unit}
           booking={active}
           charges={charges}
           payments={payments}
-          onClose={() => setShowReceipt(false)}
+          onClose={() => setShowInvoice(false)}
         />
       )}
       {showUnitSheet && <UnitSheet unit={unit} onClose={() => setShowUnitSheet(false)} />}

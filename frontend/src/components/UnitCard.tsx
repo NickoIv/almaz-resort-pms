@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { StatusDot } from './ui'
 import { dateRange, money, timeRange } from '../format'
 import { STATUS_LABELS, type Unit } from '../types'
@@ -24,8 +25,33 @@ export default function UnitCard({
   const showsAmounts = active?.total_amount !== undefined
   const due = (active?.remaining_amount ?? 0) > 0
 
+  /**
+   * The details panel: open while the pointer is over the card, or once the
+   * "i" has been pressed. Two states rather than one, because a single flag
+   * made the two ways in fight — hovering set it, and the click that followed
+   * on the same gesture toggled it straight back off, so pressing "i" on a
+   * desktop closed the panel that hovering had just opened.
+   *
+   * Pressing is what a phone has: there is no hover there, and pressing the
+   * card itself navigates away from the grid being scanned.
+   *
+   * Leaving the card clears both, so a pinned panel does not follow the reader
+   * down a grid of fourteen cards.
+   */
+  const [hovered, setHovered] = useState(false)
+  const [pinned, setPinned] = useState(false)
+  const open = Boolean(booking) && (hovered || pinned)
+
   return (
-    <div className="unit-card glass" data-status={unit.status}>
+    <div
+      className={`unit-card glass ${open ? 'is-peeking' : ''}`}
+      data-status={unit.status}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => {
+        setHovered(false)
+        setPinned(false)
+      }}
+    >
       <button type="button" className="unit-card-hit" onClick={() => onOpen(unit)}>
         <div className="unit-card-top">
           <div>
@@ -82,8 +108,76 @@ export default function UnitCard({
           </span>
         )}
 
+        {booking && (
+          <button
+            type="button"
+            className="unit-peek-toggle"
+            aria-expanded={open}
+            aria-label={open ? 'Скрыть детали брони' : 'Показать детали брони'}
+            onClick={() => setPinned((was) => !was)}
+          >
+            i
+          </button>
+        )}
+
         {action}
       </div>
+
+      {/* What a sunbed or a gazebo is actually booked for. It was on no screen
+          short of opening the unit: the card showed a name and a clock range,
+          and answering "whose is it, and have they paid" meant leaving the grid
+          you were reading. */}
+      {open && booking && (
+        <div className="unit-peek" role="group" aria-label="Детали брони">
+          <div className="info-rows">
+            <div className="info-row">
+              <span>Гость</span>
+              <span>{booking.guest_name || '—'}</span>
+            </div>
+            <div className="info-row">
+              <span>Телефон</span>
+              <span>{booking.guest_phone || 'не указан'}</span>
+            </div>
+            <div className="info-row">
+              <span>{hourly ? 'Время' : 'Даты'}</span>
+              <span>
+                {hourly
+                  ? timeRange(booking.date_from, booking.date_to)
+                  : dateRange(booking.date_from, booking.date_to)}
+              </span>
+            </div>
+            <div className="info-row">
+              <span>Статус</span>
+              <span>
+                {isUpcoming ? 'ещё не заехал' : STATUS_LABELS[unit.status]}
+                {!booking.verified_at && ' · не проверена'}
+              </span>
+            </div>
+            {/* Amounts only where the API sent them — a waiter sees the paid
+                flag on the card and nothing more, and this must not become a
+                way around that. */}
+            {booking.total_amount !== undefined && (
+              <>
+                <div className="info-row">
+                  <span>Начислено</span>
+                  <span>
+                    {money(
+                      (booking.total_amount ?? 0) + (booking.charges_amount ?? 0),
+                      booking.currency
+                    )}
+                  </span>
+                </div>
+                <div className="info-row">
+                  <span>Остаток</span>
+                  <span className={(booking.remaining_amount ?? 0) > 0 ? 'money-due' : undefined}>
+                    {money(booking.remaining_amount, booking.currency)}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

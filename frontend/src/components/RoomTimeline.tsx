@@ -206,6 +206,7 @@ export default function RoomTimeline({
   const [clash, setClash] = useState<string | null>(null)
   const [popover, setPopover] = useState<Popover | null>(null)
   const board = useRef<HTMLDivElement>(null)
+  const scroller = useRef<HTMLDivElement>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -225,6 +226,35 @@ export default function RoomTimeline({
   useEffect(load, [load, reloadKey])
 
   const today = todayIso()
+
+  /**
+   * Bring today into view once the window that contains it has loaded.
+   *
+   * A calendar month starts on the 1st, and the board only ever shows six or
+   * seven columns on a phone — so pressing «Месяц» on the 20th opened on the
+   * 1st and left the reader looking at three weeks that had already happened,
+   * with today somewhere off the right edge. The month is still the whole month;
+   * this only decides which part of it the scroller is parked on.
+   *
+   * Geometry rather than `offsetLeft`, which is measured against the nearest
+   * positioned ancestor and would be wrong the moment one appears; and
+   * `scrollLeft` rather than `scrollIntoView`, which would also scroll the page.
+   */
+  useEffect(() => {
+    if (scale === 'year' || !data) return
+    const box = scroller.current
+    if (!box) return
+    if (!data.dates.includes(today)) return
+
+    const cell = box.querySelector('.tl-head .tl-day.is-today')
+    if (!cell) return
+
+    // A third of a screen in from the left, so the days just before today stay
+    // visible — they are the context that makes "today" mean anything.
+    const offset =
+      cell.getBoundingClientRect().left - box.getBoundingClientRect().left - box.clientWidth / 3
+    box.scrollLeft = Math.max(0, box.scrollLeft + offset)
+  }, [data, scale, today])
 
   /** Move the anchor by one of whatever is currently on screen. */
   const step = useCallback(
@@ -560,7 +590,7 @@ export default function RoomTimeline({
       ) : loading && !data ? (
         <Spinner />
       ) : !data ? null : (
-        <div className="timeline-scroll">
+        <div className="timeline-scroll" ref={scroller}>
           {/* While a run is being drawn the bars stop swallowing the pointer,
               so the selection can extend across an occupied stretch and say
               in red why it will not be accepted. Without this the drag simply
@@ -754,7 +784,7 @@ export default function RoomTimeline({
                 onPrintBooking(booking, room.unit_name)
               }}
             >
-              Печать брони
+              Печать инвойса
             </button>
             <button
               className="btn btn-sm"

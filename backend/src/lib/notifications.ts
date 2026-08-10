@@ -41,6 +41,32 @@ export const TEXT_SETTINGS = {
   reviews_2gis_url:
     'https://2gis.kz/almaty/geo/9429940001542859/76.908229,43.126376',
   reviews_google_url: '',
+
+  /*
+   * Legal details for the invoice.
+   *
+   * All empty by default, and the invoice omits any line that is still empty
+   * rather than printing a placeholder. An invoice is a document someone may
+   * put into their own accounts: a fabricated BIN or a bank account nobody
+   * checked is worse than a missing line, because a missing line is obvious and
+   * a wrong one is not.
+   *
+   * No migration adds these — `loadTextSettings` falls back to the default for
+   * any key with no row, so an unset key is simply the default.
+   */
+
+  /** Legal entity, e.g. «ТОО "Таура"» — the name money is owed to. */
+  invoice_legal_name: '',
+  /** БИН / ИИН. */
+  invoice_tax_id: '',
+  /** Registered address, when it differs from the one guests visit. */
+  invoice_legal_address: '',
+  /** Phone and e-mail for billing questions. */
+  invoice_contact: '',
+  /** Bank, IBAN and BIC, as one block; printed verbatim. */
+  invoice_bank: '',
+  /** Payment terms, printed at the foot. */
+  invoice_terms: '',
 } as const
 
 export type TextSettingKey = keyof typeof TEXT_SETTINGS

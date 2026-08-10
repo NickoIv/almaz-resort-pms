@@ -4,7 +4,7 @@ import { api } from '../api'
 import { useAuth } from '../auth'
 import BookingModal from '../components/BookingModal'
 import GroupBookingModal from '../components/GroupBookingModal'
-import ReceiptSheet from '../components/ReceiptSheet'
+import InvoiceSheet from '../components/InvoiceSheet'
 import RoomTimeline from '../components/RoomTimeline'
 import UnitCard from '../components/UnitCard'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
@@ -308,7 +308,7 @@ export default function RoomsPage() {
 
       {/* Printed from a bar, so the object is always a room. */}
       {printing && (
-        <ReceiptSheet
+        <InvoiceSheet
           unit={{ name: printing.unitName, type: 'room' }}
           booking={printing.booking}
           charges={printing.charges}
