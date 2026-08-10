@@ -4227,20 +4227,42 @@ button {
   z-index: 1;
 }
 
-/* On the dashboard it is a texture rather than a picture: a quarter of the
-   opacity, clipped to the heading strip, and stopped short of the text. */
+/* On the dashboard it is a horizon under the heading rather than a picture:
+   quieter than the login screen, but a line the eye can find.
+
+   It used to sit bottom-right at 55% width and `opacity: 0.22`. Against the
+   page that measures **1.17:1 for the near ridge and 1.08:1 for the far one**
+   — which is not "subtle", it is invisible, and it was reported as exactly
+   that. A phone fix had already raised the same drawing to 0.5 inside the
+   ≤760px block and left the desktop on the old value, so the two widths
+   disagreed and only the smaller one had been looked at.
+
+   At 0.9 the near ridge measures 2.22:1 night / 2.02:1 day: plainly a drawing,
+   still far below anything readable, and clear of the ~0.4 effective opacity
+   below which this line was measured to read as a smudge. */
 .page-head.has-ridge {
   position: relative;
   overflow: hidden;
+  padding-bottom: 74px;
 }
 
 .ridge-dashboard {
   position: absolute;
+  left: 0;
   right: 0;
-  bottom: -16px;
-  width: min(520px, 55%);
-  height: 96px;
-  opacity: 0.22;
+  bottom: 0;
+  /* Explicit, not `auto`. An SVG is a replaced element, so `width: auto` on an
+     absolutely positioned one resolves to the drawing's own intrinsic width and
+     `right` is dropped as over-constrained — the ridge stopped less than half
+     way across the heading instead of reaching both edges. */
+  width: 100%;
+  /* Full width at a heading-strip height, which only works with `slice`:
+     `meet` would letterbox the 1200×220 viewBox and demand a fifth of the
+     width in height — about 200px for a desktop — or else shrink the drawing
+     into a fragment floating in the middle. `slice` crops the top instead,
+     and the top is sky. */
+  height: 112px;
+  opacity: 0.9;
   z-index: 0;
 }
 
@@ -4251,31 +4273,16 @@ button {
 }
 
 @media (max-width: 760px) {
-  /* On a phone it stops being a texture behind the title — there is no room
-     for that — and becomes a horizon line under it instead. Full width, out of
-     the flex flow so it spans the whole head rather than sitting beside the
-     text, and anchored to the bottom edge so the peaks land clear of the
-     heading. It is the one piece of the place itself in the interface; hiding
-     it on the device most of the staff actually use meant nobody saw it. */
+  /* A phone has less room for it, so the strip is shorter — but it is the same
+     horizon at the same opacity. This block used to carry a second, brighter
+     value of its own, which is how the desktop came to be left behind on a
+     setting that had already been rejected here. One drawing, one opacity. */
   .page-head.has-ridge {
     padding-bottom: 58px;
   }
 
   .ridge-dashboard {
-    right: 0;
-    left: 0;
-    bottom: 0;
-    width: auto;
-    /* The viewBox is 1200×220, and preserveAspectRatio letterboxes rather than
-       stretches — so at 40px tall the drawing was only ~220px wide and floated
-       in the middle of the page. Roughly one fifth of the available width is
-       what makes the line actually reach both edges. Distorting it with
-       preserveAspectRatio="none" would have been the other option, and a
-       squashed mountain looks like a mistake. */
     height: 64px;
-    /* Brighter than on a desktop: at this size the line is short, and at the
-       old 0.22 it read as a smudge rather than as mountains. */
-    opacity: 0.5;
   }
 }
 

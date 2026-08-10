@@ -10,12 +10,27 @@
  * farther, lighter one, which is what makes it read as depth instead of a
  * zigzag.
  */
-export default function MountainRidge({ className = '' }: { className?: string }) {
+export default function MountainRidge({
+  className = '',
+  fit = 'meet',
+}: {
+  className?: string
+  /**
+   * `meet` fits the whole drawing inside the box and letterboxes the rest —
+   * right for the login screen, where there is room for all of it.
+   *
+   * `slice` covers the box and crops instead. The dashboard needs it: the
+   * viewBox is 1200×220, so fitting a full-width ridge into a heading strip
+   * would demand a fifth of the width in height. Cropping takes the crop off
+   * the top, which is sky, and lets the line reach both edges at any height.
+   */
+  fit?: 'meet' | 'slice'
+}) {
   return (
     <svg
       className={`ridge ${className}`}
       viewBox="0 0 1200 220"
-      preserveAspectRatio="xMidYMax meet"
+      preserveAspectRatio={`xMidYMax ${fit}`}
       aria-hidden="true"
       focusable="false"
     >

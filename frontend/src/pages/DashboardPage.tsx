@@ -90,9 +90,11 @@ export default function DashboardPage() {
   return (
     <>
       <div className="page-head has-ridge">
-        {/* Much fainter than on the login screen: a texture behind the
-            heading, never something the eye has to resolve. */}
-        <MountainRidge className="ridge-dashboard" />
+        {/* Fainter than on the login screen, but a horizon the eye can
+            actually find: the ridge is the one piece of the place itself in
+            the interface, and there is no point drawing it at an opacity that
+            makes it indistinguishable from the page. */}
+        <MountainRidge className="ridge-dashboard" fit="slice" />
         <div>
           <h1>Сводка</h1>
           <div className="page-sub">Положение дел на {today}</div>
