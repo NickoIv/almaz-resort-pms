@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import { Alert, Spinner } from '../components/ui'
 import { useAuth } from '../auth'
-import { roleHasAlerts } from '../useAlerts'
+import type { Role } from '../types'
 import {
   currentSubscription,
   disablePush,
@@ -30,6 +30,24 @@ type Device = {
  * nobody can do it for them — the browser will only accept the request from a
  * gesture by the person sitting in front of it.
  */
+
+/**
+ * What each role actually gets, in their own terms.
+ *
+ * Not decoration: a person deciding whether to allow notifications is deciding
+ * how often their phone will interrupt them, and "уведомления о событиях" does
+ * not answer that. The lists mirror what lib/alerts computes per role — money
+ * appears in none of them, because only the admin may see it at all.
+ */
+const WHAT_ARRIVES: Record<Role, string> = {
+  admin:
+    'просроченная уборка, новая бронь от коллеги, совпадение по листу ожидания ' +
+    'и скорый приезд гостей в зону отдыха',
+  housekeeper: 'номера, где уборка просрочена',
+  waiter:
+    'скорый приезд гостей в беседку или на топчан — за час до брони — ' +
+    'и просроченная уборка в зоне отдыха',
+}
 
 /** A browser string is unreadable; this is only to tell two devices apart. */
 function deviceName(userAgent: string | null): string {
@@ -116,7 +134,6 @@ export default function NotificationsPage() {
   if (subscribedHere === null || serverReady === null) return <Spinner />
 
   const canSubscribe = support.kind === 'ready' && serverReady
-  const hasAlerts = user ? roleHasAlerts(user.role) : false
 
   return (
     <>
@@ -190,19 +207,10 @@ export default function NotificationsPage() {
         </div>
 
         <div className="field-hint" style={{ marginTop: 16 }}>
-          {hasAlerts ? (
-            <>
-              Придёт то же, что показывает колокольчик: просроченная уборка, новая бронь, коллега
-              из листа ожидания. Разница в том, что уведомление догонит вас, когда приложение
-              закрыто. Одно событие — одно уведомление; если накопилось много, придёт одна общая
-              сводка, а не десять отдельных.
-            </>
-          ) : (
-            <>
-              Для вашей роли отдельных событий пока нет — уведомления включатся, как только они
-              появятся. Задачи по зоне отдыха видны на странице «Зона отдыха».
-            </>
-          )}
+          Придёт то же, что показывает колокольчик, — {WHAT_ARRIVES[user?.role ?? 'waiter']}.
+          Разница в том, что уведомление догонит вас, когда приложение закрыто. Одно событие —
+          одно уведомление; если накопилось много, придёт одна общая сводка, а не десять
+          отдельных.
         </div>
       </section>
 

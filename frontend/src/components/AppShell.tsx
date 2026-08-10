@@ -74,7 +74,7 @@ export default function AppShell() {
   }, [])
 
   // Hooks must run before the early return, so the role is read defensively.
-  const { alerts, acknowledge, acknowledgeAll } = useAlerts(user?.role ?? 'waiter')
+  const { alerts, acknowledge, acknowledgeAll } = useAlerts()
 
   if (!user) return null
 

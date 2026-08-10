@@ -43,6 +43,18 @@ const BOOKING_ALERT = {
   at: '2026-08-09 10:00',
 }
 
+// The one alert a waiter can act on: a gazebo booked for a time that has not
+// arrived yet, so there is still room to prepare it. No money in it — only the
+// admin may see money, and an alert must not route around that.
+const ARRIVAL_ALERT = {
+  id: 'upcoming:77',
+  kind: 'upcoming' as const,
+  title: 'Скоро гости — Беседка 1',
+  detail: 'через 40 мин, Динара Касымова',
+  href: '/units/20',
+  at: '2026-08-09 14:00',
+}
+
 function routes(role: 'admin' | 'housekeeper' | 'waiter', alerts: unknown[], calls?: string[]) {
   return {
     'GET /api/auth/me': { user: STAFF[role] },
@@ -228,16 +240,46 @@ describe('§13 alerts — role scope', () => {
     expect(calls.length).toBeGreaterThan(0)
   })
 
-  it('never asks on behalf of a waiter', async () => {
+  it('asks on behalf of a waiter too, and shows them an arrival', async () => {
     const calls: string[] = []
     signIn('waiter')
-    mockApi(routes('waiter', [], calls))
+    mockApi(routes('waiter', [ARRIVAL_ALERT], calls))
     renderApp(<App />, { route: '/restaurant' })
 
     await screen.findByRole('heading', { name: 'Зона отдыха' })
-    // Waiters have no alerts of their own; the request would only earn a 403.
-    expect(calls).toHaveLength(0)
-    expect(screen.queryByRole('button', { name: /Событий/ })).toBeNull()
+
+    // Waiters used to be excluded entirely. They are polled now because the
+    // arrival alert is something only they can act on.
+    await waitFor(() => expect(calls.length).toBeGreaterThan(0))
+    const bell = await screen.findByRole('button', { name: /Событий, требующих внимания: 1/ })
+    await userEvent.click(bell)
+
+    expect(screen.getByText('Скоро гости — Беседка 1')).toBeInTheDocument()
+    expect(screen.getByText(/через 40 мин, Динара Касымова/)).toBeInTheDocument()
+    // The label a waiter reads, not the internal kind.
+    expect(screen.getByText('Скоро гости')).toBeInTheDocument()
+  })
+
+  it('sends a waiter to the unit, where they can act on it', async () => {
+    signIn('waiter')
+    mockApi({
+      ...routes('waiter', [ARRIVAL_ALERT]),
+      'GET /api/units/20': makeUnit({ id: 20, type: 'gazebo', name: 'Беседка 1' }),
+      'GET /api/units/20/calendar': {
+        unit: { id: 20, name: 'Беседка 1', type: 'gazebo' },
+        month: '2026-08',
+        days: [],
+        bookings: [],
+      },
+    })
+    renderApp(<App />, { route: '/restaurant' })
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Событий, требующих внимания: 1/ })
+    )
+    await userEvent.click(screen.getByText('Скоро гости — Беседка 1'))
+
+    expect(await screen.findByRole('heading', { name: /Беседка 1/ })).toBeInTheDocument()
   })
 })
 

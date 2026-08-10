@@ -1,4 +1,4 @@
-import { computeAlerts, roleHasAlerts, type Alert } from './alerts'
+import { computeAlerts, type Alert } from './alerts'
 import {
   PushSubscriptionGone,
   sendPush,
@@ -169,8 +169,6 @@ export async function sweepAndPush(db: D1Database, keys: VapidKeys): Promise<Pus
   const out: PushResult[] = []
 
   for (const person of audience) {
-    if (!roleHasAlerts(person.role)) continue
-
     const alerts = await computeAlerts(db, { id: person.id, role: person.role })
 
     const fresh: Alert[] = []

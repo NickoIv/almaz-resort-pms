@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api'
 import { playChime } from './sound'
-import type { Role } from './types'
 
-export type AlertKind = 'sla' | 'waitlist' | 'booking'
+export type AlertKind = 'sla' | 'waitlist' | 'booking' | 'upcoming'
 
 export type StaffAlert = {
   id: string
@@ -24,11 +23,6 @@ type AlertsResponse = {
 const POLL_MS = 45_000
 
 const ACK_KEY = 'taura_pms_acked_alerts'
-
-/** Waiters have no alerts of their own; polling would only earn them a 403. */
-export function roleHasAlerts(role: Role): boolean {
-  return role === 'admin' || role === 'housekeeper'
-}
 
 function readAcked(): string[] {
   try {
@@ -60,9 +54,7 @@ function writeAcked(ids: string[]): void {
  * The chime plays once per poll in which something new turned up, not once per
  * alert. Ten overdue rooms at the start of a shift is one event to a person.
  */
-export function useAlerts(role: Role) {
-  const enabled = roleHasAlerts(role)
-
+export function useAlerts() {
   const [alerts, setAlerts] = useState<StaffAlert[]>([])
   const [acked, setAcked] = useState<string[]>(readAcked)
 
@@ -71,7 +63,6 @@ export function useAlerts(role: Role) {
   const announced = useRef<Set<string>>(new Set())
 
   const load = useCallback(async () => {
-    if (!enabled) return
     try {
       const data = await api<AlertsResponse>('/alerts')
       const live = data.alerts
@@ -97,10 +88,9 @@ export function useAlerts(role: Role) {
       // A failed poll leaves the previous list alone. An alert banner that
       // blinked out whenever the network hiccupped would be worse than stale.
     }
-  }, [enabled])
+  }, [])
 
   useEffect(() => {
-    if (!enabled) return
     void load()
     const timer = setInterval(() => void load(), POLL_MS)
     // Coming back to the tab should show the current state, not wait out the
@@ -111,7 +101,7 @@ export function useAlerts(role: Role) {
       clearInterval(timer)
       window.removeEventListener('focus', onFocus)
     }
-  }, [enabled, load])
+  }, [load])
 
   const visible = useMemo(
     () => alerts.filter((alert) => !acked.includes(alert.id)),

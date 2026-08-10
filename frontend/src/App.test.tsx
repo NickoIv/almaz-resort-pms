@@ -1436,7 +1436,7 @@ describe('§15 notifications page', () => {
     expect(screen.getByText('2026-08-10 11:00')).toBeInTheDocument()
   })
 
-  it('is reachable by a waiter, who is told there is nothing for them yet', async () => {
+  it('tells a waiter what will actually reach them, in their own terms', async () => {
     signIn('waiter')
     mockApi({
       ...routes(),
@@ -1445,6 +1445,19 @@ describe('§15 notifications page', () => {
     renderApp(<App />, { route: '/notifications' })
 
     await screen.findByRole('heading', { name: 'Уведомления' })
-    expect(screen.getByText(/отдельных событий пока нет/)).toBeInTheDocument()
+    // Someone deciding whether to let their phone interrupt them needs to know
+    // what for. A waiter gets arrivals, not rooms and not the waitlist.
+    expect(screen.getByText(/скорый приезд гостей/)).toBeInTheDocument()
+    expect(screen.queryByText(/листу ожидания/)).not.toBeInTheDocument()
+  })
+
+  it('tells a housekeeper something different', async () => {
+    signIn('housekeeper')
+    mockApi(routes())
+    renderApp(<App />, { route: '/notifications' })
+
+    await screen.findByRole('heading', { name: 'Уведомления' })
+    expect(screen.getByText(/номера, где уборка просрочена/)).toBeInTheDocument()
+    expect(screen.queryByText(/приезд гостей/)).not.toBeInTheDocument()
   })
 })

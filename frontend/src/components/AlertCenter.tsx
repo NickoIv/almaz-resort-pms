@@ -7,12 +7,14 @@ const KIND_ICON: Record<AlertKind, string> = {
   sla: '🧹',
   waitlist: '📝',
   booking: '🗓',
+  upcoming: '⏰',
 }
 
 const KIND_LABEL: Record<AlertKind, string> = {
   sla: 'Уборка',
   waitlist: 'Лист ожидания',
   booking: 'Бронь',
+  upcoming: 'Скоро гости',
 }
 
 /**

@@ -15,8 +15,9 @@ const alerts = new Hono<AppEnv>()
  * sweep — see the notes there on role scoping and on why the ids are stable.
  */
 
-// Waiters have nothing in this set they can act on; see lib/alerts.
-const canSeeAlerts = requireRole('admin', 'housekeeper')
+// Every role now has something in this set; what each one gets is decided in
+// lib/alerts, from allowedUnitTypes and from what the role can act on.
+const canSeeAlerts = requireRole('admin', 'housekeeper', 'waiter')
 
 alerts.get('/', canSeeAlerts, async (c) => {
   const staff = c.get('staff')

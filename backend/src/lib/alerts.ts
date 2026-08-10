@@ -14,7 +14,12 @@ import type { Role, UnitType } from '../types'
  *
  * Role scoping stays on the server, like everywhere else: a housekeeper's poll
  * must not carry a booking she is not allowed to see, not even for the client
- * to filter out.
+ * to filter out. **Every role gets something**, but not the same things — the
+ * set is derived from `allowedUnitTypes` and from what the role can act on.
+ *
+ * Money stays out of it entirely. `canSeeMoney` allows only the admin, so there
+ * is no alert about an unpaid balance; an alert is a poor place to route around
+ * an access rule.
  *
  * Every alert carries a **stable id**. The client remembers which ids it has
  * announced and which the user dismissed; the push sweep remembers which it has
@@ -32,10 +37,19 @@ import type { Role, UnitType } from '../types'
 /** How far back a colleague's booking is still worth announcing. */
 export const BOOKING_WINDOW_HOURS = 8
 
+/**
+ * How far ahead an arrival at a recreation unit is worth announcing.
+ *
+ * An hour is roughly how long before guests arrive a gazebo can still be
+ * prepared. Much earlier and the alert is noted and forgotten; much later and
+ * there is nothing to be done with it.
+ */
+export const ARRIVAL_WINDOW_MINUTES = 60
+
 /** Cap per category, so a quiet client cannot be handed a thousand alerts. */
 const MAX_PER_KIND = 25
 
-export type AlertKind = 'sla' | 'waitlist' | 'booking'
+export type AlertKind = 'sla' | 'waitlist' | 'booking' | 'upcoming'
 
 export type Alert = {
   id: string
@@ -54,13 +68,6 @@ export type AlertAudience = {
   role: Role
 }
 
-// Waiters are deliberately not included: the recreation area has no event in
-// this set they can act on, and the waitlist page they would be sent to is
-// admin-only. Adding them means giving them a scoped waitlist view first.
-export function roleHasAlerts(role: Role): boolean {
-  return role === 'admin' || role === 'housekeeper'
-}
-
 type SlaRow = {
   unit_id: number
   unit_name: string
@@ -68,6 +75,16 @@ type SlaRow = {
   pending: number
   waiting_since: string
   waiting_minutes: number
+}
+
+type ArrivalRow = {
+  id: number
+  guest_name: string
+  date_from: string
+  unit_id: number
+  unit_name: string
+  unit_type: UnitType
+  minutes_away: number
 }
 
 type WaitlistRow = {
@@ -149,7 +166,51 @@ export async function computeAlerts(db: D1Database, audience: AlertAudience): Pr
     })
   }
 
-  // ── 2. Someone on the waitlist can now be placed ────────────────────────
+  // ── 2. Guests due shortly at a recreation unit ─────────────────────────
+  //
+  // Recreation units are sold by the hour, so "starts at 14:00" is a real
+  // moment someone has to prepare for — unlike a room, which is sold by night
+  // and whose date_from carries no time at all. That is why this is scoped to
+  // the restaurant types rather than to everything the role may see.
+  const hourly = types.filter((type) => type !== 'room')
+  if (hourly.length > 0) {
+    const { results: arrivals } = await db
+      .prepare(
+        `SELECT b.id, b.guest_name, b.date_from,
+                u.id AS unit_id, u.name AS unit_name, u.type AS unit_type,
+                (julianday(datetime(b.date_from)) - julianday(${SQL_NOW})) * 1440
+                  AS minutes_away
+           FROM bookings b
+           JOIN units u ON u.id = b.unit_id
+          WHERE b.status <> 'free'
+            AND u.type IN (${placeholders(hourly.length)})
+            AND datetime(b.date_from) > ${SQL_NOW}
+            AND datetime(b.date_from) <= datetime(${SQL_NOW}, '+${ARRIVAL_WINDOW_MINUTES} minutes')
+          ORDER BY b.date_from
+          LIMIT ${MAX_PER_KIND}`
+      )
+      .bind(...hourly)
+      .all<ArrivalRow>()
+
+    for (const row of arrivals) {
+      out.push({
+        // One booking is one arrival, so the booking id alone is enough to make
+        // this fire once. Moving the booking to a new time makes a new id
+        // pointless — it is the same arrival — and re-announcing it would be
+        // wrong anyway.
+        id: `upcoming:${row.id}`,
+        kind: 'upcoming',
+        title: `Скоро гости — ${row.unit_name}`,
+        detail: `через ${elapsed(row.minutes_away)}, ${row.guest_name}`,
+        href: unitHref(row.unit_id, row.unit_type),
+        // Ordered by when the alert became relevant, like the others, rather
+        // than by the arrival time itself.
+        at: row.date_from,
+      })
+    }
+  }
+
+  // ── 3. Someone on the waitlist can now be placed ────────────────────────
   if (isAdmin) {
     const { results: matches } = await db
       .prepare(
@@ -197,7 +258,7 @@ export async function computeAlerts(db: D1Database, audience: AlertAudience): Pr
     }
   }
 
-  // ── 3. A booking made by someone else ──────────────────────────────────
+  // ── 4. A booking made by someone else ──────────────────────────────────
   // Read from the audit log: bookings themselves do not record who created
   // them, and the log already does, immutably.
   if (isAdmin) {
