@@ -8,6 +8,7 @@ import {
   almatyYear,
   dateRange,
   shortDate,
+  percent,
   todayIso,
 } from './format'
 
@@ -147,5 +148,26 @@ describe('rangeLabel — what span the board is showing', () => {
 
   it('crosses a year end without going backwards', () => {
     expect(rangeLabel('2026-12-28', 7)).toBe('28 дек — 3 янв')
+  })
+})
+
+describe('percent — Russian decimals, and safe in the CSV', () => {
+  it('rounds to whole percent by default', () => {
+    expect(percent(0.732)).toBe('73%')
+    expect(percent(0)).toBe('0%')
+    expect(percent(1)).toBe('100%')
+  })
+
+  it('writes a comma, not a full stop', () => {
+    // Money next to it is already written the Russian way; a full stop here
+    // made one screen look like two applications. It also matters in the CSV:
+    // that file is semicolon-delimited for Russian Excel, which reads "73,2"
+    // as a number and "73.2" as text.
+    expect(percent(0.732, 1)).toBe('73,2%')
+    expect(percent(0.002, 1)).toBe('0,2%')
+  })
+
+  it('does not introduce a comma where there is no decimal', () => {
+    expect(percent(0.5, 0)).not.toContain(',')
   })
 })

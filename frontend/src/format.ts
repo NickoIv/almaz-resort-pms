@@ -111,8 +111,16 @@ export function monthShort(month: string): string {
   return `${names[Number(index) - 1]} ${year.slice(2)}`
 }
 
+/**
+ * 0.732 -> "73%", and with digits, "73,2%" — a comma, as Russian writes it.
+ *
+ * `compactMoney` below already does this; a percentage printed with a full stop
+ * beside money printed with a comma looks like two different applications. It
+ * is also what the CSV export needs: the file is semicolon-delimited for Russian
+ * Excel, which then reads "73,2" as a number and "73.2" as text.
+ */
 export function percent(value: number, digits = 0): string {
-  return `${(value * 100).toFixed(digits)}%`
+  return `${(value * 100).toFixed(digits).replace('.', ',')}%`
 }
 
 /** Compact money for axis ticks and stat tiles: 1 250 000 -> "1,25 млн" */

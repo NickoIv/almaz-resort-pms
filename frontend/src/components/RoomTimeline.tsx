@@ -1,19 +1,76 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { Alert, Spinner } from './ui'
-import { addDaysIso, daysBetween, money, pluralRu, shortDate, todayIso } from '../format'
+import { addDaysIso, daysBetween, money, percent, pluralRu, shortDate, todayIso } from '../format'
 import { STATUS_LABELS } from '../types'
-import type { RoomTimeline as Timeline, TimelineBooking, TimelineRoom } from '../types'
+import type {
+  RoomTimeline as Timeline,
+  RoomYear,
+  TimelineBooking,
+  TimelineRoom,
+} from '../types'
 
 const DOW_SHORT = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
 
 const WEEK = 7
-const MONTH = 30
+
+/**
+ * What the board is showing.
+ *
+ * «Месяц» is a **calendar** month, from the 1st to the last day, and not a
+ * rolling thirty days — thirty days came up short in every 31-day month, so the
+ * whole of August could not be seen at all.
+ *
+ * «Год» is a different chart, not a longer one. 365 day-columns would be
+ * ~17 000px of horizontal scrolling on a board where a phone shows six columns;
+ * the question at that range is which months are filling up, and that fits on
+ * one screen in twelve.
+ */
+type Scale = 'week' | 'month' | 'year'
+
+const SCALES: [Scale, string][] = [
+  ['week', 'Неделя'],
+  ['month', 'Месяц'],
+  ['year', 'Год'],
+]
 
 /** Day-of-week from a YYYY-MM-DD string, read in UTC so it cannot shift. */
 function weekdayIndex(iso: string): number {
   const [year, month, day] = iso.split('-').map(Number)
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+}
+
+/** Days in a 1-based month, leap years included. */
+function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate()
+}
+
+/** The 1st of the month `iso` falls in. */
+function monthStart(iso: string): string {
+  return `${iso.slice(0, 7)}-01`
+}
+
+/** The 1st of the month `delta` months away from the one `iso` falls in. */
+function shiftMonth(iso: string, delta: number): string {
+  const [year, month] = iso.split('-').map(Number)
+  const shifted = new Date(Date.UTC(year, month - 1 + delta, 1))
+  return shifted.toISOString().slice(0, 10)
+}
+
+/**
+ * How full a month reads at a glance, in four steps rather than a gradient.
+ *
+ * A continuous shade would need the reader to compare two cells to tell 60%
+ * from 70%, which is not a question anyone asks of a year chart. The steps are
+ * the answers people act on: nothing yet, filling, busy, effectively sold out.
+ */
+function fillLevel(sold: number, total: number): 'none' | 'low' | 'mid' | 'high' | 'full' {
+  if (sold <= 0) return 'none'
+  const ratio = sold / total
+  if (ratio >= 0.95) return 'full'
+  if (ratio >= 0.67) return 'high'
+  if (ratio >= 0.34) return 'mid'
+  return 'low'
 }
 
 const MONTHS_SHORT = [
@@ -127,11 +184,23 @@ export default function RoomTimeline({
   /** Bumped by the page after a save, to pull fresh bars. */
   reloadKey?: number
 }) {
+  const [scale, setScale] = useState<Scale>('week')
   const [from, setFrom] = useState(todayIso())
-  const [days, setDays] = useState(WEEK)
   const [data, setData] = useState<Timeline | null>(null)
+  const [year, setYear] = useState<RoomYear | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  /**
+   * The window the day views ask for. A calendar month starts on the 1st and
+   * runs to the last day, so both the start and the length follow from the scale
+   * rather than being set alongside it and drifting apart.
+   */
+  const windowStart = scale === 'month' ? monthStart(from) : from
+  const days =
+    scale === 'month'
+      ? daysInMonth(Number(windowStart.slice(0, 4)), Number(windowStart.slice(5, 7)))
+      : WEEK
 
   const [drag, setDrag] = useState<Drag | null>(null)
   const [clash, setClash] = useState<string | null>(null)
@@ -141,19 +210,68 @@ export default function RoomTimeline({
   const load = useCallback(() => {
     setLoading(true)
     setError(null)
-    api<Timeline>(`/rooms/timeline?from=${from}&days=${days}`)
-      .then(setData)
+    // The year is a different endpoint, not a longer window: it answers in
+    // nights-per-month, which is the only shape that fits twelve columns.
+    const request =
+      scale === 'year'
+        ? api<RoomYear>(`/rooms/year?year=${from.slice(0, 4)}`).then(setYear)
+        : api<Timeline>(`/rooms/timeline?from=${windowStart}&days=${days}`).then(setData)
+
+    request
       .catch((err) => setError(err instanceof Error ? err.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
-  }, [from, days])
+  }, [scale, windowStart, days, from])
 
   useEffect(load, [load, reloadKey])
 
   const today = todayIso()
 
+  /** Move the anchor by one of whatever is currently on screen. */
+  const step = useCallback(
+    (iso: string, direction: number): string => {
+      if (scale === 'week') return addDaysIso(iso, direction * WEEK)
+      if (scale === 'month') return shiftMonth(iso, direction)
+      return `${Number(iso.slice(0, 4)) + direction}${iso.slice(4)}`
+    },
+    [scale]
+  )
+
   const columns = useMemo(
     () => ({ gridTemplateColumns: `var(--tl-name-w) repeat(${days}, var(--tl-day-w))` }),
     [days]
+  )
+
+  /**
+   * Twelve columns that share whatever width there is, rather than the fixed
+   * day width the other scales scroll through — a year that scrolled like the
+   * day board would be the thing this view exists to avoid.
+   *
+   * The 40px floor is a tap target, not a look: a month cell is a button that
+   * opens that month, and at 390px twelve free-sharing columns came out 20px
+   * wide — half the size the mobile audit treats as a failure. It is 40 rather
+   * than 36 because the cell carries 2px of gutter, so a 36px track would leave
+   * a 34px button and fail the very threshold it was set to clear.
+   *
+   * With the floor a phone scrolls the year by about half a screen — nothing
+   * like the 4× the day board scrolls, and the whole year is one thumb movement
+   * away rather than twelve.
+   */
+  const yearColumns = useMemo(
+    () => ({ gridTemplateColumns: 'var(--tl-name-w) repeat(12, minmax(40px, 1fr))' }),
+    []
+  )
+
+  /** Occupancy across the whole year, for the label above the chart. */
+  const yearOccupancy = useMemo(() => {
+    if (!year) return 0
+    const sold = year.months.reduce((sum, month) => sum + month.nights_sold, 0)
+    const available = year.months.reduce((sum, month) => sum + month.nights_available, 0)
+    return available > 0 ? sold / available : 0
+  }, [year])
+
+  const lowWaterYear = useMemo(
+    () => (year ? Math.max(1, Math.round(year.rooms_total * 0.2)) : 1),
+    [year]
   )
 
   /**
@@ -274,16 +392,19 @@ export default function RoomTimeline({
 
   const nights = dragRange ? dragRange.hi - dragRange.lo + 1 : 0
 
+  // The panel carries the scale as `data-scale`. An `is-month` class used to
+  // hang here that no stylesheet or test ever read — a leftover hook from the
+  // column-density experiment that was reverted.
   return (
-    <section
-      className={`panel glass timeline-panel ${days === MONTH ? 'is-month' : ''}`}
-      ref={board}
-    >
+    <section className="panel glass timeline-panel" data-scale={scale} ref={board}>
       <div className="timeline-bar">
+        {/* One step is one of whatever is on screen: a week, a whole month, a
+            year. Stepping a month view by thirty days would land it mid-month
+            and stop it being a calendar month at all. */}
         <div className="timeline-nav">
           <button
             className="btn btn-sm btn-ghost"
-            onClick={() => setFrom((f) => addDaysIso(f, -days))}
+            onClick={() => setFrom((f) => step(f, -1))}
             aria-label="Предыдущий период"
           >
             ←
@@ -293,35 +414,34 @@ export default function RoomTimeline({
           </button>
           <button
             className="btn btn-sm btn-ghost"
-            onClick={() => setFrom((f) => addDaysIso(f, days))}
+            onClick={() => setFrom((f) => step(f, 1))}
             aria-label="Следующий период"
           >
             →
           </button>
         </div>
 
-        <label className="timeline-jump">
-          <span>Перейти к дате</span>
-          <input
-            type="date"
-            value={from}
-            onChange={(event) => event.target.value && setFrom(event.target.value)}
-          />
-        </label>
+        {scale !== 'year' && (
+          <label className="timeline-jump">
+            <span>Перейти к дате</span>
+            <input
+              type="date"
+              value={from}
+              onChange={(event) => event.target.value && setFrom(event.target.value)}
+            />
+          </label>
+        )}
 
         <div className="timeline-scale">
-          <button
-            className={`chip chip-sm ${days === WEEK ? 'active' : ''}`}
-            onClick={() => setDays(WEEK)}
-          >
-            Неделя
-          </button>
-          <button
-            className={`chip chip-sm ${days === MONTH ? 'active' : ''}`}
-            onClick={() => setDays(MONTH)}
-          >
-            Месяц
-          </button>
+          {SCALES.map(([key, label]) => (
+            <button
+              key={key}
+              className={`chip chip-sm ${scale === key ? 'active' : ''}`}
+              onClick={() => setScale(key)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {/*
@@ -333,11 +453,23 @@ export default function RoomTimeline({
           broken because nothing on screen moved. This is the part that always
           moves.
         */}
-        {data && (
-          <div className="timeline-range" aria-live="polite">
-            {rangeLabel(data.from, data.days)}
-          </div>
-        )}
+        {scale === 'year'
+          ? year && (
+              <div className="timeline-range" aria-live="polite">
+                {/* A decimal below 1%: a flat "0%" beside cells that visibly
+                    hold numbers reads as the figure being broken rather than
+                    as a year that has barely been sold yet. */}
+                {year.year} · занято{' '}
+                {yearOccupancy > 0 && yearOccupancy < 0.01
+                  ? percent(yearOccupancy, 1)
+                  : percent(yearOccupancy)}
+              </div>
+            )
+          : data && (
+              <div className="timeline-range" aria-live="polite">
+                {rangeLabel(data.from, data.days)}
+              </div>
+            )}
       </div>
 
       {error && <Alert>{error}</Alert>}
@@ -350,7 +482,82 @@ export default function RoomTimeline({
         </div>
       )}
 
-      {loading && !data ? (
+      {scale === 'year' ? (
+        loading && !year ? (
+          <Spinner />
+        ) : !year ? null : (
+          /* No drag: a month is not a night, and there is nothing here that
+             could be booked by pressing on it. Pressing opens the month in
+             days, where booking lives. The scroll wrapper only ever engages on
+             a narrow phone, where the cells hit their 36px floor. */
+          <>
+            <div className="timeline-scroll">
+              <div className={`timeline timeline-year ${loading ? 'is-stale' : ''}`}>
+            <div className="tl-row tl-head" style={yearColumns}>
+              <div className="tl-name tl-corner">Номер</div>
+              {year.months.map((month) => (
+                <div
+                  key={month.month}
+                  className={`tl-day ${month.month === today.slice(0, 7) ? 'is-today' : ''}`}
+                >
+                  <span className="tl-day-num">{MONTHS_SHORT[Number(month.month.slice(5, 7)) - 1]}</span>
+                  <span className="tl-day-dow">{month.nights_total}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="tl-row tl-free-row" style={yearColumns}>
+              <div className="tl-name tl-free-label">Свободно</div>
+              {year.months.map((month) => (
+                <div
+                  key={month.month}
+                  className={`tl-free ${month.rooms_free === 0 ? 'is-none' : ''} ${
+                    month.rooms_free > 0 && month.rooms_free <= lowWaterYear ? 'is-low' : ''
+                  }`}
+                  title={`${month.month}: ни одной ночи не продано в ${month.rooms_free} из ${year.rooms_total} номеров · загрузка ${percent(month.occupancy_rate)}`}
+                >
+                  {month.rooms_free}
+                </div>
+              ))}
+            </div>
+
+            {year.rooms.map((room) => (
+              <div className="tl-row" key={room.unit_id} style={yearColumns}>
+                <button
+                  className="tl-name tl-room"
+                  onClick={() => onOpenRoom(room.unit_id)}
+                  title={`${room.category ?? '—'} · до ${room.capacity} чел.`}
+                >
+                  {room.unit_name}
+                </button>
+                {room.months.map((month) => (
+                  <button
+                    key={month.month}
+                    className="tl-month"
+                    data-fill={fillLevel(month.nights_sold, month.nights_total)}
+                    onClick={() => {
+                      setFrom(`${month.month}-01`)
+                      setScale('month')
+                    }}
+                    title={`${room.unit_name}, ${month.month}: занято ${month.nights_sold} из ${month.nights_total} ${pluralRu(month.nights_total, ['ночи', 'ночей', 'ночей'])} — открыть месяц`}
+                  >
+                    {month.nights_sold > 0 ? month.nights_sold : ''}
+                  </button>
+                ))}
+              </div>
+            ))}
+
+              </div>
+            </div>
+            {/* Outside the scroller: it is prose about the chart, and prose
+                that slides sideways with the grid is prose nobody finishes. */}
+            <div className="timeline-hint">
+              Число в клетке — сколько ночей продано за месяц. Нажмите на месяц,
+              чтобы открыть его по дням и забронировать.
+            </div>
+          </>
+        )
+      ) : loading && !data ? (
         <Spinner />
       ) : !data ? null : (
         <div className="timeline-scroll">
@@ -563,11 +770,16 @@ export default function RoomTimeline({
         </div>
       )}
 
-      <div className="field-hint timeline-hint">
-        Протяните по свободным ночам, чтобы создать бронь на этот промежуток; одно нажатие — одна
-        ночь. Нажмите на полосу, чтобы посмотреть или изменить бронь. Выезд утром, поэтому день
-        выезда уже свободен для следующего гостя.
-      </div>
+      {/* Instructions for dragging nights, which the year view has none of —
+          telling someone to drag across a month is telling them to do
+          something that will not work. */}
+      {scale !== 'year' && (
+        <div className="field-hint timeline-hint">
+          Протяните по свободным ночам, чтобы создать бронь на этот промежуток; одно нажатие — одна
+          ночь. Нажмите на полосу, чтобы посмотреть или изменить бронь. Выезд утром, поэтому день
+          выезда уже свободен для следующего гостя.
+        </div>
+      )}
     </section>
   )
 }

@@ -331,6 +331,40 @@ export type TimelineRoom = {
   bookings: TimelineBooking[]
 }
 
+/**
+ * The year at month granularity — twelve columns instead of 365.
+ *
+ * Nights sold rather than bookings counted: two one-night stays fill a room the
+ * same as one two-night stay, and at this range it is the filling being asked
+ * about, not the paperwork.
+ */
+export type RoomYearMonth = {
+  month: string
+  nights_sold: number
+  nights_total: number
+}
+
+export type RoomYear = {
+  year: number
+  rooms_total: number
+  months: {
+    month: string
+    nights_total: number
+    nights_sold: number
+    nights_available: number
+    occupancy_rate: number
+    /** Rooms with nothing at all booked that month. */
+    rooms_free: number
+  }[]
+  rooms: {
+    unit_id: number
+    unit_name: string
+    category: string | null
+    capacity: number
+    months: RoomYearMonth[]
+  }[]
+}
+
 export type RoomTimeline = {
   from: string
   days: number

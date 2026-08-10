@@ -4196,6 +4196,79 @@ button {
   background: var(--tint-occupied);
 }
 
+/* ── The year, at month granularity ───────────────────────────────────────── */
+
+/* Twelve columns that share the width instead of scrolling. The whole point of
+   this view is that a year fits on one screen; the moment it scrolls sideways
+   it is just the day board with worse labels. */
+.timeline-year {
+  min-width: 0;
+}
+
+.timeline-year .tl-row {
+  min-height: var(--tl-row-h);
+}
+
+/* A month cell is a button, because pressing it opens that month by days —
+   the only place a booking can actually be made. */
+.tl-month {
+  height: calc(var(--tl-row-h) - 6px);
+  margin: 3px 2px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color 0.16s var(--ease), transform 0.16s var(--ease);
+}
+
+.tl-month:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.tl-month:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Four steps, not a gradient: the number of nights is printed in the cell as
+   well, so the fill is a summary and never the only carrier of the fact. */
+.tl-month[data-fill='none'] {
+  background: rgb(var(--lift-rgb) / 0.03);
+}
+
+.tl-month[data-fill='low'] {
+  background: rgb(var(--accent-rgb) / 0.14);
+  color: var(--text);
+}
+
+.tl-month[data-fill='mid'] {
+  background: rgb(var(--accent-rgb) / 0.3);
+  color: var(--text);
+}
+
+.tl-month[data-fill='high'] {
+  background: rgb(var(--booked-rgb) / 0.34);
+  color: var(--booked-ink);
+}
+
+.tl-month[data-fill='full'] {
+  background: rgb(var(--occupied-rgb) / 0.38);
+  color: var(--occupied-ink);
+}
+
+/* On a phone twelve columns are narrow, so the gutters go rather than the type
+   — 13px is the bottom of the scale and there is nothing legible below it. */
+@media (max-width: 640px) {
+  .tl-month {
+    margin: 3px 1px;
+  }
+}
+
 /* ── Dragging a stay ──────────────────────────────────────────────────────── */
 
 /* A bar normally sits above the cells and takes the pointer, which is what

@@ -952,12 +952,48 @@ describe('§12 the planning board', () => {
     ],
   }
 
+  /** A year as the endpoint returns it: two rooms, twelve months each. */
+  const YEAR = {
+    year: 2026,
+    rooms_total: 2,
+    months: Array.from({ length: 12 }, (_, index) => ({
+      month: `2026-${String(index + 1).padStart(2, '0')}`,
+      nights_total: 30,
+      nights_sold: index === 7 ? 44 : 0,
+      nights_available: 60,
+      occupancy_rate: index === 7 ? 44 / 60 : 0,
+      rooms_free: index === 7 ? 0 : 2,
+    })),
+    rooms: [
+      {
+        unit_id: 5, unit_name: '101', category: 'standard', capacity: 2,
+        months: Array.from({ length: 12 }, (_, index) => ({
+          month: `2026-${String(index + 1).padStart(2, '0')}`,
+          nights_sold: index === 7 ? 30 : 0,
+          nights_total: 30,
+        })),
+      },
+      {
+        unit_id: 6, unit_name: '104', category: 'standard', capacity: 2,
+        months: Array.from({ length: 12 }, (_, index) => ({
+          month: `2026-${String(index + 1).padStart(2, '0')}`,
+          nights_sold: index === 7 ? 14 : 0,
+          nights_total: 30,
+        })),
+      },
+    ],
+  }
+
   function routesWithSpy(calls: string[], body: unknown = TIMELINE) {
     return {
       ...baseRoutes('admin'),
       'GET /api/rooms/timeline': (url: string) => {
         calls.push(url)
         return body
+      },
+      'GET /api/rooms/year': (url: string) => {
+        calls.push(url)
+        return YEAR
       },
     }
   }
@@ -1081,15 +1117,101 @@ describe('§12 the planning board', () => {
     expect(dates[1].value).toBe('2026-08-13')
   })
 
-  it('switches between a week and a month', async () => {
+  /** Days in a 1-based month, so the expectation is not a hard-coded 31. */
+  const lengthOf = (month: string) => {
+    const [y, m] = month.split('-').map(Number)
+    return new Date(Date.UTC(y, m, 0)).getUTCDate()
+  }
+
+  it('asks for a whole calendar month, from the 1st, not a rolling thirty days', async () => {
     const calls: string[] = []
     await openBoard(calls)
 
     expect(calls[0]).toContain('days=7')
+
     await userEvent.click(screen.getByRole('button', { name: 'Месяц' }))
-    await waitFor(() => expect(calls.at(-1)).toContain('days=30'))
+    await waitFor(() => expect(calls.at(-1)).not.toContain('days=7'))
+
+    const asked = new URL(calls.at(-1)!, 'http://x').searchParams
+    const from = asked.get('from')!
+    // The 1st, and exactly as many days as that month has — 30 was the old
+    // answer and it came up a day short in every 31-day month.
+    expect(from.slice(8)).toBe('01')
+    expect(Number(asked.get('days'))).toBe(lengthOf(from.slice(0, 7)))
+
     await userEvent.click(screen.getByRole('button', { name: 'Неделя' }))
     await waitFor(() => expect(calls.at(-1)).toContain('days=7'))
+  })
+
+  it('steps a month view by whole months, not by its length in days', async () => {
+    const calls: string[] = []
+    await openBoard(calls)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Месяц' }))
+    await waitFor(() => expect(calls.at(-1)).not.toContain('days=7'))
+    const first = new URL(calls.at(-1)!, 'http://x').searchParams.get('from')!
+
+    await userEvent.click(screen.getByRole('button', { name: 'Следующий период' }))
+    await waitFor(() => {
+      const next = new URL(calls.at(-1)!, 'http://x').searchParams.get('from')!
+      expect(next).not.toBe(first)
+    })
+
+    const next = new URL(calls.at(-1)!, 'http://x').searchParams.get('from')!
+    // Still the 1st: stepping by thirty days would have landed mid-month and
+    // stopped it being a calendar month at all.
+    expect(next.slice(8)).toBe('01')
+    const months = (iso: string) => Number(iso.slice(0, 4)) * 12 + Number(iso.slice(5, 7))
+    expect(months(next) - months(first)).toBe(1)
+  })
+
+  it('shows a year as twelve months, not as 365 days', async () => {
+    const calls: string[] = []
+    await openBoard(calls)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Год' }))
+    await waitFor(() => expect(calls.at(-1)).toContain('/rooms/year'))
+
+    // Twelve columns per room, and no day request — a year at day granularity
+    // would be ~17 000px of sideways scrolling.
+    await waitFor(() => expect(document.querySelectorAll('.tl-month').length).toBe(24))
+    expect(calls.at(-1)).not.toContain('/rooms/timeline')
+
+    // Nights sold are printed, not only shaded: colour is never the only
+    // carrier of the number.
+    const row = [...document.querySelectorAll('.tl-row')].find(
+      (r) => r.querySelector('.tl-room')?.textContent === '101'
+    )!
+    const cells = [...row.querySelectorAll('.tl-month')]
+    expect(cells[7].textContent).toBe('30')
+    expect(cells[7].getAttribute('data-fill')).toBe('full')
+    // A month with nothing booked stays blank rather than printing a nought.
+    expect(cells[0].textContent).toBe('')
+    expect(cells[0].getAttribute('data-fill')).toBe('none')
+
+    // The headline is the whole year, not the one busy month: 44 nights sold
+    // out of 720 available across twelve months is 6%, even though August
+    // itself is full. Reading August's 73% as "the year" is exactly the
+    // mistake this label exists to prevent.
+    expect(screen.getByText(/2026 · занято 6%/)).toBeInTheDocument()
+  })
+
+  it('opens a month by days when its cell is pressed', async () => {
+    const calls: string[] = []
+    await openBoard(calls)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Год' }))
+    await waitFor(() => expect(document.querySelectorAll('.tl-month').length).toBe(24))
+
+    // August, the eighth column of the first room.
+    await userEvent.click(document.querySelectorAll('.tl-month')[7] as HTMLElement)
+
+    await waitFor(() => expect(calls.at(-1)).toContain('/rooms/timeline'))
+    const asked = new URL(calls.at(-1)!, 'http://x').searchParams
+    expect(asked.get('from')).toBe('2026-08-01')
+    expect(Number(asked.get('days'))).toBe(31)
+    // And the scale control followed, so the board says where it is.
+    expect(screen.getByRole('button', { name: 'Месяц' })).toHaveClass('active')
   })
 
   it('steps by the window and jumps straight to a date', async () => {
