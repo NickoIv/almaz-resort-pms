@@ -39,5 +39,10 @@ id = "66d93884ca5e40bbb8b005117008d24a"
 # the morning digest before check-ins, the evening one to catch unpaid balances
 # and unfinished cleaning. The third takes the daily backup at 09:15 local,
 # just after the morning digest.
+#
+# The fourth is the push sweep. Five minutes is the granularity staff notice —
+# a cleaning breach reaching a phone within five minutes reads as "just now",
+# and anything more frequent would spend the free plan's cron budget to shave
+# off time nobody perceives.
 [triggers]
-crons = ["0 4 * * *", "0 13 * * *", "15 4 * * *"]
+crons = ["0 4 * * *", "0 13 * * *", "15 4 * * *", "*/5 * * * *"]

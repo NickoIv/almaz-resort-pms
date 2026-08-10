@@ -16,3 +16,16 @@ GREEN_API_URL=
 # setting is "telegram" or "both".
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
+
+# Web Push (VAPID) — how staff get notified on their own phones. Costs nothing
+# and depends on no third-party account; the browser hands us an endpoint at
+# Google, Mozilla or Apple and we push to it directly.
+#
+# Generate a pair with:  node --experimental-strip-types vapid-keys.mjs
+# The private key lets anyone push to every subscribed device — treat it as a
+# secret. Rotating the pair invalidates every existing subscription, so staff
+# would have to switch notifications on again.
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+# Where a push service should write if it needs to reach the operator.
+VAPID_SUBJECT=mailto:admin@taura.kz

@@ -7,6 +7,7 @@ import AuditPage from './pages/AuditPage'
 import CleaningPage from './pages/CleaningPage'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
+import NotificationsPage from './pages/NotificationsPage'
 import RestaurantPage from './pages/RestaurantPage'
 import RoomsPage from './pages/RoomsPage'
 import UnitDetailPage from './pages/UnitDetailPage'
@@ -122,6 +123,15 @@ export default function App() {
           element={
             <RequireRole roles={['admin']}>
               <SettingsPage />
+            </RequireRole>
+          }
+        />
+        {/* Open to all three roles: each person switches on their own phone. */}
+        <Route
+          path="/notifications"
+          element={
+            <RequireRole roles={['admin', 'housekeeper', 'waiter']}>
+              <NotificationsPage />
             </RequireRole>
           }
         />

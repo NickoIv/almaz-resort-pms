@@ -18,8 +18,11 @@ import cleaningRoutes from './routes/cleaning'
 import guestRoutes from './routes/guests'
 import settingsRoutes from './routes/settings'
 import photoRoutes from './routes/photos'
+import pushRoutes from './routes/push'
 import staffRoutes from './routes/staff'
 import waitlistRoutes from './routes/waitlist'
+import { pruneDeliveries, sweepAndPush } from './lib/push'
+import { vapidKeysOf } from './lib/webpush'
 import type { AppEnv, Bindings } from './types'
 
 const app = new Hono<AppEnv>()
@@ -53,6 +56,7 @@ app.use('/api/alerts/*', requireAuth)
 app.use('/api/rooms/*', requireAuth)
 app.use('/api/waitlist', requireAuth)
 app.use('/api/waitlist/*', requireAuth)
+app.use('/api/push/*', requireAuth)
 
 app.route('/api/alerts', alertRoutes)
 app.route('/api/rooms', roomRoutes)
@@ -67,6 +71,7 @@ app.route('/api/staff', staffRoutes)
 app.route('/api/backup', backupRoutes)
 app.route('/api/waitlist', waitlistRoutes)
 app.route('/api/photos', photoRoutes)
+app.route('/api/push', pushRoutes)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
@@ -86,6 +91,9 @@ app.notFound((c) => c.json({ error: 'Not found' }, 404))
  */
 /** Cron expression for the daily backup — see `[triggers]` in wrangler.toml. */
 const BACKUP_CRON = '15 4 * * *'
+
+/** Cron expression for the push sweep — see `[triggers]` in wrangler.toml. */
+const PUSH_CRON = '*/5 * * * *'
 
 /**
  * Writes a dated snapshot to the backup store and prunes older ones.
@@ -117,7 +125,50 @@ async function runDailyBackup(env: Bindings): Promise<void> {
   )
 }
 
+/**
+ * Pushes whatever each subscriber has not been told about yet.
+ *
+ * Runs on its own five-minute cron rather than inside the twice-daily digest,
+ * because the thing being fixed is precisely that a cleaning breach at 11:00
+ * should not wait until 18:00 to reach the housekeeper's phone. The work is
+ * proportional to the number of people who switched notifications on, not to
+ * the size of the staff list — a hotel where nobody subscribed does two queries
+ * and stops.
+ */
+async function runPushSweep(env: Bindings): Promise<void> {
+  const keys = vapidKeysOf(env)
+  if (!keys) {
+    // Not a warning. Push is unconfigured until the operator generates a VAPID
+    // pair, and shouting about it every five minutes would bury real errors.
+    return
+  }
+
+  const results = await sweepAndPush(env.DB, keys)
+  const sent = results.reduce((total, row) => total + row.sent, 0)
+  const removed = results.reduce((total, row) => total + row.removed, 0)
+
+  if (sent > 0 || removed > 0) {
+    console.log(
+      `push sweep: ${sent} sent to ${results.length} staff` +
+        (removed > 0 ? `, ${removed} dead subscriptions removed` : '')
+    )
+  }
+}
+
 async function scheduled(event: ScheduledController, env: Bindings): Promise<void> {
+  if (event.cron === PUSH_CRON) {
+    try {
+      await runPushSweep(env)
+      // Once a day, not 288 times: the sweep is the only cron running often
+      // enough to hang this off, so it is gated to a single five-minute slot.
+      const now = new Date()
+      if (now.getUTCHours() === 3 && now.getUTCMinutes() < 5) await pruneDeliveries(env.DB)
+    } catch (error) {
+      console.error('push sweep failed', error)
+    }
+    return
+  }
+
   if (event.cron === BACKUP_CRON) {
     try {
       await runDailyBackup(env)

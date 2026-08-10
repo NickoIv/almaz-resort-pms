@@ -8,6 +8,16 @@
     <title>Taura PMS</title>
 
     <!--
+      Installability. On Android the manifest is what offers "Install app"; on
+      iOS it is what makes "На экран «Домой»" produce a standalone window
+      instead of a Safari bookmark — and only a standalone window is allowed to
+      receive push notifications, which is the whole reason this is here.
+      apple-touch-icon is separate because iOS ignores the manifest's icons.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!--
       The theme is applied before the first paint. Read from React instead and
       a night-theme user gets a white flash on every load, which at a reception
       desk after dark is worse than it sounds.

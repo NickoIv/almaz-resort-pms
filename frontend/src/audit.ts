@@ -41,6 +41,9 @@ const ACTION_LABELS: Record<string, string> = {
   'backup.export': 'Выгружена резервная копия',
   'backup.restore': 'Восстановление из копии',
   'login.disabled': 'Отказ: учётная запись отключена',
+  'push.subscribe': 'Включены уведомления на устройстве',
+  'push.unsubscribe': 'Выключены уведомления на устройстве',
+  'push.test': 'Проверка уведомлений',
 }
 
 /** Photo kinds, as they appear in `photo.upload:<kind>`. */

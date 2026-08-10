@@ -18,6 +18,16 @@ export type Bindings = {
   TELEGRAM_BOT_TOKEN?: string
   TELEGRAM_CHAT_ID?: string
   /**
+   * Web Push (VAPID). Generated once with `node vapid-keys.mjs` and stored as
+   * secrets; the public half is served to the browser by GET /api/push/key.
+   * Rotating them invalidates every existing subscription, so staff would have
+   * to switch notifications on again — see lib/webpush.ts.
+   */
+  VAPID_PUBLIC_KEY?: string
+  VAPID_PRIVATE_KEY?: string
+  /** Contact a push service can use to reach the operator, e.g. `mailto:…`. */
+  VAPID_SUBJECT?: string
+  /**
    * Where daily backups go. KV works on the free plan with no card; R2 needs
    * enabling in the dashboard first. Whichever is bound gets used — see
    * lib/backup-store.ts. With neither, the scheduled backup skips and the

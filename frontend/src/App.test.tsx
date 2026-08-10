@@ -800,7 +800,7 @@ describe('§11 grouped navigation and the dashboard', () => {
 
     // Every link stays reachable — grouping is not hiding.
     for (const label of ['Номера', 'Зона отдыха', 'Уборка', 'Ожидание',
-                         'Аналитика', 'Журнал', 'Персонал', 'Настройки']) {
+                         'Аналитика', 'Журнал', 'Уведомления', 'Персонал', 'Настройки']) {
       expect(within(nav).getByRole('link', { name: label })).toBeInTheDocument()
     }
   })
@@ -812,11 +812,17 @@ describe('§11 grouped navigation and the dashboard', () => {
 
     const nav = await screen.findByRole('navigation', { name: 'Разделы' })
     expect(within(nav).getByText('Работа')).toBeInTheDocument()
-    // No reports and no management items are allowed, so neither heading shows.
+    // Every report is admin-only, so that heading disappears entirely.
     expect(within(nav).queryByText('Отчёты')).not.toBeInTheDocument()
-    expect(within(nav).queryByText('Управление')).not.toBeInTheDocument()
     expect(within(nav).getByRole('link', { name: 'Уборка' })).toBeInTheDocument()
     expect(within(nav).queryByRole('link', { name: 'Номера' })).not.toBeInTheDocument()
+
+    // «Управление» survives on one item: notifications are switched on per
+    // person, so every role reaches them, while Персонал and Настройки do not.
+    expect(within(nav).getByText('Управление')).toBeInTheDocument()
+    expect(within(nav).getByRole('link', { name: 'Уведомления' })).toBeInTheDocument()
+    expect(within(nav).queryByRole('link', { name: 'Персонал' })).not.toBeInTheDocument()
+    expect(within(nav).queryByRole('link', { name: 'Настройки' })).not.toBeInTheDocument()
   })
 
   // The roll-up is a real rAF animation, and rAF gets starved when the whole
@@ -1319,5 +1325,125 @@ describe('§14 the settings page follows the server delivery flag', () => {
     // The page follows the server flag rather than hardcoding the decision.
     expect(screen.getByRole('button', { name: 'WhatsApp' })).not.toBeDisabled()
     expect(screen.getByRole('button', { name: /Отправить тест/ })).toBeInTheDocument()
+  })
+})
+
+/**
+ * Push notifications, from the page's side.
+ *
+ * jsdom has no PushManager, which is exactly the environment of a browser that
+ * cannot do this — so the default here exercises the degraded path, and the
+ * capable path is reached by planting the APIs. What is being pinned is that
+ * each distinct reason a phone will not ring produces its own instruction, in
+ * particular the iPhone-in-a-tab case, which is silent in the platform and
+ * would otherwise look like the feature being broken.
+ */
+describe('§15 notifications page', () => {
+  const routes = (over: Record<string, unknown> = {}) => ({
+    'GET /api/auth/me': { user: STAFF.housekeeper },
+    'GET /api/units': [makeUnit()],
+    'GET /api/cleaning': { sla_minutes: 60, units: [] },
+    'GET /api/alerts': { sla_minutes: 60, booking_window_hours: 8, alerts: [] },
+    'GET /api/push/key': { configured: true, public_key: 'BPublicKeyStub' },
+    'GET /api/push/devices': { devices: [] },
+    ...over,
+  })
+
+  // Capability probing reads globals, and a property planted on `navigator`
+  // outlives the test that planted it. Without this, the second test in the
+  // file would be probing the first test's browser.
+  beforeEach(() => {
+    for (const key of ['userAgent', 'standalone', 'serviceWorker'] as const) {
+      delete (navigator as unknown as Record<string, unknown>)[key]
+    }
+    delete (window as { PushManager?: unknown }).PushManager
+  })
+
+  /**
+   * jsdom has neither a service worker nor a PushManager, so the capability
+   * probe has to be given a browser to look at. The iPhone-in-a-tab case is
+   * precisely "service worker yes, PushManager no" — planting exactly that is
+   * what makes this a test of the real branch rather than of a mock.
+   */
+  const asIphoneTab = () => {
+    Object.defineProperty(navigator, 'userAgent', {
+      configurable: true,
+      get: () => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15',
+    })
+    Object.defineProperty(navigator, 'standalone', { configurable: true, value: false })
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { register: vi.fn(), ready: Promise.resolve({}), getRegistration: vi.fn() },
+    })
+    // Safari in a tab exposes no PushManager at all; that absence is the signal.
+    delete (window as { PushManager?: unknown }).PushManager
+  }
+
+  it('tells an iPhone in a Safari tab to add the app to the home screen', async () => {
+    asIphoneTab()
+    signIn('housekeeper')
+    mockApi(routes())
+    renderApp(<App />, { route: '/notifications' })
+
+    await screen.findByRole('heading', { name: 'Уведомления' })
+    expect(screen.getByText(/На экран „Домой“/)).toBeInTheDocument()
+    // The enable button must not look like the fix — it is not.
+    expect(screen.getByRole('button', { name: 'Включить уведомления' })).toBeDisabled()
+  })
+
+  it('explains itself rather than going blank where push cannot work at all', async () => {
+    signIn('housekeeper')
+    mockApi(routes())
+    renderApp(<App />, { route: '/notifications' })
+
+    await screen.findByRole('heading', { name: 'Уведомления' })
+    expect(screen.getByText(/не поддерживает/)).toBeInTheDocument()
+    // The in-app fallback is named, so nobody concludes work goes unseen.
+    expect(screen.getByText(/колокольчике/)).toBeInTheDocument()
+  })
+
+  it('names the missing server secrets instead of blaming the phone', async () => {
+    signIn('housekeeper')
+    mockApi(routes({ 'GET /api/push/key': { configured: false, public_key: null } }))
+    renderApp(<App />, { route: '/notifications' })
+
+    await screen.findByRole('heading', { name: 'Уведомления' })
+    expect(screen.getByText(/VAPID_PUBLIC_KEY/)).toBeInTheDocument()
+  })
+
+  it('lists the devices a person has registered', async () => {
+    signIn('housekeeper')
+    mockApi(
+      routes({
+        'GET /api/push/devices': {
+          devices: [
+            {
+              id: 1,
+              endpoint: 'https://fcm.googleapis.com/x',
+              user_agent: 'Mozilla/5.0 (Linux; Android 14) Chrome/126',
+              created_at: '2026-08-10 09:15:00',
+              last_ok_at: '2026-08-10 11:00:00',
+            },
+          ],
+        },
+      })
+    )
+    renderApp(<App />, { route: '/notifications' })
+
+    await screen.findByRole('heading', { name: 'Уведомления' })
+    expect(screen.getByText('Android')).toBeInTheDocument()
+    expect(screen.getByText('2026-08-10 11:00')).toBeInTheDocument()
+  })
+
+  it('is reachable by a waiter, who is told there is nothing for them yet', async () => {
+    signIn('waiter')
+    mockApi({
+      ...routes(),
+      'GET /api/auth/me': { user: STAFF.waiter },
+    })
+    renderApp(<App />, { route: '/notifications' })
+
+    await screen.findByRole('heading', { name: 'Уведомления' })
+    expect(screen.getByText(/отдельных событий пока нет/)).toBeInTheDocument()
   })
 })

@@ -43,6 +43,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Управление',
     items: [
+      // Every role, unlike the rest of this group: notifications are switched
+      // on per person and per phone, so a housekeeper has to reach this herself.
+      { to: '/notifications', label: 'Уведомления', roles: ['admin', 'housekeeper', 'waiter'] },
       { to: '/staff', label: 'Персонал', roles: ['admin'] },
       { to: '/settings', label: 'Настройки', roles: ['admin'] },
     ],
