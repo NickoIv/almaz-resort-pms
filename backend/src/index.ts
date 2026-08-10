@@ -84,16 +84,41 @@ app.onError((err, c) => {
 app.notFound((c) => c.json({ error: 'Not found' }, 404))
 
 /**
- * Cron handler — see the `[triggers]` block in wrangler.toml.
- * Builds the digest and posts it to whichever channel the admin selected
- * (WhatsApp by default); stays silent when there is nothing to report, so the
- * group is not pinged for an empty day.
+ * Everything scheduled runs off **one** cron trigger.
+ *
+ * Not a stylistic choice: the Workers free plan allows five cron triggers per
+ * *account*, and this account runs several Workers. Four separate schedules
+ * here — two digests, a backup and the push sweep — pushed it over, and the
+ * deploy failed with code 10072 after the Worker itself had already uploaded.
+ *
+ * So the trigger fires every five minutes and the handler decides what is due.
+ * The times below are the same ones the four triggers used, and each job keeps
+ * its own try/catch, so a failing digest still cannot take the backup down with
+ * it. The cost is that a job whose slot is skipped is skipped for the day —
+ * acceptable for a digest, and the backup writes a date-keyed object, so a
+ * later run of the same day would simply overwrite it.
  */
-/** Cron expression for the daily backup — see `[triggers]` in wrangler.toml. */
-const BACKUP_CRON = '15 4 * * *'
 
-/** Cron expression for the push sweep — see `[triggers]` in wrangler.toml. */
-const PUSH_CRON = '*/5 * * * *'
+/**
+ * Which scheduled jobs are due now. UTC throughout; Almaty is UTC+5, so 04:00
+ * UTC is the 09:00 morning digest and 13:00 UTC the 18:00 evening one.
+ *
+ * The windows are five minutes wide because that is the trigger interval: a
+ * narrower test would simply never match.
+ */
+function jobsDue(now: Date): { digest: boolean; backup: boolean; prune: boolean } {
+  const hour = now.getUTCHours()
+  const minute = now.getUTCMinutes()
+
+  return {
+    // 09:00 and 18:00 Almaty.
+    digest: (hour === 4 || hour === 13) && minute < 5,
+    // 09:15 Almaty, just after the morning digest.
+    backup: hour === 4 && minute >= 15 && minute < 20,
+    // Once a day, in the quiet hours.
+    prune: hour === 3 && minute < 5,
+  }
+}
 
 /**
  * Writes a dated snapshot to the backup store and prunes older ones.
@@ -155,29 +180,8 @@ async function runPushSweep(env: Bindings): Promise<void> {
   }
 }
 
-async function scheduled(event: ScheduledController, env: Bindings): Promise<void> {
-  if (event.cron === PUSH_CRON) {
-    try {
-      await runPushSweep(env)
-      // Once a day, not 288 times: the sweep is the only cron running often
-      // enough to hang this off, so it is gated to a single five-minute slot.
-      const now = new Date()
-      if (now.getUTCHours() === 3 && now.getUTCMinutes() < 5) await pruneDeliveries(env.DB)
-    } catch (error) {
-      console.error('push sweep failed', error)
-    }
-    return
-  }
-
-  if (event.cron === BACKUP_CRON) {
-    try {
-      await runDailyBackup(env)
-    } catch (error) {
-      console.error('daily backup failed', error)
-    }
-    return
-  }
-
+/** The twice-daily digest. Separate so the single handler stays readable. */
+async function runDigest(env: Bindings): Promise<void> {
   try {
     const settings = await loadSettings(env.DB)
     const digest = await buildDigest(env.DB, settings)
@@ -212,6 +216,42 @@ async function scheduled(event: ScheduledController, env: Bindings): Promise<voi
   } catch (error) {
     // Never throw out of a cron run — a failed send must not retry-storm.
     console.error('scheduled: digest failed', error)
+  }
+}
+
+/**
+ * The single scheduled entry point.
+ *
+ * Each job is awaited inside its own error boundary, so one failing does not
+ * cancel the rest — that isolation used to come free from having separate
+ * triggers, and has to be written out now that they share one.
+ */
+async function scheduled(_event: ScheduledController, env: Bindings): Promise<void> {
+  const due = jobsDue(new Date())
+
+  // Every run. This is the one that has to be timely; the rest are daily.
+  try {
+    await runPushSweep(env)
+  } catch (error) {
+    console.error('push sweep failed', error)
+  }
+
+  if (due.digest) await runDigest(env)
+
+  if (due.backup) {
+    try {
+      await runDailyBackup(env)
+    } catch (error) {
+      console.error('daily backup failed', error)
+    }
+  }
+
+  if (due.prune) {
+    try {
+      await pruneDeliveries(env.DB)
+    } catch (error) {
+      console.error('push delivery prune failed', error)
+    }
   }
 }
 

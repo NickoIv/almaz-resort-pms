@@ -35,14 +35,17 @@ id = "66d93884ca5e40bbb8b005117008d24a"
 # binding = "BACKUPS_R2"
 # bucket_name = "almaz-resort-pms-backups"
 
-# Cron times are UTC. Almaty is UTC+5, so these fire at 09:00 and 18:00 local:
-# the morning digest before check-ins, the evening one to catch unpaid balances
-# and unfinished cleaning. The third takes the daily backup at 09:15 local,
-# just after the morning digest.
+# One trigger, not four.
 #
-# The fourth is the push sweep. Five minutes is the granularity staff notice —
-# a cleaning breach reaching a phone within five minutes reads as "just now",
-# and anything more frequent would spend the free plan's cron budget to shave
-# off time nobody perceives.
+# The Workers free plan allows five cron triggers per *account*, and this
+# account runs several Workers. Asking for four here exceeded it and the deploy
+# failed with code 10072 — after the Worker had already uploaded, so the failure
+# looked like a broken build rather than a quota.
+#
+# So this fires every five minutes and src/index.ts decides what is due: the
+# push sweep every time, the digests at 04:00 and 13:00 UTC (09:00 and 18:00 in
+# Almaty), the backup at 04:15 UTC, the delivery prune at 03:00 UTC. Five
+# minutes is also the granularity staff notice — a cleaning breach reaching a
+# phone within five minutes reads as "just now".
 [triggers]
-crons = ["0 4 * * *", "0 13 * * *", "15 4 * * *", "*/5 * * * *"]
+crons = ["*/5 * * * *"]
