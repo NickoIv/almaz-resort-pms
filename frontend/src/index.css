@@ -208,6 +208,18 @@ body,
 
 body {
   margin: 0;
+  /*
+   * The page itself does not bounce, and does not hand a swipe onward.
+   *
+   * Reported as "окно приложения двигается в разные стороны пальцем". Two
+   * things caused it, and this is the outer one: with the default behaviour a
+   * swipe that runs out of scrollable content rubber-bands the whole document
+   * and, on a phone, triggers pull-to-refresh. In a browser tab that reads as
+   * the page having some give; in an app installed on the home screen it reads
+   * as the window itself sliding around, because there is no browser chrome to
+   * anchor it against.
+   */
+  overscroll-behavior: none;
   font-family: var(--font-ui);
   /* Up from the browser default's effective 13-14px in this app's components:
      the whole interface was reading small. Everything below is sized relative
@@ -1380,6 +1392,9 @@ button {
   padding: 24px;
   max-height: 90vh;
   overflow-y: auto;
+  /* Same rule as the sheets: a long form scrolled to its end must not start
+     moving the page underneath it. */
+  overscroll-behavior: contain;
   animation: rise 0.28s var(--ease);
 }
 
@@ -2659,11 +2674,15 @@ button {
    badly on paper, and the browser's own print-to-PDF then covers the export
    case with no library involved.                                             */
 
+/* An overlay is a surface of its own: scrolling to the end of a long invoice
+   must not start scrolling the page behind it, which is how a reader ends up
+   somewhere else entirely when they close the sheet. */
 .sheet-overlay {
   position: fixed;
   inset: 0;
   z-index: 80;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 22px;
   background: rgba(6, 4, 18, 0.86);
   backdrop-filter: blur(6px);
@@ -3599,6 +3618,12 @@ button {
    the top. */
 .timeline-scroll {
   overflow: auto;
+  /* And the scroll stops here. Without this, a swipe that reaches the end of
+     the board carries on into the page — so panning the board sideways dragged
+     the whole layout with it, which is the inner half of "окно двигается в
+     разные стороны". The board became a two-axis scroller in af38d1c and
+     inherited the problem the moment it did. */
+  overscroll-behavior: contain;
   max-height: calc(100vh - 260px);
   /* Enough that the pane never collapses to a couple of rows on a short
      window, even though that means the page scrolls as well. */
