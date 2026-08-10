@@ -136,13 +136,14 @@ async function scheduled(event: ScheduledController, env: Bindings): Promise<voi
       return
     }
 
-    // The digest is still built: the same query feeds the dashboard's summary
-    // panel, and keeping the cron exercising it means a break in that logic
-    // shows up here rather than only when someone opens the page.
+    // Note the digest is built above this guard, not below it: the same query
+    // feeds the dashboard's summary panel, so if delivery is ever switched off
+    // again the cron keeps exercising that logic and a break in it still shows
+    // up here rather than only when someone opens the page.
     if (!EXTERNAL_DELIVERY_ENABLED) {
-      // Deliberately console.log, not warn. Nothing has gone wrong — external
-      // delivery is off by decision, and a twice-daily warning about absent
-      // Green API credentials is noise that trains people to ignore the log.
+      // Deliberately console.log, not warn. Nothing has gone wrong — delivery
+      // would be off by decision, and a twice-daily warning about absent Green
+      // API credentials is noise that trains people to ignore the log.
       console.log(
         `scheduled: digest ready (${digest.sections.length} sections); ` +
           'external delivery is off, nothing sent'

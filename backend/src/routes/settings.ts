@@ -106,8 +106,9 @@ settings.get('/preview', async (c) => {
 settings.post('/test-notification', async (c) => {
   const staff = c.get('staff')
 
-  // Kept working rather than removed: flipping EXTERNAL_DELIVERY_ENABLED back
-  // on is all it takes to restore the whole feature, test button included.
+  // The settings page hides this button when delivery is off, so reaching here
+  // means a direct API call. Answer with the decision rather than letting it
+  // fall through and blame missing Green API credentials.
   if (!EXTERNAL_DELIVERY_ENABLED) {
     throw new HTTPException(503, {
       message:

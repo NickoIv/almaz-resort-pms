@@ -9,21 +9,24 @@ import { isWhatsAppConfigured, sendWhatsAppMessage, WhatsAppNotConfigured } from
 import type { Bindings } from '../types'
 
 /**
- * External delivery is switched off.
+ * External delivery is on.
  *
- * The hotel decided against WhatsApp and Telegram: staff are in the app for
- * the whole shift and already see their work on the Cleaning page, the
- * recreation units, the in-app alert centre and the dashboard's digest panel.
- * Push exists to reach people who are *not* looking at the app, which is not
- * how this place runs.
+ * It was switched off for a day (2026-08-09) on the reasoning that staff are in
+ * the app for the whole shift and already see their work on the Cleaning page,
+ * the recreation units, the alert centre and the dashboard's digest panel. The
+ * hotel reversed that on 2026-08-10 and wants the WhatsApp digest back.
  *
- * Everything below still works. Nothing was deleted — the renderers, the Green
- * API client and the Telegram client are all intact, and flipping this one
- * constant back to `true` restores sending. Until then the cron gathers the
- * digest for the dashboard and stops short of the send, and the settings page
- * says so rather than looking like a live feature missing its credentials.
+ * This is the single switch for the whole feature: the cron's send, the
+ * "Отправить тест" button, the channel chips and the credential warnings all
+ * follow it — the last two because the settings response carries it as
+ * `external_delivery` and the page reads the server rather than hardcoding a
+ * decision. Both branches are covered by tests, so switching it off again is
+ * one edit and stays honest.
+ *
+ * Typed `boolean` on purpose: as a literal type the guards elsewhere narrow to
+ * dead code and the off-path stops being type-checked.
  */
-export const EXTERNAL_DELIVERY_ENABLED = false
+export const EXTERNAL_DELIVERY_ENABLED: boolean = true
 
 export type DeliveryResult = {
   channel: 'whatsapp' | 'telegram'

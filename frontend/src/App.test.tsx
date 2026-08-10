@@ -1243,7 +1243,9 @@ describe('§14 manual "send to cleaning"', () => {
   })
 })
 
-describe('§14 external delivery is switched off', () => {
+// Delivery is on in production. These pin the page to the server's flag in
+// both positions, so switching it off again stays a one-line server change.
+describe('§14 the settings page follows the server delivery flag', () => {
   const SETTINGS = (over: Record<string, unknown> = {}) => ({
     notifications: {
       notify_checkins: true, notify_checkouts: true,
