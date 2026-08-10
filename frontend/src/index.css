@@ -3208,6 +3208,15 @@ button {
     min-height: var(--control-h-sm);
   }
 
+  /* Note on what was tried and reverted: narrowing --tl-day-w for the month
+     view made things worse, not better. The columns came out *wider* (42px →
+     78px) and fewer days fitted, because these tracks are `minmax(_, 1fr)`
+     inside a horizontally scrolling grid, where the 1fr does not resolve
+     against the viewport the way it appears to. Fitting thirty readable days
+     into 328px is not achievable anyway — it would need 11px columns. The
+     board scrolls; what was missing was any sign that the range had changed,
+     and that is what .timeline-range is for. */
+
   /* A date field is a control like any other; the browser gives it no height
      of its own. */
   input[type='date'] {
@@ -3303,6 +3312,18 @@ button {
   align-items: center;
   gap: 8px;
   margin-bottom: 16px;
+}
+
+/* The span the board is showing, in words. Pushed to the end of the toolbar so
+   it reads as a statement of what you are looking at rather than as another
+   control. On a phone the toolbar wraps and it lands on its own line, directly
+   above the dates it describes. */
+.timeline-range {
+  margin-left: auto;
+  font-size: 15px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .timeline-nav {

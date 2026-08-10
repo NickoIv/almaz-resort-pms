@@ -16,6 +16,28 @@ function weekdayIndex(iso: string): number {
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay()
 }
 
+const MONTHS_SHORT = [
+  'янв', 'фев', 'мар', 'апр', 'мая', 'июн',
+  'июл', 'авг', 'сен', 'окт', 'ноя', 'дек',
+]
+
+/**
+ * The window in words: «10 — 16 авг» or «10 авг — 8 сен».
+ *
+ * The month is written once when both ends share it, because "10 авг — 16 авг"
+ * makes the reader compare two words to learn they are the same.
+ */
+export function rangeLabel(from: string, days: number): string {
+  const [fy, fm, fd] = from.split('-').map(Number)
+  const last = new Date(Date.UTC(fy, fm - 1, fd + days - 1))
+  const lm = last.getUTCMonth()
+  const ld = last.getUTCDate()
+
+  return fm - 1 === lm
+    ? `${fd} — ${ld} ${MONTHS_SHORT[lm]}`
+    : `${fd} ${MONTHS_SHORT[fm - 1]} — ${ld} ${MONTHS_SHORT[lm]}`
+}
+
 /** Whole days between two YYYY-MM-DD strings. */
 function daysBetween(from: string, to: string): number {
   const [fy, fm, fd] = from.split('-').map(Number)
@@ -244,7 +266,10 @@ export default function RoomTimeline({
   const nights = dragRange ? dragRange.hi - dragRange.lo + 1 : 0
 
   return (
-    <section className="panel glass timeline-panel" ref={board}>
+    <section
+      className={`panel glass timeline-panel ${days === MONTH ? 'is-month' : ''}`}
+      ref={board}
+    >
       <div className="timeline-bar">
         <div className="timeline-nav">
           <button
@@ -289,6 +314,21 @@ export default function RoomTimeline({
             Месяц
           </button>
         </div>
+
+        {/*
+          The span, in words.
+
+          On a phone the board can only ever show six or seven columns, so
+          switching from a week to a month changed thirty columns behind a
+          viewport that still displayed the same six days — the control looked
+          broken because nothing on screen moved. This is the part that always
+          moves.
+        */}
+        {data && (
+          <div className="timeline-range" aria-live="polite">
+            {rangeLabel(data.from, data.days)}
+          </div>
+        )}
       </div>
 
       {error && <Alert>{error}</Alert>}

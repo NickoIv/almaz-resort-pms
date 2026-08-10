@@ -1,3 +1,4 @@
+import { rangeLabel } from './components/RoomTimeline'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   addDaysIso,
@@ -118,5 +119,33 @@ describe('date rendering is timezone-independent', () => {
 
   it('renders a range without shifting either end', () => {
     expect(dateRange('2026-08-08', '2026-08-11')).toBe('8 авг. — 11 авг.')
+  })
+})
+
+/**
+ * The planning board's range label.
+ *
+ * It exists because on a phone the board can only show six columns, so
+ * switching from a week to a month loaded thirty days while the screen kept
+ * showing the same six — the control looked broken. This label is the part
+ * that always changes, so what it says has to be right.
+ */
+describe('rangeLabel — what span the board is showing', () => {
+  it('writes the month once when both ends share it', () => {
+    expect(rangeLabel('2026-08-10', 7)).toBe('10 — 16 авг')
+  })
+
+  it('writes both months when the span crosses one', () => {
+    expect(rangeLabel('2026-08-10', 30)).toBe('10 авг — 8 сен')
+  })
+
+  it('counts the last day inclusively, not one past it', () => {
+    // Seven days from the 10th ends on the 16th, not the 17th — the same
+    // half-open convention the bookings use would be wrong for a label.
+    expect(rangeLabel('2026-08-10', 1)).toBe('10 — 10 авг')
+  })
+
+  it('crosses a year end without going backwards', () => {
+    expect(rangeLabel('2026-12-28', 7)).toBe('28 дек — 3 янв')
   })
 })
