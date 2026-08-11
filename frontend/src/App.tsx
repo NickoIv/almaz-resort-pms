@@ -73,7 +73,11 @@ export default function App() {
         <Route
           path="/cleaning"
           element={
-            <RequireRole roles={['admin', 'housekeeper']}>
+            /* The waiter too: the recreation units' checklist is clearing
+               tables, and the server scopes the page to what each role may
+               see — rooms for a housekeeper, gazebos and sunbeds for a
+               waiter. */
+            <RequireRole roles={['admin', 'housekeeper', 'waiter']}>
               <CleaningPage />
             </RequireRole>
           }

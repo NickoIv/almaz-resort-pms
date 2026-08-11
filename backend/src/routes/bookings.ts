@@ -592,8 +592,27 @@ bookings.patch('/:id', canBook, async (c) => {
 
   if (!updated) throw new HTTPException(500, { message: 'Failed to update booking' })
 
-  // Checking out queues the unit for housekeeping.
-  if (ending) {
+  // Somebody having been in the unit is what queues it for cleaning — not the
+  // booking merely ending.
+  //
+  // `status = 'free'` covers a checkout and a cancellation alike, and this used
+  // to reset the checklist for both. So cancelling a booking as «Дубль брони»
+  // or «Гость передумал» — a booking that had never been anything but
+  // `booked`, on a room nobody had entered — created eight cleaning items, and
+  // an hour later the SLA fired and pushed «Уборка просрочена» to the
+  // housekeeper's phone about a room that was never used. The invented work
+  // then had to be ticked off item by item to make it go away.
+  //
+  // Two ways in, and both are meant:
+  //   - the guest was actually in there (`occupied`), whatever the reason for
+  //     ending it — someone who leaves early still leaves a used room;
+  //   - the reason given is «Обычный выезд», even from `booked`. Small hotels
+  //     do check people out without ever having flipped the status to
+  //     `occupied`, and taking the word of whoever wrote "the guest left" is
+  //     the safe direction to be wrong in: an unnecessary clean costs a tick,
+  //     a missed one costs the next guest.
+  const wasUsed = existing.status === 'occupied' || cancelReason === 'checked_out'
+  if (ending && wasUsed) {
     await resetChecklist(c.env.DB, existing.unit_id, unit.type, id)
   }
 

@@ -161,3 +161,48 @@ export async function disablePush(): Promise<void> {
 export async function sendTestPush(): Promise<void> {
   await api('/push/test', { method: 'POST' })
 }
+
+/**
+ * Shows a notification from this browser, with no network involved.
+ *
+ * This exists because "уведомления не приходят" is three different faults and
+ * the app could not tell them apart. A push has to survive: the server
+ * encrypting it, the push service accepting and delivering it, the browser
+ * decrypting it, and finally the operating system agreeing to draw it. When one
+ * of those fails, every one of them looks the same from here — and the server
+ * reporting "отправлено" is about the second link, not the last.
+ *
+ * A local notification skips the first three links entirely. If it appears, the
+ * browser and the OS are willing and the fault is in delivery. If it does not,
+ * nothing sent from anywhere would have appeared either, and the place to look
+ * is the system's own notification settings.
+ *
+ * The return value is what the *browser* thinks: `getNotifications` lists what
+ * it has accepted. An operating system that silently swallows the display still
+ * leaves the entry here — which is itself the useful answer, because it means
+ * the app has done everything it can.
+ */
+export async function showLocalNotification(): Promise<{ accepted: boolean }> {
+  const support = pushSupport()
+  if (support.kind === 'needs-install') {
+    throw new Error('Сначала добавьте приложение на домашний экран')
+  }
+  if (support.kind === 'unsupported') throw new Error(support.reason)
+  if (permissionState() !== 'granted') {
+    throw new Error('Сначала разрешите уведомления на этом устройстве')
+  }
+
+  const registered = await navigator.serviceWorker.getRegistration('/')
+  if (!registered) throw new Error('Service worker не зарегистрирован — включите уведомления заново')
+
+  await registered.showNotification('Taura PMS — проверка', {
+    body: 'Это показал сам браузер, без сервера.',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: 'local-test',
+    data: { url: '/notifications' },
+  })
+
+  const shown = await registered.getNotifications({ tag: 'local-test' })
+  return { accepted: shown.length > 0 }
+}

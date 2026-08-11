@@ -34,8 +34,28 @@ function serializeItem(row: ChecklistRow) {
 
 const cleaning = new Hono<AppEnv>()
 
-// Waiters have no housekeeping duties.
-const canClean = requireRole('admin', 'housekeeper')
+/**
+ * Everyone who cleans something, which includes the waiter.
+ *
+ * This used to be `admin, housekeeper`, and the arithmetic of that did not work
+ * out. A housekeeper's `allowedUnitTypes` is `['room']`, so every one of these
+ * endpoints answered 403 for a gazebo or a sunbed — leaving the **admin as the
+ * only person in the hotel who could tick off a recreation unit's checklist**,
+ * whose items are «Убрать посуду», «Протереть стол и лавки», «Заменить
+ * скатерть». That is the waiter's job by description.
+ *
+ * Worse, `computeAlerts` has always scoped its SLA alerts by the same
+ * `allowedUnitTypes`, so a waiter *was* being told «Уборка просрочена — Топчан
+ * 6», on their own phone, with `href: '/cleaning'` — a page that then refused
+ * them. An alert whose only action is forbidden teaches people to ignore
+ * alerts.
+ *
+ * No new data is exposed by this: every query below is filtered by
+ * `allowedUnitTypes` or guarded by `assertUnitTypeAllowed`, so a waiter sees
+ * the recreation units and nothing else, exactly as a housekeeper sees rooms
+ * and nothing else.
+ */
+const canClean = requireRole('admin', 'housekeeper', 'waiter')
 
 /** GET /api/cleaning — every unit with outstanding items ("what to clean today"). */
 cleaning.get('/', canClean, async (c) => {

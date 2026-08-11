@@ -30,7 +30,10 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/rooms', label: 'Номера', roles: ['admin'] },
       { to: '/restaurant', label: 'Зона отдыха', roles: ['admin', 'waiter'] },
-      { to: '/cleaning', label: 'Уборка', roles: ['admin', 'housekeeper'] },
+      // The waiter cleans too — the recreation units' checklist is clearing
+      // tables. Without this they were sent «Уборка просрочена» about a gazebo
+      // and had no link to the page that answers it.
+      { to: '/cleaning', label: 'Уборка', roles: ['admin', 'housekeeper', 'waiter'] },
       { to: '/waitlist', label: 'Ожидание', roles: ['admin'] },
     ],
   },

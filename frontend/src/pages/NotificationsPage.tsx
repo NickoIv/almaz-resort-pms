@@ -11,6 +11,7 @@ import {
   permissionState,
   pushSupport,
   sendTestPush,
+  showLocalNotification,
   type PushSupport,
 } from '../push'
 
@@ -96,6 +97,8 @@ export default function NotificationsPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  /** What the last check established. See `check()`. */
+  const [diagnosis, setDiagnosis] = useState<'both' | 'local-only' | 'blocked' | null>(null)
 
   const refresh = useCallback(async () => {
     setSubscribedHere((await currentSubscription()) !== null)
@@ -119,11 +122,50 @@ export default function NotificationsPage() {
     setBusy(true)
     setError(null)
     setNotice(null)
+    setDiagnosis(null)
     try {
       await action()
       setPermission(permissionState())
       await refresh()
       setNotice(done)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не получилось')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * The check, in two halves, because "уведомления не приходят" is three
+   * different faults wearing the same coat.
+   *
+   * First the browser shows one itself, with no network involved; then the
+   * server sends one the long way round. Two bubbles should appear. Which of
+   * them does is the diagnosis, and the reader is told what each outcome means
+   * before they look — the previous version reported «отправлено», which was
+   * true of the server and said nothing at all about the screen.
+   */
+  async function check() {
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    setDiagnosis(null)
+    try {
+      const local = await showLocalNotification()
+      try {
+        await sendTestPush()
+        setDiagnosis(
+          local.accepted
+            ? 'both'
+            : // The browser refused its own notification, so nothing that
+              // arrives over the network would be shown either.
+              'blocked'
+        )
+      } catch (err) {
+        setDiagnosis(local.accepted ? 'local-only' : 'blocked')
+        setError(err instanceof Error ? err.message : 'Сервер не смог отправить')
+      }
+      await refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не получилось')
     } finally {
@@ -144,12 +186,8 @@ export default function NotificationsPage() {
         </div>
         {subscribedHere && (
           <div className="page-head-actions">
-            <button
-              className="btn btn-sm"
-              disabled={busy}
-              onClick={() => void run(sendTestPush, 'Тестовое уведомление отправлено')}
-            >
-              Проверить
+            <button className="btn btn-sm" disabled={busy} onClick={() => void check()}>
+              {busy ? 'Проверяем…' : 'Проверить'}
             </button>
           </div>
         )}
@@ -157,6 +195,40 @@ export default function NotificationsPage() {
 
       {error && <Alert>{error}</Alert>}
       {notice && <div className="notice">{notice}</div>}
+
+      {/* The result of the two-part check, in the terms the reader needs: not
+          "sent", which is about the server, but "what should be on your screen
+          and what it means if it is not". */}
+      {diagnosis === 'both' && (
+        <div className="notice">
+          <strong>Отправлено два уведомления.</strong> Первое браузер показал сам, второе идёт
+          через push-сервис — обычно за несколько секунд.
+          <div style={{ marginTop: 8 }}>
+            Пришли оба — всё работает. Пришло только первое — доставка не доходит до этого
+            браузера: он должен быть запущен, а сайт открыт хотя бы в одной вкладке или добавлен
+            на домашний экран. <strong>Не появилось ни одного</strong> — показ выключен в самой
+            системе: Windows → Параметры → Система → Уведомления → Google&nbsp;Chrome, и там же
+            снимите «Не беспокоить». Приложение с этим ничего сделать не может.
+          </div>
+        </div>
+      )}
+
+      {diagnosis === 'local-only' && (
+        <div className="notice notice-warn">
+          <strong>Браузер уведомление показал, а сервер отправить не смог.</strong> Значит с этим
+          устройством всё в порядке — не сработала доставка. Подробности в сообщении об ошибке
+          выше.
+        </div>
+      )}
+
+      {diagnosis === 'blocked' && (
+        <div className="notice notice-warn">
+          <strong>Этот браузер не принял даже собственное уведомление.</strong> Ни одно
+          уведомление здесь не появится, откуда бы оно ни пришло. Проверьте настройки уведомлений
+          в системе: Windows → Параметры → Система → Уведомления → Google&nbsp;Chrome, и режим
+          «Не беспокоить».
+        </div>
+      )}
 
       <SupportNotice support={support} />
 

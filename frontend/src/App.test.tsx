@@ -2511,3 +2511,45 @@ describe('§28 the invoice requisites use the whole row they are given', () => {
     }
   })
 })
+
+describe('§29 the waiter can answer the cleaning alerts they are sent', () => {
+  it('gives them the Уборка page they are told to go to', async () => {
+    signIn('waiter')
+    mockApi(baseRoutes('waiter'))
+    renderApp(<App />, { route: '/restaurant' })
+
+    const nav = await screen.findByRole('navigation', { name: 'Разделы' })
+    // The recreation checklist is «Убрать посуду», «Протереть стол и лавки» —
+    // the waiter's job. Without this link the SLA alert they receive points at
+    // a page they have no way to open.
+    expect(within(nav).getByRole('link', { name: 'Уборка' })).toBeInTheDocument()
+    expect(within(nav).queryByRole('link', { name: 'Номера' })).not.toBeInTheDocument()
+  })
+
+  it('lets them open it rather than bouncing them to the dashboard', async () => {
+    signIn('waiter')
+    mockApi({
+      ...baseRoutes('waiter'),
+      'GET /api/cleaning': {
+        sla_minutes: 60,
+        units: [
+          { id: 20, type: 'gazebo', name: 'Беседка 1', category: null, total: 5, pending: 3,
+            waiting_since: '2026-08-11 09:00', waiting_minutes: 95, is_overdue: true },
+        ],
+      },
+      'GET /api/cleaning/unit/20': [
+        { id: 1, unit_id: 20, booking_id: null, item_name: 'Убрать посуду', is_done: false,
+          updated_at: null, updated_by: null, updated_by_name: null },
+      ],
+    })
+    renderApp(<App />, { route: '/cleaning' })
+
+    expect(await screen.findByRole('heading', { name: 'Уборка' })).toBeInTheDocument()
+
+    // The gazebo is listed as a card and, being the first one, is also the
+    // selected unit whose name titles the checklist panel beside it.
+    const card = await screen.findByRole('button', { name: /Беседка 1/ })
+    expect(card).toBeInTheDocument()
+    expect(await screen.findByText('Убрать посуду')).toBeInTheDocument()
+  })
+})
