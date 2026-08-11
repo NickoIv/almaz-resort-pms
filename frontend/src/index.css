@@ -1086,9 +1086,23 @@ button {
     border-color 0.16s var(--ease);
 }
 
+/* A day is a real button when it opens something, so it inherits none of the
+   browser's button chrome and all of the app's. */
+button.cal-day {
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 0;
+}
+
 .cal-day:hover {
   transform: translateY(-2px);
   border-color: var(--border);
+}
+
+button.cal-day:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .cal-day.is-empty {

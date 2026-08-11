@@ -18,7 +18,9 @@ import {
   PAYMENT_METHOD_LABELS,
   STATUS_LABELS,
   UNIT_TYPE_LABELS,
+  type Booking,
   type Calendar,
+  type CalendarDay,
   type Charge,
   type ChecklistItem,
   type GroupDetail,
@@ -64,6 +66,18 @@ export default function UnitDetailPage() {
   const [editBooking, setEditBooking] = useState(false)
   /** The loose end from a past booking nobody closed — see UnclosedBooking. */
   const [fixUnclosed, setFixUnclosed] = useState(false)
+  /**
+   * What was pressed in the month grid.
+   *
+   * A day carrying a booking opens that booking — including a past one, which
+   * is the whole reason this is worth having: the calendar shows a stay from
+   * three weeks ago and until now there was no way to reach it. A free day
+   * starts a new booking arriving that day, rather than on the first free date
+   * after today, because the day someone pressed is the day they meant.
+   */
+  const [dayBooking, setDayBooking] = useState<Booking | null>(null)
+  const [dayFrom, setDayFrom] = useState<string | null>(null)
+  const [dayError, setDayError] = useState<string | null>(null)
   const [showPayment, setShowPayment] = useState(false)
   const [showCharge, setShowCharge] = useState(false)
   const [showGuest, setShowGuest] = useState(false)
@@ -194,6 +208,32 @@ export default function UnitDetailPage() {
   const paidShare = billed > 0 ? Math.min(100, (prepaid / billed) * 100) : 0
   const doneCount = checklist.filter((item) => item.is_done).length
 
+
+  /** Opening whatever is on a day of the month grid. */
+  async function openDay(day: CalendarDay) {
+    setDayError(null)
+    if (!day.booking_id) {
+      setDayFrom(day.date)
+      setShowBooking(true)
+      return
+    }
+    try {
+      // Asked for by date rather than by id: there is no per-booking endpoint,
+      // and the unit plus the day is enough to find the one that was pressed.
+      const onThatDay = await api<Booking[]>(
+        `/bookings?unit_id=${unit!.id}&from=${day.date}&to=${day.date}`
+      )
+      const found = onThatDay.find((item) => item.id === day.booking_id) ?? onThatDay[0]
+      if (!found) {
+        setDayError('Бронь не найдена — возможно, её уже закрыли.')
+        return
+      }
+      setDayBooking(found)
+    } catch (err) {
+      setDayError(err instanceof Error ? err.message : 'Не удалось открыть бронь')
+    }
+  }
+
   return (
     <>
       <Link className="back-link" to={isRoom ? '/rooms' : '/restaurant'}>
@@ -293,7 +333,12 @@ export default function UnitDetailPage() {
                 </span>
               </div>
             </div>
-            {calendar ? <MonthCalendar days={calendar.days} /> : <Spinner />}
+            {calendar ? (
+              <MonthCalendar days={calendar.days} onSelect={openDay} />
+            ) : (
+              <Spinner />
+            )}
+            {dayError && <div className="field-hint">{dayError}</div>}
           </section>
 
           <PhotoGallery unitId={unit.id} bookingId={active?.id ?? null} />
@@ -535,9 +580,12 @@ export default function UnitDetailPage() {
           booking={null}
           canSetPrice={isAdmin}
           hourly={!isRoom}
-          initialFrom={nextFreeDay}
-          initialTo={isRoom ? addDaysIso(nextFreeDay, 1) : undefined}
-          onClose={() => setShowBooking(false)}
+          initialFrom={dayFrom ?? nextFreeDay}
+          initialTo={isRoom ? addDaysIso(dayFrom ?? nextFreeDay, 1) : undefined}
+          onClose={() => {
+            setShowBooking(false)
+            setDayFrom(null)
+          }}
           onSaved={refreshAll}
         />
       )}
@@ -565,6 +613,18 @@ export default function UnitDetailPage() {
           canSetPrice={isAdmin}
           hourly={!isRoom}
           onClose={() => setFixUnclosed(false)}
+          onSaved={refreshAll}
+        />
+      )}
+      {dayBooking && (
+        <BookingModal
+          unitId={unit.id}
+          unitType={unit.type}
+          unitName={unit.name}
+          booking={dayBooking}
+          canSetPrice={isAdmin}
+          hourly={!isRoom}
+          onClose={() => setDayBooking(null)}
           onSaved={refreshAll}
         />
       )}

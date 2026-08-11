@@ -2769,3 +2769,75 @@ describe('§32 миграционный учёт: иностранцев счи�
     expect(await screen.findByText(/миграционную службу нужно уведомить/)).toBeInTheDocument()
   })
 })
+
+describe('§33 нажатие на дату в календаре открывает бронь', () => {
+  const room = makeUnit({ id: 6, name: '106', status: 'free' })
+  const AUGUST = {
+    unit: { id: 6, name: '106', type: 'room' },
+    month: '2026-08',
+    days: Array.from({ length: 31 }, (_, i) => {
+      const date = `2026-08-${String(i + 1).padStart(2, '0')}`
+      const busy = i >= 13 && i <= 15
+      return {
+        date,
+        status: busy ? 'booked' : 'free',
+        booking_id: busy ? 128 : null,
+        guest_name: busy ? 'Кликнутый Гость' : null,
+      }
+    }),
+  }
+  const BOOKING = {
+    id: 128, unit_id: 6, guest_name: 'Кликнутый Гость', guest_phone: null,
+    date_from: '2026-08-14', date_to: '2026-08-16', status: 'booked',
+  }
+
+  function routes() {
+    return {
+      ...baseRoutes('admin', [room]),
+      'GET /api/units/6': room,
+      'GET /api/units/6/calendar': AUGUST,
+      'GET /api/bookings': [BOOKING],
+    }
+  }
+
+  it('makes every day a real button, named for a reader who cannot see colour', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/6' })
+
+    await screen.findByRole('heading', { name: 'Номер 106' })
+    // Colour alone says nothing to a screen reader, and «14» says almost as
+    // little — the label carries the state and the action.
+    expect(await screen.findByRole('button', { name: /14 авг.*Кликнутый Гость.*открыть бронь/ }))
+      .toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /29 авг.*свободно.*забронировать/ }))
+      .toBeInTheDocument()
+  })
+
+  it('opens the booking that is on the day pressed', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/6' })
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /14 авг.*Кликнутый Гость/ })
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Бронь #128' })).toBeInTheDocument()
+    expect((screen.getByLabelText('Гость') as HTMLInputElement).value).toBe('Кликнутый Гость')
+  })
+
+  it('starts a new booking on the day pressed, not on the next free one', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/6' })
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /29 авг.*свободно/ })
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Новая бронь' })).toBeInTheDocument()
+    // The day someone pressed is the day they meant.
+    expect((screen.getByLabelText('Заезд') as HTMLInputElement).value).toBe('2026-08-29')
+  })
+})
