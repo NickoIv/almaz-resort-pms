@@ -29,6 +29,12 @@ type UnitRow = {
   next_date_from: string | null
   next_date_to: string | null
   next_guest_name: string | null
+  stale_booking_id: number | null
+  stale_date_from: string | null
+  stale_date_to: string | null
+  stale_guest_name: string | null
+  stale_guest_phone: string | null
+  stale_status: BookingStatus | null
 }
 
 const UNIT_SELECT = `
@@ -40,7 +46,10 @@ const UNIT_SELECT = `
     b.status AS booking_status, b.total_amount, b.prepaid_amount, b.deposit_amount, b.currency,
     b.group_id, ${chargesSumSql('b')} AS charges_total,
     nb.id AS next_booking_id, nb.date_from AS next_date_from, nb.date_to AS next_date_to,
-    nb.guest_name AS next_guest_name
+    nb.guest_name AS next_guest_name,
+    sb.id AS stale_booking_id, sb.date_from AS stale_date_from, sb.date_to AS stale_date_to,
+    sb.guest_name AS stale_guest_name, sb.guest_phone AS stale_guest_phone,
+    sb.status AS stale_status
   FROM units u
   LEFT JOIN bookings b ON b.id = (
     SELECT id FROM bookings
@@ -52,6 +61,18 @@ const UNIT_SELECT = `
     SELECT id FROM bookings
     WHERE unit_id = u.id AND status <> 'free' AND ${SQL_STARTS_LATER}
     ORDER BY date_from ASC
+    LIMIT 1
+  )
+  -- A booking that fell off the end of time: not current, not future, and
+  -- never closed. Two ways to get one, and both leave the unit page blank
+  -- without this join — the guest who never arrived, and the guest who was
+  -- never checked out. Neither is reachable from anywhere else in the app,
+  -- so the alert about it used to lead to a screen with nothing on it.
+  LEFT JOIN bookings sb ON sb.id = (
+    SELECT id FROM bookings
+    WHERE unit_id = u.id AND status <> 'free'
+      AND NOT (${SQL_COVERS_NOW}) AND NOT (${SQL_STARTS_LATER})
+    ORDER BY date_from DESC
     LIMIT 1
   )
 `
@@ -108,6 +129,21 @@ function serializeUnit(row: UnitRow, withMoney: boolean) {
           guest_name: row.next_guest_name,
           date_from: row.next_date_from,
           date_to: row.next_date_to,
+        }
+      : null,
+    /**
+     * An unclosed booking whose dates are behind us. It is not the unit's
+     * status — the room is free and sellable — it is a loose end somebody has
+     * to tie off, so it rides alongside rather than in `current_booking`.
+     */
+    unclosed_booking: row.stale_booking_id
+      ? {
+          id: row.stale_booking_id,
+          guest_name: row.stale_guest_name,
+          guest_phone: row.stale_guest_phone,
+          date_from: row.stale_date_from,
+          date_to: row.stale_date_to,
+          status: row.stale_status,
         }
       : null,
   }

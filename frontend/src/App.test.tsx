@@ -2621,3 +2621,68 @@ describe('§30 the price list fills the amount in, and a person can overrule it'
     expect(screen.queryByText(/По прайсу/)).not.toBeInTheDocument()
   })
 })
+
+describe('§31 a booking that fell off the end of time can still be closed', () => {
+  const STALE = {
+    id: 85,
+    guest_name: 'Не Заехал Тестовый',
+    guest_phone: '+77009998877',
+    date_from: '2026-08-08',
+    date_to: '2026-08-10',
+    status: 'booked',
+  }
+
+  const emptyRoom = makeUnit({ id: 2, name: '102', status: 'free' })
+  const withStale = { ...emptyRoom, unclosed_booking: STALE }
+
+  function routes() {
+    return {
+      ...baseRoutes('admin', [withStale]),
+      'GET /api/units/2': withStale,
+      'GET /api/units/2/calendar': { ...CALENDAR, unit: { id: 2, name: '102', type: 'room' } },
+    }
+  }
+
+  it('says what happened, on the page the alert points at', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/2' })
+
+    // The unit itself is free and the page rightly says so — the loose end is
+    // reported beside that, not as the unit's status.
+    expect(await screen.findByRole('heading', { name: 'Номер 102' })).toBeInTheDocument()
+    expect(await screen.findByText(/Гость не заехал/)).toBeInTheDocument()
+    expect(screen.getByText(/Не Заехал Тестовый/)).toBeInTheDocument()
+  })
+
+  it('opens that very booking, so it can be checked in or closed', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/2' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Открыть бронь' }))
+
+    // The ordinary booking form, on booking 85 — nothing special was invented
+    // for this, it just had to be reachable.
+    expect(await screen.findByRole('heading', { name: 'Бронь #85' })).toBeInTheDocument()
+    expect((screen.getByLabelText('Гость') as HTMLInputElement).value).toBe('Не Заехал Тестовый')
+    expect((screen.getByLabelText('Заезд') as HTMLInputElement).value).toBe('2026-08-08')
+    // «Выехал / отменена» is how it gets closed, and it is right there.
+    expect([...(screen.getByLabelText('Статус') as HTMLSelectElement).options].map((o) => o.value))
+      .toContain('free')
+  })
+
+  it('says nothing when there is no loose end', async () => {
+    signIn('admin')
+    mockApi({
+      ...baseRoutes('admin', [emptyRoom]),
+      'GET /api/units/2': emptyRoom,
+      'GET /api/units/2/calendar': { ...CALENDAR, unit: { id: 2, name: '102', type: 'room' } },
+    })
+    renderApp(<App />, { route: '/rooms/2' })
+
+    await screen.findByRole('heading', { name: 'Номер 102' })
+    expect(screen.queryByText(/Гость не заехал/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Открыть бронь' })).not.toBeInTheDocument()
+  })
+})

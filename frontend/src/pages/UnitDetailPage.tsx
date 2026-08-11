@@ -62,6 +62,8 @@ export default function UnitDetailPage() {
   // for dates months away), `editBooking` opens the stay that is running now.
   const [showBooking, setShowBooking] = useState(false)
   const [editBooking, setEditBooking] = useState(false)
+  /** The loose end from a past booking nobody closed — see UnclosedBooking. */
+  const [fixUnclosed, setFixUnclosed] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
   const [showCharge, setShowCharge] = useState(false)
   const [showGuest, setShowGuest] = useState(false)
@@ -245,6 +247,31 @@ export default function UnitDetailPage() {
           )}
         </div>
       </div>
+
+      {/* A booking that fell off the end of time. The unit is free and the page
+          rightly says so — but somebody has to say what happened to this stay,
+          and until now there was nowhere in the app it appeared at all. The
+          «Гость не заехал» alert points here, so here is where the answer has
+          to be. */}
+      {unit.unclosed_booking && isAdmin && (
+        <div className="notice notice-warn">
+          <strong>
+            {unit.unclosed_booking.status === 'booked'
+              ? 'Гость не заехал'
+              : 'Гость не был выселен'}
+          </strong>{' '}
+          — бронь {dateRange(unit.unclosed_booking.date_from, unit.unclosed_booking.date_to)},{' '}
+          {unit.unclosed_booking.guest_name ?? 'без имени'}
+          {unit.unclosed_booking.guest_phone && ` · ${unit.unclosed_booking.guest_phone}`}. Даты
+          прошли, а бронь так и осталась открытой — она числится за объектом и попадает в
+          «Начислено по броням».
+          <div style={{ marginTop: 10 }}>
+            <button className="btn btn-sm btn-primary" onClick={() => setFixUnclosed(true)}>
+              Открыть бронь
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="detail-grid">
         <div>
@@ -523,6 +550,21 @@ export default function UnitDetailPage() {
           canSetPrice={isAdmin}
           hourly={!isRoom}
           onClose={() => setEditBooking(false)}
+          onSaved={refreshAll}
+        />
+      )}
+      {/* The same form as everywhere else, so closing this is the ordinary
+          «Выехал / отменена» with a reason — nothing special had to be invented
+          for it, it just had to be reachable. */}
+      {fixUnclosed && unit.unclosed_booking && (
+        <BookingModal
+          unitId={unit.id}
+          unitType={unit.type}
+          unitName={unit.name}
+          booking={unit.unclosed_booking}
+          canSetPrice={isAdmin}
+          hourly={!isRoom}
+          onClose={() => setFixUnclosed(false)}
           onSaved={refreshAll}
         />
       )}

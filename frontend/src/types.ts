@@ -113,6 +113,13 @@ export type Unit = {
   cleaning_total: number
   current_booking: Booking | null
   next_booking: Booking | null
+  /**
+   * A booking whose dates are behind us and which was never closed — the guest
+   * never arrived, or was never checked out. **Not** the unit's status: the
+   * room is free and sellable. It is a loose end, and until it was surfaced
+   * the «Гость не заехал» alert led to a page with nothing on it.
+   */
+  unclosed_booking?: Booking | null
 }
 
 export type CalendarDay = {
