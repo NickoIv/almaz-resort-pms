@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLiveData } from '../useLiveData'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import MountainRidge from '../components/MountainRidge'
@@ -56,6 +57,9 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(load, [load])
+  // The summary is a claim about right now; old data on it is a wrong claim.
+  // No spinner to guard — the previous figures stay up until new ones land.
+  useLiveData(load, { poll: true })
 
   const today = todayIso()
 
@@ -100,7 +104,7 @@ export default function DashboardPage() {
           <div className="page-sub">Положение дел на {today}</div>
         </div>
         <div className="page-head-actions">
-          <button className="btn btn-sm" onClick={load}>
+          <button className="btn btn-sm" onClick={() => load()}>
             Обновить
           </button>
         </div>

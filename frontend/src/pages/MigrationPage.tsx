@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useLiveData } from '../useLiveData'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { Alert, EmptyState, Spinner, StatusBadge } from '../components/ui'
@@ -36,6 +37,9 @@ export default function MigrationPage() {
   }, [])
 
   useEffect(load, [load])
+  // Filing a notice elsewhere, or a new foreign guest checking in, changes
+  // this list — and it is the one list with a legal deadline on it.
+  useLiveData(load)
 
   async function markFiled(entry: MigrationEntry) {
     setBusy(entry.booking_id)
@@ -114,7 +118,7 @@ export default function MigrationPage() {
           <button className="btn btn-sm" onClick={exportCsv} disabled={!data.due.length && !data.filed.length}>
             Экспорт CSV
           </button>
-          <button className="btn btn-sm" onClick={load}>
+          <button className="btn btn-sm" onClick={() => load()}>
             Обновить
           </button>
         </div>

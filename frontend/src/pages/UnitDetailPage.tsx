@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useLiveData } from '../useLiveData'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
@@ -156,6 +157,12 @@ export default function UnitDetailPage() {
       setCalendar(await api<Calendar>(`/units/${id}/calendar?month=${month}`).catch(() => null))
     }
   }
+
+  // `load` here never raises the spinner after the first pass, so this is
+  // already a background refresh: the room, its stay, its money and its month
+  // renew in place. Someone checking a guest out at the desk while this page is
+  // open on a phone must not leave the phone showing an occupied room.
+  useLiveData(() => void refreshAll())
 
   async function removeCharge(chargeId: number) {
     await api(`/bookings/${unit?.current_booking?.id}/charges/${chargeId}`, { method: 'DELETE' })

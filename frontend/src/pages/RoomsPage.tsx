@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLiveData } from '../useLiveData'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
@@ -90,8 +91,10 @@ export default function RoomsPage() {
     }
   }, [])
 
-  const load = useCallback(() => {
-    setLoading(true)
+  // `background` is the whole difference between a first load and a refresh:
+  // the spinner belongs to the first one only. See useLiveData.
+  const load = useCallback((background = false) => {
+    if (!background) setLoading(true)
     api<Unit[]>('/units?type=room')
       .then(setUnits)
       .catch((err) => setError(err instanceof Error ? err.message : 'Ошибка загрузки'))
@@ -99,6 +102,17 @@ export default function RoomsPage() {
   }, [])
 
   useEffect(load, [load])
+  // The board is what the desk keeps open all day, and what everyone else's
+  // work shows up on. Both halves have to renew: the cards come from `load`,
+  // the bars are drawn by RoomTimeline off its own fetch, which `boardVersion`
+  // is what re-triggers.
+  useLiveData(
+    (background) => {
+      load(background)
+      setBoardVersion((version) => version + 1)
+    },
+    { poll: true }
+  )
 
   /** Pull what the receipt needs for one booking, then show the sheet. */
   const openReceipt = useCallback(async (booking: Booking, unitName: string) => {
@@ -167,7 +181,7 @@ export default function RoomsPage() {
               Групповая бронь
             </button>
           )}
-          <button className="btn btn-sm" onClick={load}>
+          <button className="btn btn-sm" onClick={() => load()}>
             Обновить
           </button>
         </div>

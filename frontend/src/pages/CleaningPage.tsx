@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLiveData } from '../useLiveData'
 import { api } from '../api'
 import CleaningSheet from '../components/CleaningSheet'
 import Checklist from '../components/Checklist'
@@ -20,8 +21,9 @@ export default function CleaningPage() {
   const [error, setError] = useState<string | null>(null)
   const panel = useRef<HTMLElement>(null)
 
-  const load = useCallback(() => {
-    setLoading(true)
+  const load = useCallback((background = false) => {
+    // Never a spinner over a checklist being ticked — see useLiveData.
+    if (!background) setLoading(true)
     api<CleaningOverview>('/cleaning')
       .then((data) => {
         setUnits(data.units)
@@ -35,6 +37,9 @@ export default function CleaningPage() {
   }, [])
 
   useEffect(load, [load])
+  // Rooms are dirtied by other people's checkouts while this page is open, and
+  // this is the page a housekeeper leaves up for a whole shift.
+  useLiveData(load, { poll: true })
 
   useEffect(() => {
     if (!selected) {
@@ -109,7 +114,7 @@ export default function CleaningPage() {
           >
             Печать заданий на смену
           </button>
-          <button className="btn btn-sm" onClick={load}>
+          <button className="btn btn-sm" onClick={() => load()}>
             Обновить
           </button>
         </div>

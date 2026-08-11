@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useLiveData } from '../useLiveData'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import QuickBookModal from '../components/QuickBookModal'
@@ -26,8 +27,8 @@ export default function RestaurantPage() {
   const [error, setError] = useState<string | null>(null)
   const [quickUnit, setQuickUnit] = useState<Unit | null>(null)
 
-  const load = useCallback(() => {
-    setLoading(true)
+  const load = useCallback((background = false) => {
+    if (!background) setLoading(true)
     api<Unit[]>('/units?type=sunbed,gazebo,vip_gazebo')
       .then(setUnits)
       .catch((err) => setError(err instanceof Error ? err.message : 'Ошибка загрузки'))
@@ -35,6 +36,8 @@ export default function RestaurantPage() {
   }, [])
 
   useEffect(load, [load])
+  // The waiter's grid: sittings begin and end while it is being looked at.
+  useLiveData(load, { poll: true })
 
   const visible = units.filter((unit) => unit.type === tab)
   const busy = visible.filter((unit) => unit.status !== 'free').length
@@ -53,7 +56,7 @@ export default function RestaurantPage() {
           </div>
         </div>
         <div className="page-head-actions">
-          <button className="btn btn-sm" onClick={load}>
+          <button className="btn btn-sm" onClick={() => load()}>
             Обновить
           </button>
         </div>

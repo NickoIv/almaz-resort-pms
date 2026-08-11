@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useLiveData } from '../useLiveData'
 import { api } from '../api'
 import RevenueChart from '../components/RevenueChart'
 import WeekdayBreakdown from '../components/WeekdayBreakdown'
@@ -32,8 +33,8 @@ export default function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null)
   const [actBusy, setActBusy] = useState(false)
 
-  const load = useCallback(() => {
-    setLoading(true)
+  const load = useCallback((background = false) => {
+    if (!background) setLoading(true)
     setError(null)
     api<Analytics>(`/analytics/summary?from=${from}&to=${to}`)
       .then(setData)
@@ -42,6 +43,9 @@ export default function AnalyticsPage() {
   }, [from, to])
 
   useEffect(load, [load])
+  // No interval here: a report is opened deliberately, and this is the most
+  // expensive query in the app. A payment taken elsewhere still updates it.
+  useLiveData(load)
 
   /** Exports exactly what is on screen, in the same order. */
   function exportCsv() {

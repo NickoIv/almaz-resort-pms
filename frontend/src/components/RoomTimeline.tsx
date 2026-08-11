@@ -208,8 +208,8 @@ export default function RoomTimeline({
   const board = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
 
-  const load = useCallback(() => {
-    setLoading(true)
+  const load = useCallback((background = false) => {
+    if (!background) setLoading(true)
     setError(null)
     // The year is a different endpoint, not a longer window: it answers in
     // nights-per-month, which is the only shape that fits twelve columns.
@@ -223,7 +223,23 @@ export default function RoomTimeline({
       .finally(() => setLoading(false))
   }, [scale, windowStart, days, from])
 
-  useEffect(load, [load, reloadKey])
+  useEffect(load, [load])
+
+  // `reloadKey` changes when something was saved or the page refreshed itself.
+  // Silent on purpose: `.timeline.is-stale` drops the board to 55% opacity, and
+  // a board that dims once a minute under a person's hands is worse than one
+  // that is a minute out of date. The first render is already covered above.
+  const mounted = useRef(false)
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true
+      return
+    }
+    load(true)
+    // Deliberately keyed on the signal alone: `load` changing means the window
+    // moved, and that is the effect above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadKey])
 
   const today = todayIso()
 

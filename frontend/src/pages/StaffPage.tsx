@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useLiveData } from '../useLiveData'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import StaffModal from '../components/StaffModal'
@@ -18,8 +19,8 @@ export default function StaffPage() {
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<StaffMember | null>(null)
 
-  const load = useCallback(() => {
-    setLoading(true)
+  const load = useCallback((background = false) => {
+    if (!background) setLoading(true)
     api<StaffMember[]>('/staff')
       .then(setStaff)
       .catch((err) => setError(err instanceof Error ? err.message : 'Ошибка загрузки'))
@@ -27,6 +28,7 @@ export default function StaffPage() {
   }, [])
 
   useEffect(load, [load])
+  useLiveData(load)
 
   async function patch(member: StaffMember, body: Record<string, unknown>, message: string) {
     setBusyId(member.id)
@@ -78,7 +80,7 @@ export default function StaffPage() {
           <button className="btn btn-sm btn-primary" onClick={() => setAdding(true)}>
             Добавить сотрудника
           </button>
-          <button className="btn btn-sm" onClick={load}>
+          <button className="btn btn-sm" onClick={() => load()}>
             Обновить
           </button>
         </div>

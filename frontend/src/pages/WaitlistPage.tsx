@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useLiveData } from '../useLiveData'
 import { api } from '../api'
 import { Alert, EmptyState, Spinner } from '../components/ui'
 import { dateRange } from '../format'
@@ -24,8 +25,8 @@ export default function WaitlistPage() {
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
 
-  const load = useCallback(() => {
-    setLoading(true)
+  const load = useCallback((background = false) => {
+    if (!background) setLoading(true)
     api<WaitlistEntry[]>(`/waitlist${filter === 'all' ? '' : `?status=${filter}`}`)
       .then(setEntries)
       .catch((err) => setError(err instanceof Error ? err.message : 'Ошибка загрузки'))
@@ -33,6 +34,7 @@ export default function WaitlistPage() {
   }, [filter])
 
   useEffect(load, [load])
+  useLiveData(load)
 
   async function setStatus(entry: WaitlistEntry, status: WaitlistStatus) {
     setBusyId(entry.id)
@@ -59,7 +61,7 @@ export default function WaitlistPage() {
           </div>
         </div>
         <div className="page-head-actions">
-          <button className="btn btn-sm" onClick={load}>
+          <button className="btn btn-sm" onClick={() => load()}>
             Обновить
           </button>
         </div>

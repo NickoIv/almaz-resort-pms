@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useLiveData } from '../useLiveData'
 import { api } from '../api'
 import { Alert, EmptyState, Spinner } from '../components/ui'
 import { downloadCsv } from '../csv'
@@ -28,8 +29,8 @@ export default function AuditPage() {
   const [error, setError] = useState<string | null>(null)
   const isPhone = useIsPhone()
 
-  const load = useCallback(() => {
-    setLoading(true)
+  const load = useCallback((background = false) => {
+    if (!background) setLoading(true)
     const params = new URLSearchParams({
       limit: String(PAGE_SIZE),
       offset: String(page * PAGE_SIZE),
@@ -44,6 +45,9 @@ export default function AuditPage() {
   }, [action, staffId, page])
 
   useEffect(load, [load])
+  // The journal is the answer to «кто это сделал», and it is asked while the
+  // thing is still happening. Page and filters are kept — only the rows renew.
+  useLiveData(load)
 
   useEffect(() => {
     api<Filters>('/audit/filters')
@@ -84,7 +88,7 @@ export default function AuditPage() {
           <button className="btn btn-sm" onClick={exportCsv} disabled={!data?.entries.length}>
             Экспорт CSV
           </button>
-          <button className="btn btn-sm" onClick={load}>
+          <button className="btn btn-sm" onClick={() => load()}>
             Обновить
           </button>
         </div>
