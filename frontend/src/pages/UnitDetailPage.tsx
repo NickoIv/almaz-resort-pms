@@ -10,11 +10,12 @@ import GuestHistoryModal from '../components/GuestHistoryModal'
 import MonthCalendar from '../components/MonthCalendar'
 import PaymentModal from '../components/PaymentModal'
 import PhotoGallery from '../components/PhotoGallery'
+import TransferModal from '../components/TransferModal'
 import InvoiceSheet from '../components/InvoiceSheet'
 import UnitSheet from '../components/UnitSheet'
 import { Alert, EmptyState, Modal, Spinner, StatusBadge, StatusDot } from '../components/ui'
 import { addDaysIso, almatyMonth, dateRange, money, shortDate, timeRange, todayIso } from '../format'
-import { CANCEL_REASON_LABELS, type CancelReason } from '../cancellation'
+import { REASON_LABELS } from '../cancellation'
 import {
   PAYMENT_METHOD_LABELS,
   STATUS_LABELS,
@@ -100,6 +101,13 @@ export default function UnitDetailPage() {
   const [showPayment, setShowPayment] = useState(false)
   const [showCharge, setShowCharge] = useState(false)
   const [showGuest, setShowGuest] = useState(false)
+  /**
+   * Переселение. Until this existed the only way to move a guest was to cancel
+   * their booking and write a new one, which threw away the payments, the
+   * charges, the audit trail and the guest's history — everything about the
+   * stay except the one thing that changed.
+   */
+  const [showTransfer, setShowTransfer] = useState(false)
   const [showInvoice, setShowInvoice] = useState(false)
   const [showUnitSheet, setShowUnitSheet] = useState(false)
   const [sendingToCleaning, setSendingToCleaning] = useState(false)
@@ -337,6 +345,16 @@ export default function UnitDetailPage() {
               </button>
             </>
           )}
+          {/* Beside «Изменить бронь» rather than inside it, and offered for a
+              reservation that has not started as well as for a guest already in
+              the room: moving somebody is not an edit to their dates, it is the
+              one operation that has to keep two objects' calendars honest at
+              once. */}
+          {isAdmin && booking && (
+            <button className="btn btn-sm" onClick={() => setShowTransfer(true)}>
+              Переселить
+            </button>
+          )}
           {/*
             Booking ahead is not editing what is here now.
 
@@ -491,8 +509,7 @@ export default function UnitDetailPage() {
                   <div className="info-row">
                     <span>Причина завершения</span>
                     <span>
-                      {CANCEL_REASON_LABELS[booking.cancel_reason as CancelReason] ??
-                        booking.cancel_reason}
+                      {REASON_LABELS[booking.cancel_reason] ?? booking.cancel_reason}
                       {booking.cancel_note && (
                         <span className="cancel-note">{booking.cancel_note}</span>
                       )}
@@ -751,6 +768,15 @@ export default function UnitDetailPage() {
         <ChargeModal
           bookingId={active.id}
           onClose={() => setShowCharge(false)}
+          onSaved={refreshAll}
+        />
+      )}
+      {showTransfer && booking && (
+        <TransferModal
+          booking={booking}
+          unitName={unit.name}
+          canSetPrice={isAdmin}
+          onClose={() => setShowTransfer(false)}
           onSaved={refreshAll}
         />
       )}

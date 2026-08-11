@@ -165,6 +165,7 @@ export default function RoomTimeline({
   onNewBooking,
   onEditBooking,
   onPrintBooking,
+  onTransferBooking,
   reloadKey = 0,
 }: {
   onOpenRoom: (unitId: number) => void
@@ -181,6 +182,12 @@ export default function RoomTimeline({
    * in to printing an arbitrary booking's confirmation.
    */
   onPrintBooking: (booking: TimelineBooking, unitName: string) => void
+  /**
+   * Переселение. The board is where the question is actually asked — it is the
+   * one screen showing which rooms are free on the nights in question, so
+   * "куда его переселить" is answered by looking at it.
+   */
+  onTransferBooking: (booking: TimelineBooking, unitName: string) => void
   /** Bumped by the page after a save, to pull fresh bars. */
   reloadKey?: number
 }) {
@@ -818,6 +825,16 @@ export default function RoomTimeline({
               }}
             >
               Изменить бронь
+            </button>
+            <button
+              className="btn btn-sm"
+              onClick={() => {
+                const { room, booking } = popover
+                setPopover(null)
+                onTransferBooking(booking, room.unit_name)
+              }}
+            >
+              Переселить
             </button>
             <button
               className="btn btn-sm"

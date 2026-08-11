@@ -60,6 +60,10 @@ export const BACKUP_TABLES = [
       'total_amount', 'prepaid_amount', 'deposit_amount', 'currency', 'created_at', 'group_id',
       'cancel_reason', 'cancel_note', 'cancelled_at', 'verified_at', 'verified_by',
       'guest_citizenship', 'guest_document', 'migration_notified_at', 'migration_notified_by',
+      // Which leg of a переселение this is, and when the guest actually arrived.
+      // Dropping these would restore a moved stay as two unrelated bookings and
+      // restart the migration deadline.
+      'moved_from_booking_id', 'arrived_on',
     ],
   },
   {

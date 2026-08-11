@@ -2570,6 +2570,68 @@ button.cal-day:focus-visible {
   color: var(--text-faint);
 }
 
+/* ── Переселение: picking the unit to move a guest into ─────────────────────
+ *
+ * A `.stay-row` that is also a control, so it needs the button reset a div did
+ * not: a browser's own button face would fight the row's border and centre the
+ * text it is meant to line up in a column.
+ */
+/* Fourteen rooms is a list, not a page. Uncapped it came to 741px inside a
+   812px dialog and pushed «Переселить» to y=1358 on a 844px screen — the
+   confirm button of a two-tap operation, off the bottom on the phone and on the
+   desktop alike. Capped, the dialog is a dialog again.
+   Any new scrolling pane needs `overscroll-behavior: contain`, or a swipe past
+   the end of it drags the page underneath. */
+.transfer-list {
+  max-height: 38vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Sticky to the bottom of the modal's own scroll box, so however many rooms the
+   hotel grows to, the way out of this dialog stays on the screen. `bottom` is
+   the negative of .modal's padding, so the band sits flush with its edge
+   instead of leaving 24px for the list to show through. */
+.transfer-actions {
+  position: sticky;
+  bottom: -24px;
+  padding: 12px 0 24px;
+  margin-bottom: -24px;
+  background: var(--surface);
+}
+
+.transfer-option {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--border-soft);
+}
+
+.transfer-option:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+/* The chosen row carries the accent as an edge and a tint, never as a fill:
+   the text on it is page text and stays --text, so nothing here can repeat the
+   .chip.active mistake of putting --text on the accent gradient. */
+.transfer-option.is-picked {
+  border-color: var(--accent);
+  background: rgb(var(--accent-rgb) / 0.14);
+}
+
+/* A unit that is taken is neutralised, not faded. Whole-element opacity was
+   measured on the buttons and cannot clear 4.5:1 in Taura Day at any value that
+   still reads as disabled — and this row has to stay readable, because *who* is
+   in the room is the reason it is on the list at all. */
+.transfer-option:disabled {
+  cursor: not-allowed;
+  background: transparent;
+  border-color: var(--border-soft);
+  color: var(--text-dim);
+}
+
 /* ── Invoice ───────────────────────────────────────────────────────────────── */
 
 /* Issuer on the left, document identity on the right — the arrangement every

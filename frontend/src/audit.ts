@@ -4,7 +4,7 @@
  * Shared by the full log page and the dashboard's recent-activity tile, so an
  * event reads identically wherever it surfaces.
  */
-import { CANCEL_REASON_LABELS, type CancelReason } from './cancellation'
+import { REASON_LABELS } from './cancellation'
 import type { Role } from './types'
 
 export type AuditEntry = {
@@ -114,8 +114,15 @@ export function describeAudit(entry: AuditEntry): string {
     const [, status, reason] = entry.action.split(':')
     const base = `Изменена бронь — ${STATUS_WORDS[status] ?? status}`
     return reason
-      ? `${base} (${CANCEL_REASON_LABELS[reason as CancelReason] ?? reason})`
+      ? `${base} (${REASON_LABELS[reason] ?? reason})`
       : base
+  }
+  // booking.transfer:<из>→<в> — both unit names ride in the action, because
+  // "кто переселил гостя и куда" is unanswerable from an entity id alone: the
+  // booking's unit column already says where it ended up and nothing anywhere
+  // remembers where it came from.
+  if (entry.action.startsWith('booking.transfer:')) {
+    return `Переселение ${entry.action.slice('booking.transfer:'.length)}`
   }
   if (entry.action.startsWith('notification.test')) {
     return `Тест уведомления (${entry.action.split(':')[1] ?? ''})`.trim()

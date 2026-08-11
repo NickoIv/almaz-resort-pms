@@ -436,6 +436,18 @@ export default function BookingModal({
           </div>
         )}
 
+        {/* A stay that starts on a Wednesday in the middle of a week reads as a
+            typing mistake until the screen says why. This is the other half of
+            переселение: the continuation has to admit what it continues, or the
+            desk sees two unrelated bookings for one guest. */}
+        {target?.moved_from_unit_name && (
+          <div className="notice">
+            Гость переселён из «{target.moved_from_unit_name}»
+            {target.arrived_on && ` · заехал ${shortDate(target.arrived_on)}`}. Ночи до переезда
+            остались за бронью #{target.moved_from_booking_id}.
+          </div>
+        )}
+
         <div className="field">
           <label htmlFor="guest">Гость</label>
           <input

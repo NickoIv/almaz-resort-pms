@@ -41,6 +41,11 @@ export function almatyNow(): string {
   return local.toISOString().slice(0, 16).replace('T', ' ')
 }
 
+/** Today in Almaty, `YYYY-MM-DD`. The hotel's day, never the server's. */
+export function almatyToday(): string {
+  return almatyNow().slice(0, 10)
+}
+
 /** Adds hours to a `YYYY-MM-DD HH:MM` string, returning the same format. */
 export function addHours(timestamp: string, hours: number): string {
   const base = new Date(`${timestamp.replace(' ', 'T')}:00Z`)

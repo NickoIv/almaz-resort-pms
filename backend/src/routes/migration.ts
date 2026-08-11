@@ -5,6 +5,7 @@ import { writeAudit } from '../lib/audit'
 import { loadTextSettings } from '../lib/notifications'
 import { SQL_NOW, SQL_TODAY } from '../lib/time'
 import {
+  arrivalOf,
   daysLeft,
   noticeDue,
   noticeState,
@@ -22,7 +23,7 @@ migration.use('*', requireRole('admin'))
 const SELECT = `
   SELECT b.id AS booking_id, b.guest_name, b.guest_phone,
          b.guest_citizenship, b.guest_document,
-         b.date_from, b.date_to,
+         b.date_from, b.date_to, b.arrived_on,
          b.migration_notified_at,
          u.id AS unit_id, u.name AS unit_name,
          su.name AS migration_notified_by_name
@@ -52,15 +53,19 @@ migration.get('/', async (c) => {
     .bind(today)
     .all<MigrationRow>()
 
-  const arrived = (row: MigrationRow) => row.date_from.slice(0, 10) <= today
+  // The arrival, not this row's start: a guest переселён on the second night
+  // keeps the deadline the hotel already had. Only the live leg of a move is
+  // here at all — the one it continues is `free` and filtered out above — so
+  // each arrival still appears exactly once.
+  const arrived = (row: MigrationRow) => arrivalOf(row) <= today
 
   const due = results
     .filter((row) => noticeState(row.guest_citizenship) === 'foreign')
     .filter((row) => !row.migration_notified_at && arrived(row))
     .map((row) => ({
       ...row,
-      due_on: noticeDue(row.date_from),
-      days_left: daysLeft(row.date_from, today),
+      due_on: noticeDue(arrivalOf(row)),
+      days_left: daysLeft(arrivalOf(row), today),
     }))
     .sort((a, b) => a.days_left - b.days_left)
 
@@ -71,7 +76,7 @@ migration.get('/', async (c) => {
   const filed = results
     .filter((row) => row.migration_notified_at)
     .slice(0, 50)
-    .map((row) => ({ ...row, due_on: noticeDue(row.date_from), days_left: 0 }))
+    .map((row) => ({ ...row, due_on: noticeDue(arrivalOf(row)), days_left: 0 }))
 
   // The notice needs the address of stay, and that is the hotel's own — it
   // lives in settings, so the screen can offer it for copying rather than

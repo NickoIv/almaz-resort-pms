@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { Spinner } from './ui'
 import { daysBetween, money, pluralRu, shortDate, timeRange, todayIso } from '../format'
-import { CANCEL_REASON_LABELS, type CancelReason } from '../cancellation'
+import { REASON_LABELS } from '../cancellation'
 import {
   PAYMENT_METHOD_LABELS,
   UNIT_TYPE_LABELS,
@@ -192,7 +192,7 @@ export default function InvoiceSheet({
                 <div className="receipt-sub">от {shortDate(todayIso())}</div>
                 {booking.cancel_reason && booking.cancel_reason !== 'checked_out' && (
                   <div className="receipt-void">
-                    {CANCEL_REASON_LABELS[booking.cancel_reason as CancelReason] ?? ''}
+                    {REASON_LABELS[booking.cancel_reason] ?? ''}
                   </div>
                 )}
               </div>

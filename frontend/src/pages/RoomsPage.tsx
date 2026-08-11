@@ -7,6 +7,7 @@ import BookingModal from '../components/BookingModal'
 import GroupBookingModal from '../components/GroupBookingModal'
 import InvoiceSheet from '../components/InvoiceSheet'
 import RoomTimeline from '../components/RoomTimeline'
+import TransferModal from '../components/TransferModal'
 import UnitCard from '../components/UnitCard'
 import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
 import { matchesQuery } from '../search'
@@ -66,6 +67,13 @@ export default function RoomsPage() {
   // Set when a bar on the board is opened for editing.
   const [editing, setEditing] = useState<{
     unitId: number
+    unitName: string
+    booking: Booking
+  } | null>(null)
+  // Переселение, opened from a bar. The board is where the question is asked:
+  // it is the one screen that shows which rooms are free on the nights in
+  // question, so «куда его переселить» is answered by looking at it.
+  const [transferring, setTransferring] = useState<{
     unitName: string
     booking: Booking
   } | null>(null)
@@ -200,6 +208,9 @@ export default function RoomsPage() {
           onPrintBooking={(booking: TimelineBooking, unitName) =>
             void openReceipt(booking, unitName)
           }
+          onTransferBooking={(booking: TimelineBooking, unitName) =>
+            setTransferring({ unitName, booking })
+          }
         />
       ) : (
         <>
@@ -313,6 +324,22 @@ export default function RoomsPage() {
           booking={editing.booking}
           canSetPrice={isAdmin}
           onClose={() => setEditing(null)}
+          onSaved={() => {
+            setBoardVersion((v) => v + 1)
+            load()
+          }}
+        />
+      )}
+
+      {/* Переселение straight from a bar. Same rule as the edit form above:
+          onSaved refreshes and onClose closes, kept apart so the dialog can
+          stay up and report what it did. */}
+      {transferring && (
+        <TransferModal
+          booking={transferring.booking}
+          unitName={transferring.unitName}
+          canSetPrice={isAdmin}
+          onClose={() => setTransferring(null)}
           onSaved={() => {
             setBoardVersion((v) => v + 1)
             load()

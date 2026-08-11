@@ -43,6 +43,18 @@ export type Booking = {
    */
   verified_at?: string | null
   verified_by_name?: string | null
+  /**
+   * Переселение: the booking this one continues, and the unit it came out of.
+   * A stay that begins in the middle of a week reads as a data-entry error
+   * until the screen says the guest was moved out of 101 that morning.
+   */
+  moved_from_booking_id?: number | null
+  moved_from_unit_name?: string | null
+  /**
+   * The day the guest arrived at the hotel, when that is not `date_from`.
+   * Carried across a move so the migration deadline does not restart.
+   */
+  arrived_on?: string | null
   /** Money fields are present only for the admin role. */
   total_amount?: number
   prepaid_amount?: number
@@ -414,6 +426,59 @@ export type Quote = {
   }[]
   /** The list had nothing to say about this stay; suggest nothing. */
   empty: boolean
+}
+
+/**
+ * Переселение, as the server describes it before anything is written.
+ *
+ * `mode` is the server's reading of the dates, not a choice this screen offers:
+ * a stay that has not started moves whole, one under way splits at today. See
+ * backend/src/lib/transfer.ts.
+ */
+export type TransferPlan = {
+  mode: 'whole' | 'split'
+  /** The day the stay divides, when it does. */
+  split_on: string | null
+  moved_from: string
+  date_to: string
+  nights_before: number
+  nights_after: number
+  from_unit: { id: number; name: string; type: UnitType }
+  /** Money fields, admin only — the same rule as everywhere else. */
+  currency?: string
+  total_amount?: number
+  prepaid_amount?: number
+  charges_amount?: number
+  deposit_amount?: number
+  suggested_stay_amount?: number
+  suggested_move_amount?: number
+  units: {
+    id: number
+    name: string
+    category: string | null
+    capacity: number
+    /** Free for the whole remaining span, by the same rule the POST enforces. */
+    free: boolean
+    /** Who is in it otherwise — so "why not 105" has an answer on the screen. */
+    taken_by: string | null
+    needs_cleaning: boolean
+    /** The price list's answer for these nights in this unit; null if it has none. */
+    quote?: number | null
+  }[]
+}
+
+export type TransferResult = {
+  mode: 'whole' | 'split'
+  from_unit: { id: number; name: string }
+  to_unit: { id: number; name: string }
+  split_on?: string | null
+  nights_before?: number
+  nights_after?: number
+  /** Prepayment that followed the guest to the new booking. */
+  carried_amount?: number
+  booking: Booking
+  /** The closed leg, on a split. Null when the whole booking simply moved. */
+  previous: Booking | null
 }
 
 /** What GET /api/guests/:phone answers — the parts the booking form uses. */

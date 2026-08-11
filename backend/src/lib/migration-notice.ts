@@ -49,6 +49,22 @@ export type MigrationRow = {
   unit_name: string
   migration_notified_at: string | null
   migration_notified_by_name: string | null
+  /** Set only on the continuation of a move — see arrivalOf below. */
+  arrived_on?: string | null
+}
+
+/**
+ * The day the guest arrived at the hotel, which is not always the day this row
+ * starts.
+ *
+ * A guest переселён on the second night leaves a booking whose `date_from` is
+ * today, and the three-day clock does **not** restart because they changed
+ * rooms. Reading `date_from` here would hand the hotel a fresh deadline on every
+ * move — later than the real one, which is precisely the direction that ends in
+ * a fine. `arrived_on` is carried forward through every leg of a move.
+ */
+export function arrivalOf(row: { date_from: string; arrived_on?: string | null }): string {
+  return (row.arrived_on ?? row.date_from).slice(0, 10)
 }
 
 export type NoticeState = 'foreign' | 'local' | 'unknown'
@@ -83,10 +99,15 @@ export function daysLeft(dateFrom: string, today: string): number {
  * would be wrong as well as alarming.
  */
 export function needsNotice(
-  row: { guest_citizenship: string | null; date_from: string; migration_notified_at: string | null },
+  row: {
+    guest_citizenship: string | null
+    date_from: string
+    arrived_on?: string | null
+    migration_notified_at: string | null
+  },
   today: string
 ): boolean {
   if (row.migration_notified_at) return false
   if (noticeState(row.guest_citizenship) !== 'foreign') return false
-  return row.date_from.slice(0, 10) <= today
+  return arrivalOf(row) <= today
 }

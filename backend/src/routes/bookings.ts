@@ -8,9 +8,12 @@ import { writeAudit } from '../lib/audit'
 import { chargesSumSql, remainingOf } from '../lib/money'
 import { ADJUSTMENT_METHOD, assertPaymentMethod, resolveReceivedBy } from '../lib/payment'
 import { cleanName, cleanOptional } from '../lib/text'
-import { CANCEL_REASONS, isCancelReason } from '../lib/cancellation'
+import { CANCEL_REASONS, isCancelReason, TRANSFER_REASON } from '../lib/cancellation'
+import { carryOver, nightsBetween, prorate } from '../lib/transfer'
+import { quoteStay } from '../lib/rates'
+import { loadRates } from './rates'
 import { findWaitlistMatches } from './waitlist'
-import { addHours, almatyNow, SQL_NOW } from '../lib/time'
+import { addHours, almatyNow, almatyToday, SQL_NOW } from '../lib/time'
 import type { AppEnv, BookingStatus, UnitType } from '../types'
 
 type BookingRow = {
@@ -21,6 +24,7 @@ type BookingRow = {
   guest_citizenship: string | null
   guest_document: string | null
   migration_notified_at: string | null
+  migration_notified_by: number | null
   date_from: string
   date_to: string
   status: BookingStatus
@@ -37,6 +41,9 @@ type BookingRow = {
   verified_at: string | null
   verified_by: number | null
   verified_by_name?: string | null
+  moved_from_booking_id: number | null
+  arrived_on: string | null
+  moved_from_unit_name?: string | null
 }
 
 const BOOKING_STATUSES: BookingStatus[] = ['free', 'booked', 'occupied']
@@ -47,9 +54,12 @@ const BOOKING_STATUSES: BookingStatus[] = ['free', 'booked', 'occupied']
  * reader to another screen to find out who that was.
  */
 const BOOKING_SELECT = `SELECT b.*, ${chargesSumSql('b')} AS charges_total,
-    ver.name AS verified_by_name
+    ver.name AS verified_by_name,
+    src_unit.name AS moved_from_unit_name
   FROM bookings b
-  LEFT JOIN staff_users ver ON ver.id = b.verified_by`
+  LEFT JOIN staff_users ver ON ver.id = b.verified_by
+  LEFT JOIN bookings src ON src.id = b.moved_from_booking_id
+  LEFT JOIN units src_unit ON src_unit.id = src.unit_id`
 
 function serializeBooking(row: BookingRow, withMoney: boolean) {
   return {
@@ -74,6 +84,13 @@ function serializeBooking(row: BookingRow, withMoney: boolean) {
     // that nobody has checked it, which is the whole point of recording it.
     verified_at: row.verified_at,
     verified_by_name: row.verified_by_name ?? null,
+    // Where this leg of a move came from. Shared with every role: a booking
+    // that begins in the middle of a stay looks like a data error until the
+    // screen says the guest was moved out of 101 this morning.
+    moved_from_booking_id: row.moved_from_booking_id,
+    moved_from_unit_name: row.moved_from_unit_name ?? null,
+    /** The day the guest arrived, when this row is not where they started. */
+    arrived_on: row.arrived_on,
     is_paid: remainingOf(row.total_amount, row.charges_total ?? 0, row.prepaid_amount) <= 0,
     ...(withMoney
       ? {
@@ -143,9 +160,12 @@ bookings.get('/', async (c) => {
   const to = c.req.query('to') ?? '9999-12-31'
 
   const { results } = await c.env.DB.prepare(
+    // Every column qualified with `b.`: BOOKING_SELECT joins the bookings table
+    // to itself to name the unit a move came out of, so a bare `date_from` is
+    // ambiguous and the whole query 500s.
     `${BOOKING_SELECT}
-     WHERE unit_id = ? AND date(date_to) >= date(?) AND date(date_from) <= date(?)
-     ORDER BY date_from DESC`
+     WHERE b.unit_id = ? AND date(b.date_to) >= date(?) AND date(b.date_from) <= date(?)
+     ORDER BY b.date_from DESC`
   )
     .bind(unitId, from, to)
     .all<BookingRow>()
@@ -778,6 +798,373 @@ bookings.post('/:id/verify', canBook, async (c) => {
 
   await writeAudit(c.env.DB, staff.sub, 'booking.verify', 'bookings', id)
   return c.json(serializeBooking(updated!, money))
+})
+
+/**
+ * What a transfer of this booking would look like, before anyone commits to it.
+ *
+ * Shared by the GET below and the POST after it, so the dialog cannot offer a
+ * move the endpoint would then refuse — the two used to be the classic place
+ * for a rule to drift, since one is arithmetic on dates and the other is
+ * arithmetic on dates.
+ */
+function planTransfer(booking: BookingRow, unitType: UnitType) {
+  const today = almatyToday()
+  const startsOn = booking.date_from.slice(0, 10)
+  const endsOn = booking.date_to.slice(0, 10)
+  // Rooms are the only thing that can be half-moved: a sitting at a gazebo has
+  // no nights to divide, so it travels whole however far into it the party is.
+  const splitDay = unitType === 'room' && startsOn < today ? today : null
+  const nightsTotal = nightsBetween(startsOn, endsOn)
+  const nightsBefore = splitDay ? nightsBetween(startsOn, splitDay) : 0
+  return {
+    today,
+    startsOn,
+    endsOn,
+    splitDay,
+    movedFrom: splitDay ?? booking.date_from,
+    nightsBefore,
+    nightsAfter: nightsTotal - nightsBefore,
+    suggested: splitDay
+      ? prorate(booking.total_amount, nightsBefore, nightsTotal)
+      : { stay: 0, move: booking.total_amount },
+  }
+}
+
+/**
+ * Refuses a booking that cannot be moved at all.
+ *
+ * Called by the GET as well as the POST, on purpose: a dialog that listed rooms
+ * and *then* refused would be teaching the desk not to trust the list.
+ */
+function assertTransferable(booking: BookingRow, plan: ReturnType<typeof planTransfer>): void {
+  if (booking.status === 'free') {
+    throw new HTTPException(400, { message: 'Бронь уже закрыта — переселять некого' })
+  }
+  // Nothing left to move: the stay is behind us, or its remaining nights are
+  // none — the guest checks out this morning.
+  if (plan.endsOn < plan.today || (plan.splitDay !== null && plan.endsOn === plan.today)) {
+    throw new HTTPException(400, {
+      message: 'Бронь уже заканчивается — переселять некуда',
+    })
+  }
+}
+
+type TransferTargetRow = {
+  id: number
+  name: string
+  category: string | null
+  capacity: number
+  cleaning_pending: number
+  taken_by: string | null
+}
+
+/**
+ * GET /api/bookings/:id/transfer-targets — where this guest could go.
+ *
+ * Availability is answered here rather than by the caller filtering the board,
+ * because "free" has to mean exactly what `assertNoOverlap` means. A dialog that
+ * worked it out from a timeline would offer a room the POST then refuses, and
+ * the desk would learn to distrust the list.
+ *
+ * Occupied units are returned too, named by who is in them. A list that simply
+ * omitted them answers "where can I put this guest" but not "why can't I put
+ * them in 105", and the second question is the one that gets asked out loud.
+ */
+bookings.get('/:id/transfer-targets', canBook, async (c) => {
+  const staff = c.get('staff')
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) throw new HTTPException(400, { message: 'Invalid booking id' })
+
+  const booking = await c.env.DB.prepare(`${BOOKING_SELECT} WHERE b.id = ?`)
+    .bind(id)
+    .first<BookingRow>()
+  if (!booking) throw new HTTPException(404, { message: 'Booking not found' })
+
+  const from = await loadUnit(c.env.DB, booking.unit_id)
+  assertUnitTypeAllowed(staff.role, from.type)
+
+  const plan = planTransfer(booking, from.type)
+  assertTransferable(booking, plan)
+  const money = canSeeMoney(staff.role)
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT u.id, u.name, u.category, u.capacity,
+            (SELECT COUNT(*) FROM cleaning_checklist cc
+              WHERE cc.unit_id = u.id AND cc.is_done = 0) AS cleaning_pending,
+            (SELECT b.guest_name FROM bookings b
+              WHERE b.unit_id = u.id AND b.status <> 'free'
+                AND datetime(b.date_from) < datetime(?) AND datetime(b.date_to) > datetime(?)
+              ORDER BY b.date_from LIMIT 1) AS taken_by
+       FROM units u
+      WHERE u.type = ? AND u.id <> ?
+      ORDER BY u.name`
+  )
+    .bind(booking.date_to, plan.movedFrom, from.type, booking.unit_id)
+    .all<TransferTargetRow>()
+
+  // Priced per candidate, because the whole point of choosing a room is that
+  // they are not all the same price. Withheld entirely when the list has
+  // nothing to say about a unit — a partial quote undercharges silently.
+  const rates = money ? await loadRates(c.env.DB) : []
+
+  const units = results.map((row) => ({
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    capacity: row.capacity,
+    free: row.taken_by === null,
+    taken_by: row.taken_by,
+    needs_cleaning: row.cleaning_pending > 0,
+    ...(money
+      ? {
+          quote: (() => {
+            const quote = quoteStay(
+              rates,
+              { type: from.type, category: row.category },
+              plan.movedFrom,
+              booking.date_to
+            )
+            return quote.empty ? null : quote.total
+          })(),
+        }
+      : {}),
+  }))
+
+  return c.json({
+    mode: plan.splitDay ? ('split' as const) : ('whole' as const),
+    split_on: plan.splitDay,
+    moved_from: plan.movedFrom,
+    date_to: booking.date_to,
+    nights_before: plan.nightsBefore,
+    nights_after: plan.nightsAfter,
+    from_unit: { id: from.id, name: from.name, type: from.type },
+    ...(money
+      ? {
+          currency: booking.currency,
+          total_amount: booking.total_amount,
+          prepaid_amount: booking.prepaid_amount,
+          charges_amount: booking.charges_total ?? 0,
+          deposit_amount: booking.deposit_amount,
+          suggested_stay_amount: plan.suggested.stay,
+          suggested_move_amount: plan.suggested.move,
+        }
+      : {}),
+    units,
+  })
+})
+
+/**
+ * POST /api/bookings/:id/transfer — переселение: the guest changes unit and the
+ * stay survives it.
+ *
+ * See lib/transfer.ts for why a stay under way is split and a stay that has not
+ * started is simply moved, and for what happens to the money. This handler is
+ * the plumbing; the reasoning is there.
+ *
+ * Body: `{ to_unit_id, stay_amount?, move_amount? }`. The two amounts are the
+ * admin's re-quote of the legs — `stay_amount` for the nights already slept in
+ * the old unit, `move_amount` for the continuation. Left out, the agreed price
+ * divides pro rata by night and the guest's bill does not change.
+ */
+bookings.post('/:id/transfer', canBook, async (c) => {
+  const staff = c.get('staff')
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) throw new HTTPException(400, { message: 'Invalid booking id' })
+
+  const existing = await c.env.DB.prepare(`${BOOKING_SELECT} WHERE b.id = ?`)
+    .bind(id)
+    .first<BookingRow>()
+  if (!existing) throw new HTTPException(404, { message: 'Booking not found' })
+
+  const body = await readJson(c)
+  const toUnitId = Number(body.to_unit_id)
+  if (!Number.isInteger(toUnitId)) {
+    throw new HTTPException(400, { message: 'Не выбран объект для переселения' })
+  }
+  if (toUnitId === existing.unit_id) {
+    throw new HTTPException(400, { message: 'Гость уже живёт в этом объекте' })
+  }
+
+  const from = await loadUnit(c.env.DB, existing.unit_id)
+  const to = await loadUnit(c.env.DB, toUnitId)
+  assertUnitTypeAllowed(staff.role, from.type)
+  assertUnitTypeAllowed(staff.role, to.type)
+
+  // A room and a gazebo are not substitutes: one is sold by the night, the
+  // other by the sitting, and every price, checklist and calendar rule below
+  // follows from which of the two this is.
+  if (from.type !== to.type) {
+    throw new HTTPException(400, {
+      message: `«${to.name}» — объект другого типа. Переселить можно только в такой же.`,
+    })
+  }
+  const plan = planTransfer(existing, from.type)
+  assertTransferable(existing, plan)
+  const { splitDay } = plan
+
+  const money = canSeeMoney(staff.role)
+
+  await assertNoOverlap(c.env.DB, toUnitId, plan.movedFrom, existing.date_to, splitDay ? null : id)
+
+  // ── The whole booking moves: one row, one id, nothing else touched ────────
+  if (!splitDay) {
+    const newTotal =
+      money && body.move_amount !== undefined ? Number(body.move_amount) : existing.total_amount
+    if (!Number.isFinite(newTotal) || newTotal < 0) {
+      throw new HTTPException(400, { message: 'Сумма должна быть неотрицательным числом' })
+    }
+
+    const moved = await c.env.DB.prepare(
+      'UPDATE bookings SET unit_id = ?, total_amount = ? WHERE id = ? RETURNING id'
+    )
+      .bind(toUnitId, newTotal, id)
+      .first<{ id: number }>()
+    if (!moved) throw new HTTPException(500, { message: 'Не удалось переселить бронь' })
+
+    // Somebody having been in the unit is what queues it for cleaning — the
+    // same rule as a checkout. A reservation that has not started yet leaves
+    // nothing behind, and inventing a checklist for it would put a clean room
+    // in the housekeeper's queue and fire the SLA an hour later.
+    if (existing.status === 'occupied') {
+      await resetChecklist(c.env.DB, existing.unit_id, from.type, id)
+    }
+
+    await writeAudit(
+      c.env.DB,
+      staff.sub,
+      `booking.transfer:${from.name}→${to.name}`,
+      'bookings',
+      id
+    )
+
+    const updated = await c.env.DB.prepare(`${BOOKING_SELECT} WHERE b.id = ?`)
+      .bind(id)
+      .first<BookingRow>()
+
+    return c.json({
+      mode: 'whole' as const,
+      from_unit: { id: from.id, name: from.name },
+      to_unit: { id: to.id, name: to.name },
+      booking: serializeBooking(updated!, money),
+      previous: null,
+    })
+  }
+
+  // ── The stay is under way: close this leg today, continue in the new unit ──
+  const stayTotal =
+    money && body.stay_amount !== undefined ? Number(body.stay_amount) : plan.suggested.stay
+  const moveTotal =
+    money && body.move_amount !== undefined ? Number(body.move_amount) : plan.suggested.move
+  if ([stayTotal, moveTotal].some((value) => !Number.isFinite(value) || value < 0)) {
+    throw new HTTPException(400, { message: 'Суммы должны быть неотрицательными числами' })
+  }
+
+  const carried = carryOver(existing.prepaid_amount, stayTotal, existing.charges_total ?? 0)
+
+  // The continuation is written first and paid for second: a batch that fails
+  // half way then leaves the guest visible in two rooms, which the desk can see
+  // and undo, rather than money counted twice, which it cannot.
+  const created = await c.env.DB.prepare(
+    `INSERT INTO bookings
+       (unit_id, guest_name, guest_phone, guest_citizenship, guest_document,
+        migration_notified_at, migration_notified_by,
+        date_from, date_to, status,
+        total_amount, prepaid_amount, deposit_amount, currency, group_id,
+        moved_from_booking_id, arrived_on, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ${SQL_NOW})
+     RETURNING *`
+  )
+    .bind(
+      toUnitId,
+      existing.guest_name,
+      existing.guest_phone,
+      existing.guest_citizenship,
+      existing.guest_document,
+      // The notice has been filed for this arrival or it has not; moving rooms
+      // does not un-file it, and re-asking would send the hotel to eQonaq twice.
+      existing.migration_notified_at,
+      existing.migration_notified_by,
+      splitDay,
+      existing.date_to,
+      existing.status,
+      moveTotal,
+      existing.deposit_amount,
+      existing.currency,
+      existing.group_id,
+      id,
+      // The three-day migration clock runs from the arrival, not from this row.
+      existing.arrived_on ?? existing.date_from.slice(0, 10)
+    )
+    .first<BookingRow>()
+
+  if (!created) throw new HTTPException(500, { message: 'Не удалось создать бронь в новом объекте' })
+
+  const statements: D1PreparedStatement[] = [
+    c.env.DB.prepare(
+      `UPDATE bookings
+          SET date_to = ?, total_amount = ?, prepaid_amount = ?, deposit_amount = 0,
+              status = 'free', cancel_reason = ?, cancel_note = ?, cancelled_at = ${SQL_NOW}
+        WHERE id = ?`
+    ).bind(
+      splitDay,
+      stayTotal,
+      Number((existing.prepaid_amount - carried).toFixed(2)),
+      TRANSFER_REASON,
+      `Переселение в «${to.name}»`,
+      id
+    ),
+  ]
+
+  // Both halves of the carry, or neither: the pair sums to zero, so a report
+  // that saw only one of them would be short exactly the amount that moved.
+  if (carried > 0) {
+    statements.push(
+      c.env.DB.prepare(
+        `INSERT INTO payments (booking_id, amount, method, received_by, recorded_by, paid_at)
+         VALUES (?, ?, ?, NULL, ?, ${SQL_NOW})`
+      ).bind(id, -carried, ADJUSTMENT_METHOD, staff.sub),
+      c.env.DB.prepare('UPDATE bookings SET prepaid_amount = ? WHERE id = ?').bind(
+        carried,
+        created.id
+      ),
+      c.env.DB.prepare(
+        `INSERT INTO payments (booking_id, amount, method, received_by, recorded_by, paid_at)
+         VALUES (?, ?, ?, NULL, ?, ${SQL_NOW})`
+      ).bind(created.id, carried, ADJUSTMENT_METHOD, staff.sub)
+    )
+  }
+
+  await c.env.DB.batch(statements)
+
+  // The guest slept in the old unit — those nights are the whole reason this is
+  // a split — so it needs cleaning whatever the status column happened to say.
+  await resetChecklist(c.env.DB, existing.unit_id, from.type, id)
+
+  await writeAudit(
+    c.env.DB,
+    staff.sub,
+    `booking.transfer:${from.name}→${to.name}`,
+    'bookings',
+    created.id
+  )
+
+  const [continuation, closed] = await Promise.all([
+    c.env.DB.prepare(`${BOOKING_SELECT} WHERE b.id = ?`).bind(created.id).first<BookingRow>(),
+    c.env.DB.prepare(`${BOOKING_SELECT} WHERE b.id = ?`).bind(id).first<BookingRow>(),
+  ])
+
+  return c.json({
+    mode: 'split' as const,
+    from_unit: { id: from.id, name: from.name },
+    to_unit: { id: to.id, name: to.name },
+    split_on: splitDay,
+    nights_before: plan.nightsBefore,
+    nights_after: plan.nightsAfter,
+    carried_amount: money ? carried : undefined,
+    booking: serializeBooking(continuation!, money),
+    previous: serializeBooking(closed!, money),
+  })
 })
 
 /**

@@ -27,6 +27,8 @@ type StayRow = {
   deposit_amount: number
   charges_total: number
   currency: string
+  /** Set when this row continues a переселение — see total_stays below. */
+  moved_from_booking_id: number | null
 }
 
 /**
@@ -42,6 +44,7 @@ guests.get('/:phone', async (c) => {
     `SELECT b.id AS booking_id, u.name AS unit_name, u.type AS unit_type,
             b.guest_name, b.date_from, b.date_to, b.status,
             b.total_amount, b.prepaid_amount, b.deposit_amount, b.currency,
+            b.moved_from_booking_id,
             ${chargesSumSql('b')} AS charges_total
      FROM bookings b
      JOIN units u ON u.id = b.unit_id
@@ -60,7 +63,10 @@ guests.get('/:phone', async (c) => {
   const todayRow = await c.env.DB.prepare(`SELECT ${SQL_TODAY} AS today`).first<{ today: string }>()
   const today = todayRow?.today ?? new Date().toISOString().slice(0, 10)
 
-  const past = stays.filter((stay) => stay.date_to.slice(0, 10) < today)
+  // Counted the same way as total_stays: one visit, however many rooms it used.
+  const past = stays.filter(
+    (stay) => !stay.moved_from_booking_id && stay.date_to.slice(0, 10) < today
+  )
   const outstanding = stays.reduce(
     (sum, stay) =>
       sum + Math.max(0, stay.total_amount + stay.charges_total - stay.prepaid_amount),
@@ -72,7 +78,11 @@ guests.get('/:phone', async (c) => {
     phone,
     // The most recent spelling of the name wins — guests get retyped.
     guest_name: stays[0]?.guest_name ?? null,
-    total_stays: stays.length,
+    // Arrivals, not rows. A guest переселён mid-stay leaves two bookings for
+    // one visit, and counting both would tell the desk a first-time guest has
+    // been here twice — the returning-guest notice in the booking form is read
+    // as a fact about the person, so it has to count people arriving.
+    total_stays: stays.filter((stay) => !stay.moved_from_booking_id).length,
     past_stays: past.length,
     outstanding_debt: Number(outstanding.toFixed(2)),
     lifetime_spend: Number(lifetimeSpend.toFixed(2)),

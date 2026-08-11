@@ -40,7 +40,8 @@ function day(value: unknown, field: string): string | null {
   return text
 }
 
-async function loadRates(db: D1Database): Promise<Rate[]> {
+/** The whole price list. Exported so the transfer quote cannot drift from it. */
+export async function loadRates(db: D1Database): Promise<Rate[]> {
   const { results } = await db
     .prepare(
       `SELECT id, unit_type, category, weekday_price, weekend_price,

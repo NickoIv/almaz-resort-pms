@@ -1,6 +1,6 @@
 import { allowedUnitTypes, placeholders } from './access'
 import { CLEANING_SLA_MINUTES } from './cleaning'
-import { daysLeft, noticeDue } from './migration-notice'
+import { arrivalOf, daysLeft, noticeDue } from './migration-notice'
 import { SQL_NOW, SQL_TODAY } from './time'
 import type { Role, UnitType } from '../types'
 
@@ -106,6 +106,8 @@ type MigrationDueRow = {
   guest_name: string
   guest_citizenship: string
   date_from: string
+  /** The real arrival when this row is the continuation of a переселение. */
+  arrived_on: string | null
   unit_id: number
   unit_name: string
   unit_type: UnitType
@@ -319,7 +321,7 @@ export async function computeAlerts(db: D1Database, audience: AlertAudience): Pr
   if (isAdmin) {
     const { results: dueNotices } = await db
       .prepare(
-        `SELECT b.id, b.guest_name, b.guest_citizenship, b.date_from,
+        `SELECT b.id, b.guest_name, b.guest_citizenship, b.date_from, b.arrived_on,
                 u.id AS unit_id, u.name AS unit_name, u.type AS unit_type
            FROM bookings b
            JOIN units u ON u.id = b.unit_id
@@ -328,20 +330,24 @@ export async function computeAlerts(db: D1Database, audience: AlertAudience): Pr
             AND b.migration_notified_at IS NULL
             AND b.guest_citizenship IS NOT NULL
             AND upper(trim(b.guest_citizenship)) <> 'KZ'
-            AND date(b.date_from) <= ${SQL_TODAY}
-            AND date(b.date_from) >= date(${SQL_TODAY}, '-30 days')
+            AND date(COALESCE(b.arrived_on, b.date_from)) <= ${SQL_TODAY}
+            AND date(COALESCE(b.arrived_on, b.date_from)) >= date(${SQL_TODAY}, '-30 days')
           ORDER BY b.date_from
           LIMIT ${MAX_PER_KIND}`
       )
       .all<MigrationDueRow>()
 
     for (const row of dueNotices) {
-      const due = noticeDue(row.date_from)
-      const left = daysLeft(row.date_from, todayIso)
+      // The arrival the clock runs from — not this row's start date, which is
+      // today for a guest who was moved to another room this morning. Reading
+      // date_from there would quietly grant three fresh days.
+      const arrival = arrivalOf(row)
+      const due = noticeDue(arrival)
+      const left = daysLeft(arrival, todayIso)
       out.push({
         // The arrival date is in the id for the same reason as a no-show: moved
         // dates are a different arrival with a different deadline.
-        id: `migration:${row.id}:${row.date_from.slice(0, 10)}`,
+        id: `migration:${row.id}:${arrival}`,
         kind: 'migration',
         title:
           left < 0
@@ -351,7 +357,7 @@ export async function computeAlerts(db: D1Database, audience: AlertAudience): Pr
           `${row.guest_name}, ${row.guest_citizenship} · ` +
           (left < 0 ? `срок истёк ${due}` : left === 0 ? `сегодня последний день (${due})` : `до ${due}`),
         href: '/migration',
-        at: row.date_from,
+        at: arrival,
       })
     }
   }
