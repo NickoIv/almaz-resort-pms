@@ -40,6 +40,7 @@ type Row = {
   total_amount: number
   prepaid_amount: number
   deposit_amount: number
+  deposit_returned_at: string | null
   currency: string
   charges_total: number
   cleaning_pending: number
@@ -65,7 +66,8 @@ today.get('/', async (c) => {
             b.guest_name, b.guest_phone, b.guest_citizenship,
             b.arrived_on, b.migration_notified_at,
             b.date_from, b.date_to, b.status, b.verified_at,
-            b.total_amount, b.prepaid_amount, b.deposit_amount, b.currency,
+            b.total_amount, b.prepaid_amount, b.deposit_amount,
+            b.deposit_returned_at, b.currency,
             ${chargesSumSql('b')} AS charges_total,
             (SELECT COUNT(*) FROM cleaning_checklist cc
               WHERE cc.unit_id = u.id AND cc.is_done = 0) AS cleaning_pending
@@ -106,6 +108,8 @@ today.get('/', async (c) => {
           total_amount: row.total_amount,
           prepaid_amount: row.prepaid_amount,
           deposit_amount: row.deposit_amount,
+          /** Still held. The last thing a checkout owes the guest. */
+          deposit_pending: row.deposit_amount > 0 && row.deposit_returned_at === null,
           charges_amount: row.charges_total ?? 0,
           remaining_amount: remainingOf(row.total_amount, row.charges_total ?? 0, row.prepaid_amount),
           currency: row.currency,

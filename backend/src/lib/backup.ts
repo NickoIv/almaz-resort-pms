@@ -64,6 +64,10 @@ export const BACKUP_TABLES = [
       // Dropping these would restore a moved stay as two unrelated bookings and
       // restart the migration deadline.
       'moved_from_booking_id', 'arrived_on',
+      // Whether the refundable hold went back, how much, and why anything was
+      // kept. A restore that dropped these would put every returned deposit
+      // back on the books as still held.
+      'deposit_returned', 'deposit_returned_at', 'deposit_returned_by', 'deposit_note',
     ],
   },
   {

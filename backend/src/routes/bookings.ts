@@ -45,6 +45,11 @@ type BookingRow = {
   moved_from_booking_id: number | null
   arrived_on: string | null
   moved_from_unit_name?: string | null
+  deposit_returned: number | null
+  deposit_returned_at: string | null
+  deposit_returned_by: number | null
+  deposit_note: string | null
+  deposit_returned_by_name?: string | null
 }
 
 const BOOKING_STATUSES: BookingStatus[] = ['free', 'booked', 'occupied']
@@ -56,9 +61,11 @@ const BOOKING_STATUSES: BookingStatus[] = ['free', 'booked', 'occupied']
  */
 const BOOKING_SELECT = `SELECT b.*, ${chargesSumSql('b')} AS charges_total,
     ver.name AS verified_by_name,
+    dep.name AS deposit_returned_by_name,
     src_unit.name AS moved_from_unit_name
   FROM bookings b
   LEFT JOIN staff_users ver ON ver.id = b.verified_by
+  LEFT JOIN staff_users dep ON dep.id = b.deposit_returned_by
   LEFT JOIN bookings src ON src.id = b.moved_from_booking_id
   LEFT JOIN units src_unit ON src_unit.id = src.unit_id`
 
@@ -98,6 +105,13 @@ function serializeBooking(row: BookingRow, withMoney: boolean) {
           total_amount: row.total_amount,
           prepaid_amount: row.prepaid_amount,
           deposit_amount: row.deposit_amount,
+          // A refundable hold has to be able to say it came back. NULL is
+          // «ещё не вернули», which is not the same answer as 0 — that one
+          // means the whole hold was kept.
+          deposit_returned: row.deposit_returned,
+          deposit_returned_at: row.deposit_returned_at,
+          deposit_returned_by_name: row.deposit_returned_by_name ?? null,
+          deposit_note: row.deposit_note,
           charges_amount: row.charges_total ?? 0,
           remaining_amount: remainingOf(row.total_amount, row.charges_total ?? 0, row.prepaid_amount),
           currency: row.currency,
@@ -1191,6 +1205,103 @@ bookings.post('/:id/transfer', canBook, async (c) => {
     booking: serializeBooking(continuation!, money),
     previous: serializeBooking(closed!, money),
   })
+})
+
+/**
+ * POST /api/bookings/:id/deposit-return — залог отдан гостю.
+ *
+ * The deposit has been stored and displayed as «возвратный, не входит в
+ * остаток» since the beginning, and nothing recorded that it went back. So the
+ * question «вернули ли 5 000?» had no answer anywhere, and the figure sat on
+ * the booking for ever — the one thing a refundable hold must never do.
+ *
+ * **A withheld part is booked, not merely mentioned.** Money the hotel keeps
+ * for damage is money the hotel earned, and leaving it as a smaller number in a
+ * text field would make it invisible in every revenue report — the same class
+ * of hole as writing a repair as a fake booking. It becomes a `charge` for the
+ * stated reason plus a matching `adjustment` payment that settles it, because
+ * the guest handed the money over at check-in and it is now being kept: nothing
+ * is owed afterwards, and both facts are in the ledger.
+ *
+ * Only the first return is kept, like the verification stamp. A second press
+ * must not rewrite who handed the money back.
+ */
+bookings.post('/:id/deposit-return', requireRole('admin'), async (c) => {
+  const staff = c.get('staff')
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) throw new HTTPException(400, { message: 'Invalid booking id' })
+
+  const existing = await c.env.DB.prepare(`${BOOKING_SELECT} WHERE b.id = ?`)
+    .bind(id)
+    .first<BookingRow>()
+  if (!existing) throw new HTTPException(404, { message: 'Booking not found' })
+
+  if (existing.deposit_returned_at) {
+    return c.json(serializeBooking(existing, true))
+  }
+  if (!(existing.deposit_amount > 0)) {
+    throw new HTTPException(400, { message: 'По этой броне залог не брали' })
+  }
+
+  const body = await readJson(c)
+  const amount = body.amount === undefined ? existing.deposit_amount : Number(body.amount)
+  const note = cleanOptional(body.note, 300)
+
+  if (!Number.isFinite(amount) || amount < 0 || amount > existing.deposit_amount) {
+    throw new HTTPException(400, {
+      message: `Вернуть можно от 0 до ${existing.deposit_amount}`,
+    })
+  }
+
+  const withheld = Number((existing.deposit_amount - amount).toFixed(2))
+  if (withheld > 0 && !note) {
+    // «Удержано 5 000» with no reason is the start of an argument nobody can
+    // settle a week later.
+    throw new HTTPException(400, { message: 'Если удерживаете часть залога — напишите, за что' })
+  }
+
+  const statements: D1PreparedStatement[] = [
+    c.env.DB.prepare(
+      `UPDATE bookings
+          SET deposit_returned = ?, deposit_returned_at = ${SQL_NOW},
+              deposit_returned_by = ?, deposit_note = ?
+        WHERE id = ?`
+    ).bind(amount, staff.sub, note, id),
+  ]
+
+  if (withheld > 0) {
+    statements.push(
+      c.env.DB.prepare(
+        `INSERT INTO charges (booking_id, reason, amount, created_by, created_at)
+         VALUES (?, ?, ?, ?, ${SQL_NOW})`
+      ).bind(id, `Удержано из залога: ${note}`, withheld, staff.sub),
+      // The guest is not asked for this again — they left it at check-in. The
+      // charge and this entry cancel out, so the balance stays where it was.
+      c.env.DB.prepare(
+        `INSERT INTO payments (booking_id, amount, method, received_by, recorded_by, paid_at)
+         VALUES (?, ?, ?, NULL, ?, ${SQL_NOW})`
+      ).bind(id, withheld, ADJUSTMENT_METHOD, staff.sub),
+      c.env.DB.prepare(
+        'UPDATE bookings SET prepaid_amount = prepaid_amount + ? WHERE id = ?'
+      ).bind(withheld, id)
+    )
+  }
+
+  await c.env.DB.batch(statements)
+
+  await writeAudit(
+    c.env.DB,
+    staff.sub,
+    withheld > 0 ? 'booking.deposit:withheld' : 'booking.deposit:returned',
+    'bookings',
+    id
+  )
+
+  const updated = await c.env.DB.prepare(`${BOOKING_SELECT} WHERE b.id = ?`)
+    .bind(id)
+    .first<BookingRow>()
+
+  return c.json({ ...serializeBooking(updated!, true), withheld })
 })
 
 /**

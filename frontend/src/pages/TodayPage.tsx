@@ -4,6 +4,7 @@ import { api } from '../api'
 import { useAuth } from '../auth'
 import { useLiveData } from '../useLiveData'
 import PaymentModal from '../components/PaymentModal'
+import DepositModal from '../components/DepositModal'
 import { Alert, EmptyState, Spinner, StatusBadge } from '../components/ui'
 import { blockReasonWord } from '../blocks'
 import { dateRange, money, pluralRu, shortDate, timeRange } from '../format'
@@ -32,6 +33,8 @@ export default function TodayPage() {
   const [busy, setBusy] = useState<number | null>(null)
   /** Set when a departure still owes: the balance is settled before the key. */
   const [collecting, setCollecting] = useState<TodayRow | null>(null)
+  /** And then the hold goes back, which is the other thing a checkout owes. */
+  const [returning, setReturning] = useState<TodayRow | null>(null)
 
   const load = useCallback(async (background = false) => {
     if (!background) setLoading(true)
@@ -71,11 +74,19 @@ export default function TodayPage() {
     }
   }
 
+  /**
+   * A checkout owes the guest two things and the hotel one, in this order:
+   * take what is owed, hand the hold back, then close the booking. Doing them
+   * in any other order is how a guest drives off with the hotel's money or
+   * without their own — and both are discovered at the end of the shift.
+   */
   async function checkOut(row: TodayRow) {
-    // The balance is what a checkout is *for*. Asking here rather than letting
-    // the key go and finding out at the end of the shift.
     if ((row.remaining_amount ?? 0) > 0) {
       setCollecting(row)
+      return
+    }
+    if (row.deposit_pending) {
+      setReturning(row)
       return
     }
     setBusy(row.booking_id)
@@ -157,8 +168,8 @@ export default function TodayPage() {
             {row.is_paid ? 'оплачено' : 'не оплачено'}
           </span>
         )}
-        {isAdmin && (row.deposit_amount ?? 0) > 0 && kind === 'out' && (
-          <span className="field-hint">залог {money(row.deposit_amount, row.currency)}</span>
+        {isAdmin && kind === 'out' && row.deposit_pending && (
+          <span className="field-hint">залог {money(row.deposit_amount, row.currency)} — вернуть</span>
         )}
       </div>
 
@@ -260,6 +271,23 @@ export default function TodayPage() {
         <PaymentModal
           bookingId={collecting.booking_id}
           onClose={() => setCollecting(null)}
+          onSaved={() => void load(true)}
+        />
+      )}
+
+      {/* The hold goes back before the booking closes: after it, the row is off
+          this screen and the money is somebody's problem tomorrow. */}
+      {returning && (
+        <DepositModal
+          booking={{
+            id: returning.booking_id,
+            guest_name: returning.guest_name,
+            date_from: returning.date_from,
+            date_to: returning.date_to,
+            deposit_amount: returning.deposit_amount,
+            currency: returning.currency,
+          }}
+          onClose={() => setReturning(null)}
           onSaved={() => void load(true)}
         />
       )}

@@ -12,6 +12,7 @@ import PaymentModal from '../components/PaymentModal'
 import PhotoGallery from '../components/PhotoGallery'
 import TransferModal from '../components/TransferModal'
 import BlockModal from '../components/BlockModal'
+import DepositModal from '../components/DepositModal'
 import InvoiceSheet from '../components/InvoiceSheet'
 import UnitSheet from '../components/UnitSheet'
 import { Alert, EmptyState, Modal, Spinner, StatusBadge, StatusDot } from '../components/ui'
@@ -112,6 +113,8 @@ export default function UnitDetailPage() {
   const [showTransfer, setShowTransfer] = useState(false)
   /** Снять с продажи — ремонт, санобработка, служебная бронь. */
   const [showBlock, setShowBlock] = useState(false)
+  /** Возврат залога — до сих пор сумма висела на броне вечно. */
+  const [showDeposit, setShowDeposit] = useState(false)
   const [unblocking, setUnblocking] = useState(false)
   const [showInvoice, setShowInvoice] = useState(false)
   const [showUnitSheet, setShowUnitSheet] = useState(false)
@@ -651,12 +654,35 @@ export default function UnitDetailPage() {
 
                   {/* A deposit is a refundable hold, not money owed — it is shown
                       in its own block so it can never be read as part of the debt. */}
+                  {/* A hold that cannot say it came back is a hold that sits on
+                      the booking for ever, and «вернули ли залог?» then has no
+                      answer anywhere in the app. */}
                   <div className="deposit-box">
                     <div>
                       <div className="deposit-label">Депозит / залог</div>
-                      <div className="deposit-hint">возвратный, не входит в остаток</div>
+                      <div className="deposit-hint">
+                        {active.deposit_returned_at
+                          ? `возвращено ${money(active.deposit_returned ?? 0, active.currency)}` +
+                            ` · ${shortDate(active.deposit_returned_at)}` +
+                            (active.deposit_returned_by_name
+                              ? ` · ${active.deposit_returned_by_name}`
+                              : '')
+                          : 'возвратный, не входит в остаток'}
+                      </div>
+                      {active.deposit_note && (
+                        <div className="deposit-hint">удержано: {active.deposit_note}</div>
+                      )}
                     </div>
                     <div className="deposit-value">{money(deposit, active.currency)}</div>
+                    {deposit > 0 && !active.deposit_returned_at && (
+                      <button
+                        className="btn btn-sm"
+                        style={{ marginLeft: 12 }}
+                        onClick={() => setShowDeposit(true)}
+                      >
+                        Вернуть
+                      </button>
+                    )}
                   </div>
 
                   {payments.length > 0 && (
@@ -827,6 +853,9 @@ export default function UnitDetailPage() {
           onClose={() => setShowTransfer(false)}
           onSaved={refreshAll}
         />
+      )}
+      {showDeposit && active && (
+        <DepositModal booking={active} onClose={() => setShowDeposit(false)} onSaved={refreshAll} />
       )}
       {showBlock && (
         <BlockModal

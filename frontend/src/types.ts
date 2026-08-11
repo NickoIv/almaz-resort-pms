@@ -60,6 +60,14 @@ export type Booking = {
   prepaid_amount?: number
   /** Refundable security hold — never folded into remaining_amount. */
   deposit_amount?: number
+  /**
+   * How much of the hold went back, and when. **null is not 0**: null means
+   * nobody has returned it yet, 0 means the whole hold was kept.
+   */
+  deposit_returned?: number | null
+  deposit_returned_at?: string | null
+  deposit_returned_by_name?: string | null
+  deposit_note?: string | null
   /** Penalties and extras, on top of the unit rate. */
   charges_amount?: number
   /** rate + charges − prepaid. Excludes the deposit. */
@@ -202,6 +210,8 @@ export type TodayRow = {
   total_amount?: number
   prepaid_amount?: number
   deposit_amount?: number
+  /** Still held — the last thing a checkout owes the guest. */
+  deposit_pending?: boolean
   charges_amount?: number
   remaining_amount?: number
   currency?: string
