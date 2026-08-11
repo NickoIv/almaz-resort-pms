@@ -2438,3 +2438,76 @@ describe('§27 the journal is a table on a desktop and a column of cards on a ph
     expect(document.querySelector('.audit-cards')).toBeNull()
   })
 })
+
+describe('§28 the invoice requisites use the whole row they are given', () => {
+  const SETTINGS_ROUTES = {
+    ...baseRoutes('admin'),
+    'GET /api/settings': {
+      notifications: {},
+      channel: 'whatsapp',
+      external_delivery: false,
+      whatsapp_configured: false,
+      telegram_configured: false,
+      text: {
+        hotel_name: 'Taura',
+        hotel_details: 'Алматы, ул. Алма-Арасан 4а',
+        reviews_2gis_url: '',
+        reviews_google_url: '',
+        invoice_legal_name: '',
+        invoice_tax_id: '',
+        invoice_legal_address: '',
+        invoice_contact: '',
+        invoice_bank: '',
+        invoice_terms: '',
+      },
+    },
+    'GET /api/backup/stored': { configured: false, kind: null, backups: [] },
+  }
+
+  it('pairs the narrow fields instead of leaving half of each row empty', async () => {
+    signIn('admin')
+    mockApi(SETTINGS_ROUTES)
+    renderApp(<App />, { route: '/settings' })
+
+    await screen.findByLabelText('Юридическое лицо')
+
+    // `.field-row` is a two-column grid. A row holding one field leaves the
+    // other column empty — which is what these four requisites used to do,
+    // 489px of nothing beside each of them on a desktop.
+    const rows = [...document.querySelectorAll('.field-row')]
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) {
+      expect(row.querySelectorAll(':scope > .field')).toHaveLength(2)
+    }
+  })
+
+  it('keeps the bank details and the payment terms across the full width', async () => {
+    signIn('admin')
+    mockApi(SETTINGS_ROUTES)
+    renderApp(<App />, { route: '/settings' })
+
+    // The two long ones are not inside a row at all — they are the full width
+    // on their own, which is what `wide` has always meant.
+    const bank = await screen.findByLabelText('Банковские реквизиты')
+    const terms = screen.getByLabelText('Условия оплаты')
+    expect(bank.closest('.field-row')).toBeNull()
+    expect(terms.closest('.field-row')).toBeNull()
+  })
+
+  it('still offers every requisite the invoice can print', async () => {
+    signIn('admin')
+    mockApi(SETTINGS_ROUTES)
+    renderApp(<App />, { route: '/settings' })
+
+    for (const label of [
+      'Юридическое лицо',
+      'БИН / ИИН',
+      'Юридический адрес',
+      'Телефон / e-mail для счетов',
+      'Банковские реквизиты',
+      'Условия оплаты',
+    ]) {
+      expect(await screen.findByLabelText(label)).toBeInTheDocument()
+    }
+  })
+})

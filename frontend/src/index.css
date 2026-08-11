@@ -3486,6 +3486,53 @@ button {
     min-height: var(--control-h-sm);
   }
 
+  /* And so is a field inside a dialog. `.field input` reaches 40px from its
+     padding alone, but a `select` renders a pixel shorter and measured 39 —
+     «Способ оплаты» and «Кто принял» were the two shortest controls in the
+     app. It went unnoticed because `audit-mobile` walks pages and never opens
+     a dialog; it turned up the first time the payment form was measured. */
+  .field input,
+  .field select,
+  .field textarea {
+    min-height: var(--control-h-sm);
+  }
+
+  /* ── Two text boxes cannot share 390px ───────────────────────────────────
+     `.field-row` is a two-column grid at every width, which is right for the
+     short things that use it — a pair of dates, a sum beside a prepayment, a
+     deposit beside a currency. It is wrong for free text: on Настройки it gave
+     «Юридический адрес» and «Телефон / e-mail для счетов» **156px each**, so
+     the requisites that go on an invoice were typed into a box that showed
+     about a dozen characters at a time.
+
+     Only the rows that carry prose are marked, so the booking form keeps its
+     dates and amounts side by side and does not grow a scrollbar. */
+  .field-row.is-text {
+    grid-template-columns: 1fr;
+  }
+
+  /* ── Dialogs sit at the top, not in the middle ───────────────────────────
+     A centred dialog is balanced on a desktop and wrong on a phone, because
+     a phone puts a keyboard over the bottom 330-odd pixels the moment a field
+     is focused — and a `position: fixed` dialog does not move out of its way.
+     «Внести оплату» is 468px of form whose whole job is: type a number, press
+     the button. Centred, its button sat at y=659 of 849, well inside where the
+     keyboard lands. Against the top it ends at 492, above it.
+
+     Measured, not assumed, for the geometry; the keyboard itself can only be
+     confirmed on a real phone. Longer forms still run past the fold and are
+     still scrolled — this does not pretend otherwise, it just stops short
+     dialogs from being pushed down into the one part of the screen that
+     disappears. */
+  .modal-backdrop {
+    align-items: start;
+    padding: 16px;
+  }
+
+  .modal {
+    max-height: calc(100vh - 32px);
+  }
+
   /* Built without the token — a text button in a segmented control. It sat at
      22px, the smallest target in the app. */
   .view-btn {
@@ -3759,6 +3806,22 @@ button {
   .filter-strip {
     flex-wrap: nowrap;
     overscroll-behavior-x: contain;
+  }
+
+  /* The recreation area's three categories, for the same reason and with the
+     same cure: «Топчаны» and «Беседки» filled the first row and «VIP-беседки»
+     dropped onto a second, making the strip 85px where one row is 43. Three
+     tabs fit across 390px, so in practice nothing even scrolls — the row just
+     stops wrapping. */
+  .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .tab {
+    flex: 0 0 auto;
   }
 }
 

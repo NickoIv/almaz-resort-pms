@@ -61,6 +61,28 @@ const INVOICE_FIELDS: {
   },
 ]
 
+/**
+ * Groups the requisites into the rows they are actually laid out in: the
+ * narrow ones two to a row, the wide ones alone, in the order declared above.
+ *
+ * They used to be written one per `.field-row`, and a `.field-row` is a
+ * two-column grid — so each single child took the left column and left the
+ * right one empty. On a desktop that was four half-width boxes with 489px of
+ * nothing beside each of them; at 390px it was a legal address typed into
+ * 156px. The `wide` flag was doing its half of the job all along; this is the
+ * other half.
+ */
+function invoiceRows(): (typeof INVOICE_FIELDS)[] {
+  const rows: (typeof INVOICE_FIELDS)[] = []
+  for (const item of INVOICE_FIELDS) {
+    const open = rows[rows.length - 1]
+    const needsNewRow = item.wide || !open || open[0].wide || open.length === 2
+    if (needsNewRow) rows.push([item])
+    else open.push(item)
+  }
+  return rows
+}
+
 type SettingsResponse = {
   notifications: Record<NotificationKey, boolean>
   channel: NotifyChannel
@@ -290,7 +312,7 @@ export default function SettingsPage() {
           <span className="count">название печатается на чеке</span>
         </div>
 
-        <div className="field-row">
+        <div className="field-row is-text">
           <div className="field">
             <label htmlFor="hotel-name">Название</label>
             <input
@@ -313,7 +335,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="field-row">
+        <div className="field-row is-text">
           <div className="field">
             <label htmlFor="url-2gis">Ссылка на 2ГИС</label>
             <input
@@ -352,9 +374,9 @@ export default function SettingsPage() {
           <span className="count">печатаются в шапке счёта</span>
         </div>
 
-        {INVOICE_FIELDS.map((item) => (
-          <div className={item.wide ? 'field' : 'field-row'} key={item.key}>
-            <div className="field">
+        {invoiceRows().map((row) => {
+          const fields = row.map((item) => (
+            <div className="field" key={item.key}>
               <label htmlFor={item.key}>{item.label}</label>
               <input
                 id={item.key}
@@ -366,8 +388,16 @@ export default function SettingsPage() {
                 placeholder={item.placeholder}
               />
             </div>
-          </div>
-        ))}
+          ))
+
+          return row[0].wide ? (
+            fields
+          ) : (
+            <div className="field-row is-text" key={row[0].key}>
+              {fields}
+            </div>
+          )
+        })}
 
         <div className="field-hint">
           Пустые поля просто не печатаются — инвойс не подставляет заглушки вместо
