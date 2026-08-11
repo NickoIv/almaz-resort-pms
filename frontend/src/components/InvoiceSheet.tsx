@@ -21,6 +21,9 @@ type TextSettings = {
   invoice_contact: string
   invoice_bank: string
   invoice_terms: string
+  vat_registered: string
+  vat_rate: string
+  vat_prices_include: string
 }
 
 const EMPTY: TextSettings = {
@@ -32,6 +35,9 @@ const EMPTY: TextSettings = {
   invoice_contact: '',
   invoice_bank: '',
   invoice_terms: '',
+  vat_registered: '0',
+  vat_rate: '16',
+  vat_prices_include: '1',
 }
 
 /**
@@ -106,8 +112,34 @@ export default function InvoiceSheet({
 
   const chargesTotal = charges.reduce((sum, charge) => sum + charge.amount, 0)
   const billed = rate + chargesTotal
+
+  /**
+   * НДС, when the hotel is registered for it.
+   *
+   * Two ways round, and the difference is whether the total moves:
+   *
+   *   - **цены с НДС** — the figures already contain the tax, so the total is
+   *     untouched and the invoice states «в том числе НДС», which is what a
+   *     company's accountant needs in order to reclaim it;
+   *   - **цены без НДС** — the figures are net, the tax is added, and the
+   *     amount due goes up by exactly that.
+   *
+   * Off by default: with `vat_registered` unset the invoice prints exactly as
+   * it did before any of this existed.
+   */
+  const vatRate = Number(text.vat_rate || 0)
+  const vatOn = text.vat_registered === '1' && vatRate > 0
+  const vatIncluded = text.vat_prices_include !== '0'
+  const vat = !vatOn
+    ? 0
+    : vatIncluded
+      ? Math.round((billed * vatRate) / (100 + vatRate))
+      : Math.round((billed * vatRate) / 100)
+  // Only the "added" case moves the total; "included" already contains it.
+  const grand = vatOn && !vatIncluded ? billed + vat : billed
+
   const paid = booking.prepaid_amount ?? 0
-  const due = billed - paid
+  const due = grand - paid
   const deposit = booking.deposit_amount ?? 0
 
   const issuer = [
@@ -237,10 +269,26 @@ export default function InvoiceSheet({
                     <td className="num">{money(charge.amount, currency)}</td>
                   </tr>
                 ))}
-                <tr className="receipt-total">
-                  <td colSpan={3}>Итого начислено</td>
+                <tr className={vatOn && !vatIncluded ? '' : 'receipt-total'}>
+                  <td colSpan={3}>
+                    {vatOn && !vatIncluded ? 'Итого без НДС' : 'Итого начислено'}
+                  </td>
                   <td className="num">{money(billed, currency)}</td>
                 </tr>
+                {vatOn && (
+                  <tr>
+                    <td colSpan={3}>
+                      {vatIncluded ? `В том числе НДС ${vatRate}%` : `НДС ${vatRate}%`}
+                    </td>
+                    <td className="num">{money(vat, currency)}</td>
+                  </tr>
+                )}
+                {vatOn && !vatIncluded && (
+                  <tr className="receipt-total">
+                    <td colSpan={3}>Итого с НДС</td>
+                    <td className="num">{money(grand, currency)}</td>
+                  </tr>
+                )}
                 <tr>
                   <td colSpan={3}>Оплачено</td>
                   <td className="num">{money(paid, currency)}</td>

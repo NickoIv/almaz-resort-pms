@@ -30,6 +30,9 @@ type TextSettings = {
   invoice_contact: string
   invoice_bank: string
   invoice_terms: string
+  vat_registered: string
+  vat_rate: string
+  vat_prices_include: string
 }
 
 /**
@@ -305,6 +308,99 @@ export default function SettingsPage() {
             </>
           )}
         </div>
+      </section>
+
+      {/* НДС.
+          Off until somebody says otherwise: whether this hotel is registered is
+          a fact about the business, and while the switch is off the invoice
+          prints exactly as it always did. It matters more than it used to —
+          Kazakhstan's Tax Code of 1 January 2026 put the rate at 16% and the
+          registration threshold at 40 млн ₸ a year. */}
+      <section className="panel glass" style={{ marginBottom: 18 }}>
+        <div className="panel-title">
+          НДС
+          <span className="count">печатается в инвойсе</span>
+        </div>
+
+        <div className="chip-row">
+          {[
+            { value: '0', label: 'Не плательщик НДС' },
+            { value: '1', label: 'Плательщик НДС' },
+          ].map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              className={`chip ${(text?.vat_registered ?? '0') === item.value ? 'active' : ''}`}
+              disabled={saving === 'vat_registered'}
+              onClick={() => {
+                setText((t) => t && { ...t, vat_registered: item.value })
+                void save({ vat_registered: item.value }, 'vat_registered')
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        {text?.vat_registered === '1' ? (
+          <>
+            <div className="field-row is-text" style={{ marginTop: 16 }}>
+              <div className="field">
+                <label htmlFor="vat-rate">Ставка, %</label>
+                <input
+                  id="vat-rate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={text.vat_rate}
+                  onChange={(event) => setText((t) => t && { ...t, vat_rate: event.target.value })}
+                  onBlur={() => text && save({ vat_rate: text.vat_rate }, 'vat_rate')}
+                />
+              </div>
+            </div>
+
+            <div className="chip-row" style={{ marginTop: 8 }}>
+              {[
+                { value: '1', label: 'Цены указаны с НДС' },
+                { value: '0', label: 'Цены указаны без НДС' },
+              ].map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  className={`chip ${text.vat_prices_include === item.value ? 'active' : ''}`}
+                  disabled={saving === 'vat_prices_include'}
+                  onClick={() => {
+                    setText((t) => t && { ...t, vat_prices_include: item.value })
+                    void save({ vat_prices_include: item.value }, 'vat_prices_include')
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="field-hint" style={{ marginTop: 16 }}>
+              {text.vat_prices_include === '0' ? (
+                <>
+                  Суммы в прайсе и в бронях считаются <strong>без налога</strong>: в инвойсе НДС
+                  начисляется сверху и <strong>увеличивает</strong> итог к оплате.
+                </>
+              ) : (
+                <>
+                  Суммы в прайсе и в бронях считаются <strong>с налогом</strong>: итог не
+                  меняется, а в инвойсе появляется строка «в том числе НДС». Так обычно и бывает
+                  в гостинице — гостю называют ту цену, которую он платит.
+                </>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="field-hint" style={{ marginTop: 16 }}>
+            Инвойс печатается без строки налога, как и раньше. Включите, если отель стоит на
+            учёте по НДС — компания не проведёт счёт без выделенного налога. С 1 января 2026
+            ставка 16%, порог постановки на учёт — 40 млн ₸ в год.
+          </div>
+        )}
       </section>
 
       <RatesPanel />

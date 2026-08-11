@@ -67,6 +67,34 @@ export const TEXT_SETTINGS = {
   invoice_bank: '',
   /** Payment terms, printed at the foot. */
   invoice_terms: '',
+
+  /*
+   * НДС.
+   *
+   * Off by default and off until somebody says otherwise: whether this hotel is
+   * registered is a fact about the business, not something an app may assume.
+   * While it is off nothing anywhere changes — the invoice prints exactly as it
+   * did before.
+   *
+   * It matters more than it used to. Kazakhstan's new Tax Code, in force since
+   * 1 January 2026, raised the rate to 16% and set the registration threshold
+   * at 40 млн ₸ a year — which fourteen rooms can cross — and a company cannot
+   * take an invoice into its accounts without the tax shown on it.
+   */
+
+  /** '1' — плательщик НДС. */
+  vat_registered: '0',
+  /** Percent, as typed. 16 since 2026; it was 12 before, and may move again. */
+  vat_rate: '16',
+  /**
+   * '1' — the prices in the price list and on the booking already include the
+   * tax, so the invoice shows «в том числе НДС» and the total is unchanged.
+   * '0' — they are net, and the tax is added on top, which raises the total.
+   *
+   * A hotel usually quotes a guest the price they pay, so '1' is the common
+   * case — but only the hotel knows, so it is asked rather than assumed.
+   */
+  vat_prices_include: '1',
 } as const
 
 export type TextSettingKey = keyof typeof TEXT_SETTINGS

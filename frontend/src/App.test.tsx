@@ -2841,3 +2841,69 @@ describe('§33 нажатие на дату в календаре открыва
     expect((screen.getByLabelText('Заезд') as HTMLInputElement).value).toBe('2026-08-29')
   })
 })
+
+describe('§34 НДС в инвойсе: выключен по умолчанию, включается переключателем', () => {
+  const BOOKED = makeUnit({
+    id: 5, name: '105', status: 'occupied',
+    current_booking: {
+      id: 42, guest_name: 'Асель Жумабаева', guest_phone: null,
+      date_from: '2026-08-07', date_to: '2026-08-09', status: 'occupied',
+      is_paid: false, total_amount: 100000, prepaid_amount: 0, deposit_amount: 0,
+      charges_amount: 0, remaining_amount: 100000, currency: 'KZT',
+    },
+  })
+
+  function routes(vat: Record<string, string>) {
+    return {
+      ...baseRoutes('admin', [BOOKED]),
+      'GET /api/units/5': BOOKED,
+      'GET /api/units/5/calendar': CALENDAR,
+      'GET /api/bookings/42/payments': [],
+      'GET /api/bookings/42/charges': [],
+      'GET /api/settings': {
+        notifications: {}, channel: 'whatsapp', whatsapp_configured: false,
+        telegram_configured: false,
+        text: { hotel_name: 'Taura', hotel_details: 'Алматы', ...vat },
+      },
+    }
+  }
+
+  async function openInvoice(vat: Record<string, string>) {
+    signIn('admin')
+    mockApi(routes(vat))
+    renderApp(<App />, { route: '/rooms/5' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Печать инвойса' }))
+    const heading = await screen.findByText('Инвойс')
+    return within(heading.closest('.print-sheet') as HTMLElement)
+  }
+
+  it('prints no tax line at all while the hotel is not registered', async () => {
+    const sheet = await openInvoice({ vat_registered: '0' })
+    expect(sheet.getByText('Итого начислено')).toBeInTheDocument()
+    expect(sheet.queryByText(/НДС/)).not.toBeInTheDocument()
+  })
+
+  it('states «в том числе НДС» when prices already contain it, leaving the total alone', async () => {
+    const sheet = await openInvoice({
+      vat_registered: '1', vat_rate: '16', vat_prices_include: '1',
+    })
+    // 100 000 with the tax inside is 100000 × 16 / 116 = 13 793.
+    expect(sheet.getByText('В том числе НДС 16%')).toBeInTheDocument()
+    expect(sheet.getByText('13 793 ₸')).toBeInTheDocument()
+    // The amount owed has not moved: the guest was quoted the price they pay.
+    expect(sheet.getByText('Итого начислено')).toBeInTheDocument()
+    expect(sheet.getAllByText('100 000 ₸').length).toBeGreaterThan(0)
+  })
+
+  it('adds the tax on top when prices are net, and the total goes up by it', async () => {
+    const sheet = await openInvoice({
+      vat_registered: '1', vat_rate: '16', vat_prices_include: '0',
+    })
+    expect(sheet.getByText('Итого без НДС')).toBeInTheDocument()
+    expect(sheet.getByText('НДС 16%')).toBeInTheDocument()
+    expect(sheet.getByText('16 000 ₸')).toBeInTheDocument()
+    expect(sheet.getByText('Итого с НДС')).toBeInTheDocument()
+    // 100 000 + 16 000, and that is what is owed.
+    expect(sheet.getAllByText('116 000 ₸').length).toBeGreaterThan(0)
+  })
+})
