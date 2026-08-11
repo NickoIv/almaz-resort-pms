@@ -4,6 +4,7 @@ import { Alert, EmptyState, Spinner } from '../components/ui'
 import { downloadCsv } from '../csv'
 import { todayIso } from '../format'
 import { describeAudit, GROUP_LABELS, type AuditEntry } from '../audit'
+import { useIsPhone } from '../useIsPhone'
 import { ROLE_LABELS, type Role } from '../types'
 
 type AuditResponse = {
@@ -25,6 +26,7 @@ export default function AuditPage() {
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const isPhone = useIsPhone()
 
   const load = useCallback(() => {
     setLoading(true)
@@ -153,42 +155,81 @@ export default function AuditPage() {
       ) : (
         <>
           <section className="panel glass">
-            {/* The table is the one genuinely wide thing on the page, so it
-                scrolls inside itself rather than dragging the page with it. */}
-            <div className="table-scroll">
-              <table className="data-table audit-table">
-                <thead>
-                  <tr>
-                    <th>Когда</th>
-                    <th>Сотрудник</th>
-                    <th>Действие</th>
-                    <th>Объект</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.entries.map((entry) => (
-                    <tr key={entry.id}>
-                      <td className="audit-when">
-                        {entry.created_at.replace('T', ' ').slice(0, 16)}
-                      </td>
-                      <td>
+            {/* One list, two shapes — and only ever one of them in the DOM.
+                Rendering both and hiding one with CSS would have a screen
+                reader read fifty journal entries twice, which is the same
+                reason the shell moves its account controls instead of
+                duplicating them.
+
+                A phone gets cards. The table measured 424px against a 320px
+                box, so «Объект» — the room or the guest a line is actually
+                about — sat 104px past the right edge behind a horizontal
+                scroll nobody would think to look for. The card carries the
+                same facts down the page instead of across it. */}
+            {isPhone ? (
+              <div className="row-list audit-cards">
+                {data.entries.map((entry) => (
+                  <div className="row-card" key={entry.id}>
+                    <div className="row-main">
+                      <div className="row-sub audit-card-when">
+                        {entry.created_at.replace('T', ' ').slice(0, 16)} ·{' '}
                         {entry.staff_name ?? '—'}
-                        {entry.staff_role && (
-                          <span className="audit-role">{ROLE_LABELS[entry.staff_role]}</span>
-                        )}
-                      </td>
-                      <td>{describeAudit(entry)}</td>
-                      <td>
-                        {entry.target ?? (entry.entity_id ? `#${entry.entity_id}` : '—')}
-                        {entry.guest_name && (
-                          <span className="audit-guest">{entry.guest_name}</span>
-                        )}
-                      </td>
+                        {entry.staff_role && ` · ${ROLE_LABELS[entry.staff_role]}`}
+                      </div>
+                      <div className="row-title">{describeAudit(entry)}</div>
+                      {/* Only when there is something to name. The table prints
+                          `#1` for a sign-in because a cell cannot be blank
+                          without looking broken; a card can simply stop, and a
+                          third of the entries are sign-ins. */}
+                      {(entry.target || entry.guest_name) && (
+                        <div className="row-sub">
+                          {entry.target ?? ''}
+                          {entry.target && entry.guest_name ? ' · ' : ''}
+                          {entry.guest_name ?? ''}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* The table is the one genuinely wide thing on the page, so it
+                 scrolls inside itself rather than dragging the page with it. */
+              <div className="table-scroll">
+                <table className="data-table audit-table">
+                  <thead>
+                    <tr>
+                      <th>Когда</th>
+                      <th>Сотрудник</th>
+                      <th>Действие</th>
+                      <th>Объект</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {data.entries.map((entry) => (
+                      <tr key={entry.id}>
+                        <td className="audit-when">
+                          {entry.created_at.replace('T', ' ').slice(0, 16)}
+                        </td>
+                        <td>
+                          {entry.staff_name ?? '—'}
+                          {entry.staff_role && (
+                            <span className="audit-role">{ROLE_LABELS[entry.staff_role]}</span>
+                          )}
+                        </td>
+                        <td>{describeAudit(entry)}</td>
+                        <td>
+                          {entry.target ?? (entry.entity_id ? `#${entry.entity_id}` : '—')}
+                          {entry.guest_name && (
+                            <span className="audit-guest">{entry.guest_name}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
 
           {totalPages > 1 && (

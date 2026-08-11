@@ -3297,6 +3297,17 @@ button {
   margin-top: 0;
 }
 
+/* The line above the action: when it happened, who did it, in what role.
+   Ordered that way on purpose — a log is read down the left edge by time.
+
+   The cards themselves are only mounted at phone width — `useIsPhone` in
+   AuditPage, not a `display: none` here — so that fifty entries are never in
+   the document twice for a screen reader to read through. */
+.audit-card-when {
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
 .pager {
   display: flex;
   align-items: center;
@@ -3672,6 +3683,82 @@ button {
   .filters-dates {
     margin-left: 0;
     width: 100%;
+  }
+
+  /* ── Numbers, two at a time ──────────────────────────────────────────────
+     Both grids ask for a 216px minimum, and 390px minus the page padding is
+     358 — so every tile took a whole row to itself. Аналитика measured 2.9
+     screens with its six figures in a 780px column, and comparing «Начислено»
+     against «Не оплачено» meant scrolling between them. Two columns puts the
+     whole set on the first screen, where a set of numbers is worth having.
+
+     The values pay for it out of the type scale, and the two grids pay
+     different amounts because they hold different things. A tile on Сводка
+     counts rooms — «1 из 14», three characters — and holds 24px comfortably.
+     A tile on Аналитика holds a month's money. Measured in a 133px value box:
+     «730 000 ₸» fits at 24px, «12 730 000 ₸» wraps and leaves the ₸ alone on
+     the second line, and «128 730 000 ₸» runs 14px past the edge. At 18px a
+     nine-figure sum still lands on one line, and 18px against a 13px label is
+     plainly the headline. A number that breaks its own tile is worse than a
+     number set one step smaller.                                             */
+  .stat-row,
+  .tile-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tile-value {
+    font-size: var(--text-lg);
+  }
+
+  .stat-value {
+    font-size: var(--text-md);
+  }
+
+  /* ── The journal, stacked ────────────────────────────────────────────────
+     Four columns of prose do not survive 390px. The table measured 424px in a
+     320px box, so «Объект» — which is the whole point of a line, the room or
+     the guest it happened to — sat 104px past the right edge behind a
+     horizontal scroll nobody would think to look for. Fifty rows at 85px also
+     made the page 5006px, six screens, with «Вперёд» at the far end of them.
+
+     The card carries the same four facts down instead of across: when and who
+     first, then what was done, then what it was done to. Nothing to reach
+     sideways for. Which of the two is built is decided in AuditPage, so only
+     one of them is ever in the document.
+
+     A card here is read, not aimed at: nothing in the journal is pressable, so
+     it needs neither the lift nor a thumb's worth of padding around it. Left
+     at the shared `--row-pad` and an 8px gutter a card came out 117px against
+     the table row's 85, and fifty of them made the page **taller** than the
+     table it replaced — 8.4 screens against 5.9, which is losing the argument
+     while winning the point. Tightened, and with the object line dropped where
+     there is no object to name, it is back under the row it replaced. */
+  .audit-cards {
+    gap: 4px;
+  }
+
+  .audit-cards .row-card {
+    padding: 8px 12px;
+  }
+
+  .audit-cards .row-card:hover {
+    transform: none;
+  }
+
+  /* ── Filter chips scroll, they do not stack ──────────────────────────────
+     `.filter-strip` was written to be a contained strip — `overflow-x: auto`
+     and all — but it also says `flex-wrap: wrap`, and wrapping wins: nothing
+     ever overflows, so nothing ever scrolls. On a desktop that is two tidy
+     rows. At 390px the journal's thirteen action chips and eight staff chips
+     came out as **nine rows, about 900px** — the whole first screen and most
+     of the second, before a single entry.
+
+     One row that scrolls sideways instead. `contain` because a swipe that
+     runs off the end of the strip must not chain into the page and start
+     dragging the layout — the same rule the board needed. */
+  .filter-strip {
+    flex-wrap: nowrap;
+    overscroll-behavior-x: contain;
   }
 }
 
@@ -4343,21 +4430,41 @@ button {
 
 /* ── Route transition ─────────────────────────────────────────────────────
    A short fade and a few pixels of rise as each page arrives. 150ms: enough
-   to register as a change of place, too brief to wait for.                  */
+   to register as a change of place, too brief to wait for.
+
+   **The rise is written with `translate`, and the animation has no fill
+   mode.** Both halves of that are load-bearing, and getting either wrong put
+   every dialog in the app in the wrong place:
+
+   `animation-fill-mode: both` keeps the final keyframe applied for ever, and a
+   `to { transform: none }` fills as the *identity matrix*, not as `none`. An
+   element with any transform — identity included — becomes the containing
+   block for `position: fixed` descendants. So `.modal-backdrop`'s `inset: 0`
+   stopped meaning "the screen" and started meaning "the whole scroll height of
+   this page". Measured at 390x844 on the planning board: the backdrop was
+   1174px tall, the booking form was centred in *that*, and «Сохранить» sat at
+   y=905 — 61px below the bottom of the screen. On a desktop the page happens
+   to be about one viewport tall, which is why it looked right.
+
+   The fill mode bought nothing: there is no delay for `backwards` to cover,
+   and the end state is the element's own resting state, so `forwards` had
+   nothing to hold. `translate` is used instead of `transform` so that even
+   mid-animation the property in play is the independent one — nothing here
+   should ever reach for `transform` on a route container again.               */
 
 @keyframes route-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    translate: 0 6px;
   }
   to {
     opacity: 1;
-    transform: none;
+    translate: 0 0;
   }
 }
 
 .content {
-  animation: route-in 0.15s var(--ease) both;
+  animation: route-in 0.15s var(--ease);
 }
 
 @media (prefers-reduced-motion: reduce) {

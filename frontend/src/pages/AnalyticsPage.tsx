@@ -289,29 +289,36 @@ export default function AnalyticsPage() {
             {data.by_type.length === 0 ? (
               <div className="unit-empty">За выбранный период платежей не было</div>
             ) : (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Тип</th>
-                    <th>Броней</th>
-                    <th>Платежей</th>
-                    <th>Выручка</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.by_type.map((row) => (
-                    <tr key={row.type}>
-                      <td>
-                        <i className={`swatch swatch-${row.category}`} />
-                        {UNIT_TYPE_LABELS[row.type]}
-                      </td>
-                      <td>{row.bookings}</td>
-                      <td>{row.payments}</td>
-                      <td className="num">{compactMoney(row.revenue)}</td>
+              /* Four columns whose first cell is a flex box holding a swatch and
+                 a name like «Беседка VIP»: it cannot shrink, so at 390px the
+                 table measured 395px and the «Выручка» column was clipped by
+                 the panel rather than reachable. Contained the same way the
+                 journal's table is — it scrolls inside itself. */
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Тип</th>
+                      <th>Броней</th>
+                      <th>Платежей</th>
+                      <th>Выручка</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {data.by_type.map((row) => (
+                      <tr key={row.type}>
+                        <td>
+                          <i className={`swatch swatch-${row.category}`} />
+                          {UNIT_TYPE_LABELS[row.type]}
+                        </td>
+                        <td>{row.bookings}</td>
+                        <td>{row.payments}</td>
+                        <td className="num">{compactMoney(row.revenue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
         </>

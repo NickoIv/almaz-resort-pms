@@ -7,6 +7,7 @@ import ReviewsLink from './ReviewsLink'
 import ThemeToggle from './ThemeToggle'
 import { unlockSound } from '../sound'
 import { useAlerts } from '../useAlerts'
+import { useIsPhone } from '../useIsPhone'
 import { ROLE_LABELS, type Role } from '../types'
 
 type NavItem = { to: string; label: string; roles: Role[] }
@@ -90,37 +91,6 @@ function primaryTabs(role: Role): NavItem[] {
       ? []
       : [{ to: '/notifications', label: 'Уведомления', roles: [role] }]
   return [...dashboard, ...work, ...own].slice(0, 4)
-}
-
-/**
- * Whether we are at phone width.
- *
- * The account controls have to *move* between the topbar and the menu sheet
- * rather than exist in both and be hidden with CSS: two copies means a screen
- * reader announcing two «Выйти» buttons and two review links, and a test
- * finding both. CSS cannot move an element, so this is the one thing the
- * layout asks JavaScript about.
- */
-const PHONE_QUERY = '(max-width: 640px)'
-
-/** Guarded: jsdom has no matchMedia, and a throw here takes the whole shell
- *  down rather than degrading to the desktop layout. */
-function phoneNow(): boolean {
-  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-    ? window.matchMedia(PHONE_QUERY).matches
-    : false
-}
-
-function useIsPhone(): boolean {
-  const [isPhone, setIsPhone] = useState(phoneNow)
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return
-    const query = window.matchMedia(PHONE_QUERY)
-    const update = () => setIsPhone(query.matches)
-    query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
-  return isPhone
 }
 
 export default function AppShell() {

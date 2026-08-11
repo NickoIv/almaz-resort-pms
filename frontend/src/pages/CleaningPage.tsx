@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import CleaningSheet from '../components/CleaningSheet'
 import Checklist from '../components/Checklist'
@@ -18,6 +18,7 @@ export default function CleaningPage() {
   const [items, setItems] = useState<ChecklistItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const panel = useRef<HTMLElement>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -46,6 +47,47 @@ export default function CleaningPage() {
   const doneCount = items.filter((item) => item.is_done).length
   const allDone = items.length > 0 && doneCount === items.length
   const overdue = units.filter((unit) => unit.is_overdue).length
+
+  /** Guarded: jsdom has no `matchMedia`, and this must not take the page down. */
+  function scrollBehavior(): ScrollBehavior {
+    const reduce =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    return reduce ? 'auto' : 'smooth'
+  }
+
+  /**
+   * Choosing an object, and being shown what to do in it.
+   *
+   * Below 980px the checklist is not beside the cards — it is under all of
+   * them. Measured at 390x844 with eight objects waiting: the panel began
+   * **1321px down, 1.6 screens**, and tapping a card moved nothing at all, so
+   * a housekeeper picked a room and was then left hunting for its checklist.
+   * Fourteen rooms puts it past two screens.
+   *
+   * Geometry rather than `scrollIntoView` — the same reason the board computes
+   * its own `scrollLeft` — and only when the panel is not already up, so that
+   * on a desktop, where it sits beside the cards, nothing moves under the
+   * reader at all.
+   */
+  function choose(unit: CleaningUnit) {
+    setSelected(unit)
+    const box = panel.current
+    if (!box) return
+    // After the click has been painted: the panel's height changes with the
+    // checklist it is about to show.
+    requestAnimationFrame(() => {
+      const top = box.getBoundingClientRect().top
+      if (top >= 0 && top < window.innerHeight / 2) return
+      window.scrollTo({ top: top + window.scrollY - 12, behavior: scrollBehavior() })
+    })
+  }
+
+  /** Finished with this one: refresh the list, and put the reader back at it. */
+  function finish() {
+    load()
+    window.scrollTo({ top: 0, behavior: scrollBehavior() })
+  }
 
   return (
     <>
@@ -88,7 +130,7 @@ export default function CleaningPage() {
                 type="button"
                 className={`unit-card glass ${unit.is_overdue ? 'is-overdue' : ''}`}
                 data-status={unit.id === selected?.id ? 'booked' : undefined}
-                onClick={() => setSelected(unit)}
+                onClick={() => choose(unit)}
               >
                 <div className="unit-card-top">
                   <div>
@@ -113,7 +155,7 @@ export default function CleaningPage() {
             ))}
           </div>
 
-          <section className="panel glass">
+          <section className="panel glass" ref={panel}>
             <div className="panel-title">
               <StatusDot status="cleaning" />
               {selected ? selected.name : 'Выберите объект'}
@@ -132,7 +174,11 @@ export default function CleaningPage() {
             />
 
             {allDone && (
-              <button className="btn btn-primary" style={{ width: '100%', marginTop: 16 }} onClick={load}>
+              <button
+                className="btn btn-primary"
+                style={{ width: '100%', marginTop: 16 }}
+                onClick={finish}
+              >
                 Готово — обновить список
               </button>
             )}

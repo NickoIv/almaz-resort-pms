@@ -2331,3 +2331,110 @@ describe('§26 the phone gets its sections under a thumb', () => {
     expect(document.querySelector('.topbar .who')).toBeNull()
   })
 })
+
+describe('§27 the journal is a table on a desktop and a column of cards on a phone', () => {
+  /** jsdom has no matchMedia; the journal asks it whether we are on a phone. */
+  function atPhoneWidth(isPhone: boolean) {
+    vi.stubGlobal(
+      'matchMedia',
+      (query: string) =>
+        ({
+          matches: isPhone,
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList
+    )
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  const AUDIT_ROUTES = {
+    'GET /api/auth/me': { user: STAFF.admin },
+    'GET /api/audit/filters': { actions: ['booking'], staff: [] },
+    'GET /api/audit': {
+      total: 2,
+      limit: 50,
+      offset: 0,
+      entries: [
+        {
+          id: 9,
+          staff_user_id: 1,
+          staff_name: 'Нурлан Абдразаков',
+          staff_role: 'admin',
+          action: 'booking.update:free:no_payment',
+          entity: 'bookings',
+          entity_id: 42,
+          created_at: '2026-08-08 18:20',
+          target: '105',
+          guest_name: 'Асель Жумабаева',
+        },
+        {
+          id: 8,
+          staff_user_id: 1,
+          staff_name: 'Нурлан Абдразаков',
+          staff_role: 'admin',
+          action: 'login',
+          entity: 'staff_users',
+          entity_id: 1,
+          created_at: '2026-08-08 09:02',
+          target: null,
+          guest_name: null,
+        },
+      ],
+    },
+  }
+
+  it('stacks each entry on a phone, so nothing sits off the right edge', async () => {
+    atPhoneWidth(true)
+    signIn('admin')
+    mockApi(AUDIT_ROUTES)
+    renderApp(<App />, { route: '/audit' })
+
+    // The object and the guest share one line, so there is no element holding
+    // the guest's name on its own to wait for — the cards themselves are the
+    // signal that the entries have landed.
+    await waitFor(() =>
+      expect(document.querySelectorAll('.audit-cards .row-card')).toHaveLength(2)
+    )
+
+    // The cards carry what the table's four columns carried.
+    const cards = document.querySelectorAll('.audit-cards .row-card')
+    expect(cards[0].textContent).toContain('Нурлан Абдразаков')
+    expect(cards[0].textContent).toContain('2026-08-08 18:20')
+    // The object of the entry — the thing the table hid 104px off the edge.
+    expect(cards[0].textContent).toContain('105')
+    expect(cards[0].textContent).toContain('Асель Жумабаева')
+
+    // A sign-in has nothing to name, so the card stops rather than printing
+    // the internal row id the table has to put in its cell.
+    expect(cards[1].textContent).not.toContain('#1')
+  })
+
+  it('builds only one of the two, so fifty entries are never announced twice', async () => {
+    atPhoneWidth(true)
+    signIn('admin')
+    mockApi(AUDIT_ROUTES)
+    renderApp(<App />, { route: '/audit' })
+
+    await waitFor(() =>
+      expect(document.querySelectorAll('.audit-cards .row-card')).toHaveLength(2)
+    )
+    // One shape in the document, not one shown and one hidden.
+    expect(document.querySelector('.audit-table')).toBeNull()
+    expect(document.querySelectorAll('.audit-cards, .audit-table')).toHaveLength(1)
+  })
+
+  it('keeps the table on a desktop, where four columns fit', async () => {
+    atPhoneWidth(false)
+    signIn('admin')
+    mockApi(AUDIT_ROUTES)
+    renderApp(<App />, { route: '/audit' })
+
+    await waitFor(() =>
+      expect(document.querySelectorAll('.audit-table tbody tr')).toHaveLength(2)
+    )
+    expect(screen.getByText('Асель Жумабаева')).toBeInTheDocument()
+    expect(document.querySelector('.audit-cards')).toBeNull()
+  })
+})
