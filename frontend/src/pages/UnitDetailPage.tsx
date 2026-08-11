@@ -11,7 +11,7 @@ import PaymentModal from '../components/PaymentModal'
 import PhotoGallery from '../components/PhotoGallery'
 import InvoiceSheet from '../components/InvoiceSheet'
 import UnitSheet from '../components/UnitSheet'
-import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
+import { Alert, EmptyState, Spinner, StatusBadge, StatusDot } from '../components/ui'
 import { addDaysIso, almatyMonth, dateRange, money, timeRange, todayIso } from '../format'
 import { CANCEL_REASON_LABELS, type CancelReason } from '../cancellation'
 import {
@@ -203,7 +203,7 @@ export default function UnitDetailPage() {
           <h1>{isRoom ? `Номер ${unit.name}` : unit.name}</h1>
           <div className="page-sub">
             {UNIT_TYPE_LABELS[unit.type]} · {unit.category ?? '—'} · до {unit.capacity} чел. ·{' '}
-            <StatusDot status={unit.status} /> {STATUS_LABELS[unit.status]}
+            <StatusBadge status={unit.status} />
           </div>
         </div>
         <div className="page-head-actions">

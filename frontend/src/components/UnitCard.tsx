@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { StatusDot } from './ui'
+import { StatusBadge } from './ui'
 import { dateRange, money, timeRange } from '../format'
 import { STATUS_LABELS, type Unit } from '../types'
 
@@ -61,8 +61,7 @@ export default function UnitCard({
             </div>
           </div>
           <span className="unit-status">
-            <StatusDot status={unit.status} />
-            {STATUS_LABELS[unit.status]}
+            <StatusBadge status={unit.status} />
           </span>
         </div>
 
@@ -102,10 +101,7 @@ export default function UnitCard({
         )}
 
         {unit.needs_cleaning && (
-          <span className="pill pill-cleaning">
-            <StatusDot status="cleaning" />
-            уборка · {unit.cleaning_pending}
-          </span>
+          <StatusBadge status="cleaning" label={`уборка · ${unit.cleaning_pending}`} />
         )}
 
         {booking && (

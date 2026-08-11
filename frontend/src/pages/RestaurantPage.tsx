@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import QuickBookModal from '../components/QuickBookModal'
 import UnitCard from '../components/UnitCard'
-import { Alert, EmptyState, Spinner, StatusDot } from '../components/ui'
+import { Alert, EmptyState, Spinner, StatusBadge } from '../components/ui'
 import type { Unit, UnitType } from '../types'
 
 const TABS: { type: UnitType; label: string }[] = [
@@ -74,15 +74,9 @@ export default function RestaurantPage() {
       </nav>
 
       <div className="legend">
-        <span>
-          <StatusDot status="free" /> свободен
-        </span>
-        <span>
-          <StatusDot status="booked" /> забронирован
-        </span>
-        <span>
-          <StatusDot status="occupied" /> занят
-        </span>
+        <StatusBadge status="free" />
+        <StatusBadge status="booked" />
+        <StatusBadge status="occupied" />
       </div>
 
       {error && <Alert>{error}</Alert>}

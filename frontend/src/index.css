@@ -76,6 +76,11 @@
   --accent-rgb: 201 121 59;
   --accent-light-rgb: 227 164 107;
   --gold-rgb: 212 175 106;
+  /* How dense the status pill is. Night can carry more tint before its light
+     `-ink` runs out of headroom; Day cannot — see the note by .status-badge. */
+  --status-tint: 0.3;
+  --status-edge: 0.55;
+
   --free-rgb: 95 167 119;
   --booked-rgb: 216 164 65;
   --occupied-rgb: 207 106 90;
@@ -139,6 +144,12 @@
   --accent-rgb: 158 85 32;
   --accent-light-rgb: 140 74 24;
   --gold-rgb: 126 97 32;
+  /* Measured: at 0.3 «Забронирован» came out 4.26:1 on paper-white, under the
+     floor, because Day's ink is dark and a heavier tint closes on it rather
+     than pulling away. */
+  --status-tint: 0.18;
+  --status-edge: 0.45;
+
   --free-rgb: 63 125 85;
   --booked-rgb: 169 122 28;
   --occupied-rgb: 176 77 61;
@@ -887,6 +898,59 @@ button {
   gap: 8px;
   font-size: 13px;
   color: var(--text-dim);
+}
+
+/* ── Status badge ──────────────────────────────────────────────────────────
+   One way of saying what state a unit is in, used everywhere one is shown.
+
+   The tint is 0.16, the same figure the board's weekend shading settled on:
+   below that a tint measures around 1.05:1 against the panel and is not a
+   colour at all. The ink is the status's own `-ink` token, which exists for
+   exactly this — text on a tinted chip — and the border repeats the hue at
+   0.42 so the pill has an edge of its own at the 3:1 controls floor.        */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+/* The mark is set slightly larger than the word: at 13px a ring and a disc are
+   two smudges, and the whole point of the shape is that it is legible. */
+.status-glyph {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.status-free {
+  background: rgb(var(--free-rgb) / var(--status-tint));
+  border-color: rgb(var(--free-rgb) / var(--status-edge));
+  color: var(--free-ink);
+}
+
+.status-booked {
+  background: rgb(var(--booked-rgb) / var(--status-tint));
+  border-color: rgb(var(--booked-rgb) / var(--status-edge));
+  color: var(--booked-ink);
+}
+
+.status-occupied {
+  background: rgb(var(--occupied-rgb) / var(--status-tint));
+  border-color: rgb(var(--occupied-rgb) / var(--status-edge));
+  color: var(--occupied-ink);
+}
+
+.status-cleaning {
+  background: rgb(var(--cleaning-rgb) / var(--status-tint));
+  border-color: rgb(var(--cleaning-rgb) / var(--status-edge));
+  color: var(--cleaning-ink);
 }
 
 .unit-guest {
