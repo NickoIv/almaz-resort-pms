@@ -5,6 +5,7 @@
  * event reads identically wherever it surfaces.
  */
 import { REASON_LABELS } from './cancellation'
+import { blockReasonWord } from './blocks'
 import type { Role } from './types'
 
 export type AuditEntry = {
@@ -103,6 +104,7 @@ export const GROUP_LABELS: Record<string, string> = {
   waitlist: 'Лист ожидания',
   backup: 'Резервные копии',
   staff: 'Персонал',
+  block: 'Снятие с продажи',
 }
 
 export function describeAudit(entry: AuditEntry): string {
@@ -123,6 +125,16 @@ export function describeAudit(entry: AuditEntry): string {
   // remembers where it came from.
   if (entry.action.startsWith('booking.transfer:')) {
     return `Переселение ${entry.action.slice('booking.transfer:'.length)}`
+  }
+  // block.create:<причина>:<объект> / block.delete:<объект> — the object name
+  // rides in the action because «снят с продажи» says nothing without it, and
+  // a deleted block leaves no row to join back to.
+  if (entry.action.startsWith('block.create:')) {
+    const [, reason, ...name] = entry.action.split(':')
+    return `Снят с продажи: ${name.join(':')} — ${blockReasonWord(reason)}`
+  }
+  if (entry.action.startsWith('block.delete:')) {
+    return `Вернули в продажу: ${entry.action.slice('block.delete:'.length)}`
   }
   if (entry.action.startsWith('notification.test')) {
     return `Тест уведомления (${entry.action.split(':')[1] ?? ''})`.trim()

@@ -1100,6 +1100,23 @@ button.cal-day {
   border-color: var(--border);
 }
 
+/* Same hatching as the board, so one state has one appearance across the app.
+   The number stays at full contrast: the reason to look at this grid is to
+   count along to a date, and a day nobody can read is a day nobody can find. */
+.cal-day.is-blocked {
+  cursor: not-allowed;
+  border-style: dashed;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgb(var(--lift-rgb) / 0.16) 0 2px,
+    transparent 2px 6px
+  );
+}
+
+.cal-day.is-blocked:hover {
+  transform: none;
+}
+
 button.cal-day:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -4252,6 +4269,40 @@ button.cal-day:focus-visible {
 .tl-cell:hover {
   background: rgb(var(--accent-rgb) / 0.22);
   border-color: var(--accent);
+}
+
+/* ── Снят с продажи ────────────────────────────────────────────────────────
+ *
+ * Diagonal hatching, not a fill and not a bar. Three separate reasons:
+ *
+ *   - it must not read as a stay. A bar means somebody is in there; a hatched
+ *     night means nothing can go in there, and confusing the two is how a room
+ *     under repair gets a guest walked to its door;
+ *   - it must not read as merely "busy". Занят and «нельзя продать» are
+ *     different answers to the same question and lead to different actions;
+ *   - **the texture is not decoration.** It is what makes the state legible to
+ *     someone who cannot separate the hues — the same rule StatusBadge follows
+ *     with its glyphs. A colour-only difference on a board of coloured bars is
+ *     no difference at all.
+ *
+ * The stripes are drawn from --text-faint at low alpha so the cell stays
+ * quieter than any bar next to it in both themes.
+ */
+.tl-cell.is-blocked {
+  cursor: not-allowed;
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background-color: rgb(var(--lift-rgb) / 0.02);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgb(var(--lift-rgb) / 0.16) 0 2px,
+    transparent 2px 6px
+  );
+}
+
+.tl-cell.is-blocked:hover {
+  background-color: rgb(var(--lift-rgb) / 0.02);
+  border-color: var(--border-strong);
 }
 
 .tl-cell:focus-visible,

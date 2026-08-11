@@ -104,6 +104,25 @@ rooms.get('/timeline', async (c) => {
     .bind(...startBind, ...startBind, days)
     .all<TimelineRow>()
 
+  // Blocks ride with the bars. The board already derives the free-per-night
+  // header, the drag-collision check and the cell shading from one list per
+  // room, so folding blocks into that list is the only way all three agree —
+  // and a night that cannot be sold has to look unsellable in the header too.
+  const { results: blockRows } = await c.env.DB.prepare(
+    `WITH win(start, end) AS (
+       SELECT ${startExpr}, date(${startExpr}, '+' || ? || ' days')
+     )
+     SELECT ub.id, ub.unit_id, ub.date_from, ub.date_to, ub.reason, ub.note
+       FROM unit_blocks ub
+       JOIN units u ON u.id = ub.unit_id
+      WHERE u.type = 'room'
+        AND date(ub.date_from) < (SELECT end FROM win)
+        AND date(ub.date_to)   > (SELECT start FROM win)
+      ORDER BY ub.date_from`
+  )
+    .bind(...startBind, ...startBind, days)
+    .all<{ id: number; unit_id: number; date_from: string; date_to: string; reason: string; note: string | null }>()
+
   const startRow = await c.env.DB.prepare(`SELECT ${startExpr} AS d`)
     .bind(...startBind)
     .first<{ d: string }>()
@@ -118,6 +137,13 @@ rooms.get('/timeline', async (c) => {
     unit_name: string
     category: string | null
     capacity: number
+    blocks: {
+      id: number
+      date_from: string
+      date_to: string
+      reason: string
+      note: string | null
+    }[]
     bookings: {
       id: number
       guest_name: string | null
@@ -141,6 +167,7 @@ rooms.get('/timeline', async (c) => {
         unit_name: row.unit_name,
         category: row.category,
         capacity: row.capacity,
+        blocks: [],
         bookings: [],
       })
     }
@@ -165,6 +192,16 @@ rooms.get('/timeline', async (c) => {
         currency: row.currency ?? 'KZT',
       })
     }
+  }
+
+  for (const block of blockRows) {
+    byRoom.get(block.unit_id)?.blocks.push({
+      id: block.id,
+      date_from: block.date_from,
+      date_to: block.date_to,
+      reason: block.reason,
+      note: block.note,
+    })
   }
 
   const dates = Array.from({ length: days }, (_, index) => {

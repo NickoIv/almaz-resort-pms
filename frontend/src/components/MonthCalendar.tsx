@@ -1,4 +1,5 @@
 import type { CalendarDay } from '../types'
+import { blockReasonWord } from '../blocks'
 import { shortDate, todayIso } from '../format'
 
 const DOW = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
@@ -39,9 +40,11 @@ export default function MonthCalendar({
 
   /** Said in full for a screen reader, which cannot see the colour. */
   const label = (day: CalendarDay) =>
-    day.guest_name
-      ? `${shortDate(day.date)} — ${day.guest_name}, открыть бронь`
-      : `${shortDate(day.date)} — свободно, забронировать`
+    day.blocked
+      ? `${shortDate(day.date)} — снят с продажи (${blockReasonWord(day.blocked.reason)})`
+      : day.guest_name
+        ? `${shortDate(day.date)} — ${day.guest_name}, открыть бронь`
+        : `${shortDate(day.date)} — свободно, забронировать`
 
   return (
     <div className="cal-grid">
@@ -57,9 +60,21 @@ export default function MonthCalendar({
 
       {days.map((day) => {
         const shared = {
-          className: `cal-day ${day.date === today ? 'is-today' : ''}`,
+          // Off sale is drawn on the day, not instead of it: the number has to
+          // stay readable, because the reason to look at this grid is to count
+          // along to a date.
+          className: `cal-day ${day.date === today ? 'is-today' : ''} ${
+            day.blocked ? 'is-blocked' : ''
+          }`,
           'data-status': day.status,
           children: Number(day.date.slice(8, 10)),
+        }
+
+        // A blocked day is not pressable. Opening the booking form on it would
+        // be offering a night the server refuses — and the honest way back on
+        // sale is «Вернуть в продажу» on the object, not a form that fails.
+        if (day.blocked) {
+          return <div key={day.date} {...shared} title={label(day)} aria-label={label(day)} />
         }
 
         return onSelect ? (

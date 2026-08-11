@@ -104,6 +104,15 @@ export const BACKUP_TABLES = [
       'season_name', 'season_from', 'season_to', 'updated_at', 'updated_by',
     ],
   },
+  // Which objects are off sale and why. Small, hand-entered, and impossible to
+  // reconstruct — a restore that dropped these would put a room under repair
+  // back on sale without telling anyone.
+  {
+    name: 'unit_blocks',
+    columns: [
+      'id', 'unit_id', 'date_from', 'date_to', 'reason', 'note', 'created_at', 'created_by',
+    ],
+  },
   {
     name: 'waitlist',
     columns: [

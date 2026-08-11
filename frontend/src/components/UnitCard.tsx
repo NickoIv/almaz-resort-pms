@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { StatusBadge } from './ui'
+import { blockReasonWord } from '../blocks'
 import { dateRange, money, timeRange } from '../format'
 import { STATUS_LABELS, type Unit } from '../types'
 
@@ -73,6 +74,18 @@ export default function UnitCard({
               {hourly
                 ? timeRange(booking.date_from, booking.date_to)
                 : dateRange(booking.date_from, booking.date_to)}
+            </div>
+          </div>
+        ) : unit.block ? (
+          // Off sale reads where the guest would be, because it answers the
+          // same question the card is scanned for: can I sell this tonight?
+          // «Нет брони» there would say the opposite of the truth.
+          <div className="unit-guest">
+            <div className="unit-guest-name">Снят с продажи</div>
+            <div className="unit-dates">
+              {blockReasonWord(unit.block.reason)} · до{' '}
+              {dateRange(unit.block.date_from, unit.block.date_to).split(' — ')[1] ??
+                unit.block.date_to.slice(0, 10)}
             </div>
           </div>
         ) : (

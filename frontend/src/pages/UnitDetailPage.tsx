@@ -11,11 +11,13 @@ import MonthCalendar from '../components/MonthCalendar'
 import PaymentModal from '../components/PaymentModal'
 import PhotoGallery from '../components/PhotoGallery'
 import TransferModal from '../components/TransferModal'
+import BlockModal from '../components/BlockModal'
 import InvoiceSheet from '../components/InvoiceSheet'
 import UnitSheet from '../components/UnitSheet'
 import { Alert, EmptyState, Modal, Spinner, StatusBadge, StatusDot } from '../components/ui'
 import { addDaysIso, almatyMonth, dateRange, money, shortDate, timeRange, todayIso } from '../format'
 import { REASON_LABELS } from '../cancellation'
+import { blockReasonWord } from '../blocks'
 import {
   PAYMENT_METHOD_LABELS,
   STATUS_LABELS,
@@ -108,6 +110,9 @@ export default function UnitDetailPage() {
    * stay except the one thing that changed.
    */
   const [showTransfer, setShowTransfer] = useState(false)
+  /** Снять с продажи — ремонт, санобработка, служебная бронь. */
+  const [showBlock, setShowBlock] = useState(false)
+  const [unblocking, setUnblocking] = useState(false)
   const [showInvoice, setShowInvoice] = useState(false)
   const [showUnitSheet, setShowUnitSheet] = useState(false)
   const [sendingToCleaning, setSendingToCleaning] = useState(false)
@@ -355,6 +360,15 @@ export default function UnitDetailPage() {
               Переселить
             </button>
           )}
+          {/* Off sale is the opposite of a booking, so it sits with the actions
+              and not inside the booking form. Only offered when the object is
+              not already off — «Вернуть в продажу» lives on the notice below,
+              beside the reason it is answering. */}
+          {isAdmin && !unit.block && (
+            <button className="btn btn-sm" onClick={() => setShowBlock(true)}>
+              Снять с продажи
+            </button>
+          )}
           {/*
             Booking ahead is not editing what is here now.
 
@@ -371,6 +385,40 @@ export default function UnitDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Off sale. Deliberately its own notice rather than a unit status: the
+          room is empty and clean and simply cannot be sold, and «занят» would
+          send somebody looking for a guest who is not there. */}
+      {unit.block && (
+        <div className="notice notice-warn">
+          <strong>Снят с продажи</strong> — {blockReasonWord(unit.block.reason)},{' '}
+          {dateRange(unit.block.date_from, unit.block.date_to)}
+          {unit.block.note && <span className="cancel-note">{unit.block.note}</span>}. Забронировать
+          на эти даты нельзя; в занятость и в отчёты эти ночи не попадают.
+          {isAdmin && (
+            <div style={{ marginTop: 10 }}>
+              <button
+                className="btn btn-sm btn-primary"
+                disabled={unblocking}
+                onClick={async () => {
+                  setUnblocking(true)
+                  setError(null)
+                  try {
+                    await api(`/blocks/${unit.block!.id}`, { method: 'DELETE' })
+                    await refreshAll()
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Не удалось вернуть в продажу')
+                  } finally {
+                    setUnblocking(false)
+                  }
+                }}
+              >
+                {unblocking ? 'Возвращаем…' : 'Вернуть в продажу'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* A booking that fell off the end of time. The unit is free and the page
           rightly says so — but somebody has to say what happened to this stay,
@@ -777,6 +825,14 @@ export default function UnitDetailPage() {
           unitName={unit.name}
           canSetPrice={isAdmin}
           onClose={() => setShowTransfer(false)}
+          onSaved={refreshAll}
+        />
+      )}
+      {showBlock && (
+        <BlockModal
+          unitId={unit.id}
+          unitName={unit.name}
+          onClose={() => setShowBlock(false)}
           onSaved={refreshAll}
         />
       )}

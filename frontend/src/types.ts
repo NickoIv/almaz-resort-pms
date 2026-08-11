@@ -136,6 +136,27 @@ export type Unit = {
    * the «Гость не заехал» alert led to a page with nothing on it.
    */
   unclosed_booking?: Booking | null
+  /**
+   * Снят с продажи сегодня — ремонт, санобработка, служебная бронь.
+   *
+   * Deliberately not a `status`: the room is empty and clean, it simply cannot
+   * be sold. «Занят» would send someone looking for a guest who is not there.
+   */
+  block?: UnitBlock | null
+}
+
+/** Объект, снятый с продажи. Half-open dates, like everything else here. */
+export type UnitBlock = {
+  id: number
+  unit_id?: number
+  date_from: string
+  date_to: string
+  reason: string
+  note: string | null
+  created_at?: string
+  created_by_name?: string | null
+  unit_name?: string
+  unit_type?: UnitType
 }
 
 export type CalendarDay = {
@@ -143,6 +164,8 @@ export type CalendarDay = {
   status: UnitStatus
   booking_id: number | null
   guest_name: string | null
+  /** Off sale: pressing it must not open a form the server will refuse. */
+  blocked?: { id: number; reason: string; note: string | null } | null
 }
 
 export type Calendar = {
@@ -150,6 +173,7 @@ export type Calendar = {
   month: string
   days: CalendarDay[]
   bookings: Booking[]
+  blocks?: UnitBlock[]
 }
 
 export type ChecklistItem = {
@@ -352,6 +376,12 @@ export type TimelineRoom = {
   category: string | null
   capacity: number
   bookings: TimelineBooking[]
+  /**
+   * Nights the room is off sale. Folded into the same per-room list the board
+   * derives everything from, so the free-per-night header, the drag collision
+   * check and the cell shading cannot disagree about what is sellable.
+   */
+  blocks?: UnitBlock[]
 }
 
 /**

@@ -35,6 +35,11 @@ type UnitRow = {
   stale_guest_name: string | null
   stale_guest_phone: string | null
   stale_status: BookingStatus | null
+  block_id: number | null
+  block_from: string | null
+  block_to: string | null
+  block_reason: string | null
+  block_note: string | null
 }
 
 const UNIT_SELECT = `
@@ -49,7 +54,9 @@ const UNIT_SELECT = `
     nb.guest_name AS next_guest_name,
     sb.id AS stale_booking_id, sb.date_from AS stale_date_from, sb.date_to AS stale_date_to,
     sb.guest_name AS stale_guest_name, sb.guest_phone AS stale_guest_phone,
-    sb.status AS stale_status
+    sb.status AS stale_status,
+    bl.id AS block_id, bl.date_from AS block_from, bl.date_to AS block_to,
+    bl.reason AS block_reason, bl.note AS block_note
   FROM units u
   LEFT JOIN bookings b ON b.id = (
     SELECT id FROM bookings
@@ -68,6 +75,16 @@ const UNIT_SELECT = `
   -- without this join — the guest who never arrived, and the guest who was
   -- never checked out. Neither is reachable from anywhere else in the app,
   -- so the alert about it used to lead to a screen with nothing on it.
+  -- Off sale right now. Kept beside the booking rather than folded into the
+  -- unit's status: the object is not occupied, it is unsellable, and a card
+  -- that said «занят» would send someone looking for a guest.
+  LEFT JOIN unit_blocks bl ON bl.id = (
+    SELECT id FROM unit_blocks
+    WHERE unit_id = u.id
+      AND date(date_from) <= ${SQL_TODAY} AND date(date_to) > ${SQL_TODAY}
+    ORDER BY date_from
+    LIMIT 1
+  )
   LEFT JOIN bookings sb ON sb.id = (
     SELECT id FROM bookings
     WHERE unit_id = u.id AND status <> 'free'
@@ -136,6 +153,22 @@ function serializeUnit(row: UnitRow, withMoney: boolean) {
      * status — the room is free and sellable — it is a loose end somebody has
      * to tie off, so it rides alongside rather than in `current_booking`.
      */
+    /**
+     * Off sale today — ремонт, санобработка, служебная бронь.
+     *
+     * Deliberately not a unit `status`: the room is empty and clean and simply
+     * cannot be sold, which is a different sentence from «занят» and sends
+     * someone looking for a different thing.
+     */
+    block: row.block_id
+      ? {
+          id: row.block_id,
+          date_from: row.block_from,
+          date_to: row.block_to,
+          reason: row.block_reason,
+          note: row.block_note,
+        }
+      : null,
     unclosed_booking: row.stale_booking_id
       ? {
           id: row.stale_booking_id,
@@ -200,20 +233,31 @@ units.get('/forecast', async (c) => {
              WHERE u.type IN (${placeholders(types.length)})
                AND b.status <> 'free'
                AND date(b.date_from) <= d AND date(b.date_to) > d
-            ) AS taken
+            ) AS taken,
+            -- Off sale is not free. Answering the phone with "yes, we have two"
+            -- when one of them is under repair is the failure this whole
+            -- forecast exists to prevent.
+            (SELECT COUNT(*)
+             FROM unit_blocks ub JOIN units u ON u.id = ub.unit_id
+             WHERE u.type IN (${placeholders(types.length)})
+               AND date(ub.date_from) <= d AND date(ub.date_to) > d
+            ) AS blocked
      FROM span
      ORDER BY d`
   )
-    .bind(days - 1, ...types)
-    .all<{ date: string; taken: number }>()
+    .bind(days - 1, ...types, ...types)
+    .all<{ date: string; taken: number; blocked: number }>()
 
   return c.json({
     total_units: total,
     days: results.map((row) => ({
       date: row.date,
       taken: row.taken,
-      free: Math.max(0, total - row.taken),
-      occupancy_rate: total > 0 ? row.taken / total : 0,
+      blocked: row.blocked,
+      free: Math.max(0, total - row.taken - row.blocked),
+      // Occupancy is against what could be sold, so a room out of order leaves
+      // the denominator rather than dragging the figure down.
+      occupancy_rate: total - row.blocked > 0 ? row.taken / (total - row.blocked) : 0,
     })),
   })
 })
@@ -313,6 +357,14 @@ units.get('/:id/calendar', async (c) => {
     .bind(id, last, first)
     .all<CalendarBookingRow>()
 
+  const { results: blockRows } = await c.env.DB.prepare(
+    `SELECT id, date_from, date_to, reason, note FROM unit_blocks
+      WHERE unit_id = ? AND date(date_from) <= date(?) AND date(date_to) > date(?)
+      ORDER BY date_from`
+  )
+    .bind(id, last, first)
+    .all<{ id: number; date_from: string; date_to: string; reason: string; note: string | null }>()
+
   const withMoney = canSeeMoney(staff.role)
 
   const days = Array.from({ length: total }, (_, index) => {
@@ -321,11 +373,15 @@ units.get('/:id/calendar', async (c) => {
     // so the name on the cell is the guest who is actually in the room that
     // night rather than the one who left that morning.
     const booking = results.find((b) => occupiesDay(b, date))
+    // A blocked day is not a free day. Pressing it must not open a booking
+    // form the server is going to refuse — the same half-open rule applies.
+    const block = blockRows.find((b) => occupiesDay(b, date))
     return {
       date,
       status: (booking?.status ?? 'free') as BookingStatus,
       booking_id: booking?.id ?? null,
       guest_name: booking?.guest_name ?? null,
+      blocked: block ? { id: block.id, reason: block.reason, note: block.note } : null,
     }
   })
 
@@ -333,6 +389,7 @@ units.get('/:id/calendar', async (c) => {
     unit: { id: unit.id, name: unit.name, type: unit.type },
     month,
     days,
+    blocks: blockRows,
     bookings: results.map((b) => ({
       id: b.id,
       guest_name: b.guest_name,

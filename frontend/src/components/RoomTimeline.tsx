@@ -3,6 +3,7 @@ import { api } from '../api'
 import { Alert, Spinner } from './ui'
 import { addDaysIso, daysBetween, money, percent, pluralRu, shortDate, todayIso } from '../format'
 import { STATUS_LABELS } from '../types'
+import { blockReasonWord } from '../blocks'
 import type {
   RoomTimeline as Timeline,
   RoomYear,
@@ -123,7 +124,25 @@ function place(booking: TimelineBooking, from: string, days: number): Placed | n
   return { booking, start, span: end - start, clippedStart: rawStart < 0, clippedEnd: rawEnd > days }
 }
 
-/** Which day-columns a room is already taken on, as a set of indices. */
+/** Which day-columns a run of nights covers, half-open, clipped to the window. */
+function span(dateFrom: string, dateTo: string, from: string, days: number) {
+  const rawStart = daysBetween(from, dateFrom.slice(0, 10))
+  const rawEnd = daysBetween(from, dateTo.slice(0, 10))
+  const start = Math.max(0, rawStart)
+  const end = Math.min(days, rawEnd)
+  if (end <= start) return null
+  return { start, span: end - start, clippedStart: rawStart < 0, clippedEnd: rawEnd > days }
+}
+
+/**
+ * Which day-columns a room cannot be sold on.
+ *
+ * Bookings **and** blocks, from one function on purpose. Three things read this
+ * — the «Свободно» header, the collision check while dragging, and the shading
+ * of each cell — and a room off for repair that only two of them knew about
+ * would be counted as available on the very line the desk reads to answer the
+ * phone.
+ */
 function occupiedNights(room: TimelineRoom, from: string, days: number): Set<number> {
   const taken = new Set<number>()
   for (const booking of room.bookings) {
@@ -131,7 +150,21 @@ function occupiedNights(room: TimelineRoom, from: string, days: number): Set<num
     if (!bar) continue
     for (let i = bar.start; i < bar.start + bar.span; i++) taken.add(i)
   }
+  for (const block of room.blocks ?? []) {
+    const bar = span(block.date_from, block.date_to, from, days)
+    if (!bar) continue
+    for (let i = bar.start; i < bar.start + bar.span; i++) taken.add(i)
+  }
   return taken
+}
+
+/** The block covering a column, if any — so a cell can say why it is dead. */
+function blockAt(room: TimelineRoom, index: number, from: string, days: number) {
+  for (const block of room.blocks ?? []) {
+    const bar = span(block.date_from, block.date_to, from, days)
+    if (bar && index >= bar.start && index < bar.start + bar.span) return block
+  }
+  return null
 }
 
 type Drag = { unitId: number; anchor: number; head: number }
@@ -700,6 +733,28 @@ export default function RoomTimeline({
                     const dow = weekdayIndex(date)
                     const selected = inDrag(room.unit_id, index)
                     const bad = selected && taken.has(index)
+                    // Off sale: the cell says why rather than opening a form
+                    // the server is going to refuse. It is still a cell and not
+                    // a bar, because a block is not a stay and must not look
+                    // like one — a hatched night reads as "not for sale", a bar
+                    // reads as "somebody is in there".
+                    const block = blockAt(room, index, data.from, data.days)
+                    if (block) {
+                      const why = `${room.unit_name} · ${shortDate(date)} — снят с продажи (${
+                        blockReasonWord(block.reason)
+                      })${block.note ? `: ${block.note}` : ''}`
+                      return (
+                        <div
+                          key={date}
+                          className={`tl-cell is-blocked ${dow === 0 || dow === 6 ? 'is-weekend' : ''} ${
+                            date === today ? 'is-today' : ''
+                          }`}
+                          style={{ gridColumn: index + 2, gridRow: 1 }}
+                          title={why}
+                          aria-label={why}
+                        />
+                      )
+                    }
                     return (
                       <button
                         key={date}

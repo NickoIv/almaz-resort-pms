@@ -9,6 +9,7 @@ import { chargesSumSql, remainingOf } from '../lib/money'
 import { ADJUSTMENT_METHOD, assertPaymentMethod, resolveReceivedBy } from '../lib/payment'
 import { cleanName, cleanOptional } from '../lib/text'
 import { CANCEL_REASONS, isCancelReason, TRANSFER_REASON } from '../lib/cancellation'
+import { assertNotBlocked } from '../lib/blocks'
 import { carryOver, nightsBetween, prorate } from '../lib/transfer'
 import { quoteStay } from '../lib/rates'
 import { loadRates } from './rates'
@@ -114,8 +115,16 @@ async function loadUnit(db: D1Database, unitId: number) {
   return unit
 }
 
-/** Rejects a booking that overlaps an existing one on the same unit. */
-async function assertNoOverlap(
+/**
+ * Are these nights actually sellable on this unit?
+ *
+ * Two ways they are not, and they are checked together on purpose: another
+ * booking already holds them, or the object has been taken off sale for repair.
+ * Five paths write a booking — create, quick seat, group, edit and переселение —
+ * and a rule enforced by only some of them is a room that is out of order until
+ * somebody uses the other button.
+ */
+async function assertSellable(
   db: D1Database,
   unitId: number,
   dateFrom: string,
@@ -137,6 +146,8 @@ async function assertNoOverlap(
       message: `Даты пересекаются с бронью #${clash.id}`,
     })
   }
+
+  await assertNotBlocked(db, unitId, dateFrom, dateTo)
 }
 
 const bookings = new Hono<AppEnv>()
@@ -201,7 +212,7 @@ bookings.post('/', canBook, async (c) => {
     throw new HTTPException(400, { message: 'Invalid booking status' })
   }
 
-  await assertNoOverlap(c.env.DB, unitId, dateFrom, dateTo, null)
+  await assertSellable(c.env.DB, unitId, dateFrom, dateTo, null)
 
   // Waiters take bookings but do not set prices; admins may.
   const money = canSeeMoney(staff.role)
@@ -288,7 +299,7 @@ bookings.post('/quick', canBook, async (c) => {
   const dateFrom = almatyNow()
   const dateTo = addHours(dateFrom, hours)
 
-  await assertNoOverlap(c.env.DB, unitId, dateFrom, dateTo, null)
+  await assertSellable(c.env.DB, unitId, dateFrom, dateTo, null)
 
   const created = await c.env.DB.prepare(
     `INSERT INTO bookings
@@ -353,7 +364,7 @@ bookings.post('/group', canBook, async (c) => {
   for (const unitId of unique) {
     const unit = await loadUnit(c.env.DB, unitId)
     assertUnitTypeAllowed(staff.role, unit.type)
-    await assertNoOverlap(c.env.DB, unitId, dateFrom, dateTo, null)
+    await assertSellable(c.env.DB, unitId, dateFrom, dateTo, null)
     units.push(unit)
   }
 
@@ -585,7 +596,7 @@ bookings.patch('/:id', canBook, async (c) => {
     throw new HTTPException(400, { message: 'date_to must not be earlier than date_from' })
   }
   if (status !== 'free') {
-    await assertNoOverlap(c.env.DB, existing.unit_id, dateFrom, dateTo, id)
+    await assertSellable(c.env.DB, existing.unit_id, dateFrom, dateTo, id)
   }
 
   // Going from booked/occupied to free is either a checkout or a cancellation.
@@ -857,13 +868,14 @@ type TransferTargetRow = {
   capacity: number
   cleaning_pending: number
   taken_by: string | null
+  blocked_reason: string | null
 }
 
 /**
  * GET /api/bookings/:id/transfer-targets — where this guest could go.
  *
  * Availability is answered here rather than by the caller filtering the board,
- * because "free" has to mean exactly what `assertNoOverlap` means. A dialog that
+ * because "free" has to mean exactly what `assertSellable` means. A dialog that
  * worked it out from a timeline would offer a room the POST then refuses, and
  * the desk would learn to distrust the list.
  *
@@ -895,12 +907,25 @@ bookings.get('/:id/transfer-targets', canBook, async (c) => {
             (SELECT b.guest_name FROM bookings b
               WHERE b.unit_id = u.id AND b.status <> 'free'
                 AND datetime(b.date_from) < datetime(?) AND datetime(b.date_to) > datetime(?)
-              ORDER BY b.date_from LIMIT 1) AS taken_by
+              ORDER BY b.date_from LIMIT 1) AS taken_by,
+            -- Off sale counts as taken. A dialog that offered a room under
+            -- repair would be offering one the POST refuses.
+            (SELECT ub.reason FROM unit_blocks ub
+              WHERE ub.unit_id = u.id
+                AND datetime(ub.date_from) < datetime(?) AND datetime(ub.date_to) > datetime(?)
+              ORDER BY ub.date_from LIMIT 1) AS blocked_reason
        FROM units u
       WHERE u.type = ? AND u.id <> ?
       ORDER BY u.name`
   )
-    .bind(booking.date_to, plan.movedFrom, from.type, booking.unit_id)
+    .bind(
+      booking.date_to,
+      plan.movedFrom,
+      booking.date_to,
+      plan.movedFrom,
+      from.type,
+      booking.unit_id
+    )
     .all<TransferTargetRow>()
 
   // Priced per candidate, because the whole point of choosing a room is that
@@ -913,8 +938,9 @@ bookings.get('/:id/transfer-targets', canBook, async (c) => {
     name: row.name,
     category: row.category,
     capacity: row.capacity,
-    free: row.taken_by === null,
+    free: row.taken_by === null && row.blocked_reason === null,
     taken_by: row.taken_by,
+    blocked_reason: row.blocked_reason,
     needs_cleaning: row.cleaning_pending > 0,
     ...(money
       ? {
@@ -1005,7 +1031,7 @@ bookings.post('/:id/transfer', canBook, async (c) => {
 
   const money = canSeeMoney(staff.role)
 
-  await assertNoOverlap(c.env.DB, toUnitId, plan.movedFrom, existing.date_to, splitDay ? null : id)
+  await assertSellable(c.env.DB, toUnitId, plan.movedFrom, existing.date_to, splitDay ? null : id)
 
   // ── The whole booking moves: one row, one id, nothing else touched ────────
   if (!splitDay) {

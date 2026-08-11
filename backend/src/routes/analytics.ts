@@ -131,8 +131,32 @@ analytics.get('/summary', async (c) => {
     "SELECT COUNT(*) AS count FROM units WHERE type = 'room'"
   ).first<{ count: number }>()
 
+  // Nights the hotel could not have sold: a room off for repair was never on
+  // the market, so it belongs out of the denominator rather than dragging the
+  // figure down. Reporting 60% because a room was being repainted answers a
+  // question nobody asked — «сколько мы продали из того, что могли» is the one
+  // this number is read for.
+  const blockedRow = await c.env.DB.prepare(
+    `SELECT COALESCE(SUM(
+       MAX(0,
+         julianday(MIN(date(ub.date_to), date(?, '+1 day'))) -
+         julianday(MAX(date(ub.date_from), date(?)))
+       )
+     ), 0) AS nights
+     FROM unit_blocks ub
+     JOIN units u ON u.id = ub.unit_id
+     WHERE u.type = 'room'
+       AND date(ub.date_from) <= date(?) AND date(ub.date_to) >= date(?)`
+  )
+    .bind(to, from, to, from)
+    .first<{ nights: number }>()
+
   const nightsSold = Math.round(nightsRow?.nights ?? 0)
-  const nightsAvailable = (roomCount?.count ?? 0) * daySpan(from, to)
+  const nightsBlocked = Math.round(blockedRow?.nights ?? 0)
+  const nightsAvailable = Math.max(
+    0,
+    (roomCount?.count ?? 0) * daySpan(from, to) - nightsBlocked
+  )
   const occupancyRate = nightsAvailable > 0 ? nightsSold / nightsAvailable : 0
 
   // ── By day of week ───────────────────────────────────────────────────────
@@ -258,6 +282,8 @@ analytics.get('/summary', async (c) => {
     occupancy: {
       nights_sold: nightsSold,
       nights_available: nightsAvailable,
+      /** Nights taken off the market — already excluded from nights_available. */
+      nights_blocked: nightsBlocked,
       rate: occupancyRate,
       rooms: roomCount?.count ?? 0,
     },
