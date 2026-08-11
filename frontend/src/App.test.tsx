@@ -2907,3 +2907,119 @@ describe('§34 НДС в инвойсе: выключен по умолчани�
     expect(sheet.getAllByText('116 000 ₸').length).toBeGreaterThan(0)
   })
 })
+
+// ── §36 ────────────────────────────────────────────────────────────────────
+//
+// Asked from the desk: «почему один заезд надо отменять каждый день брони
+// отдельно?» The bookings in question were separate ones — but they were
+// separate because that is what the calendar made. Pressing the night after a
+// stay booked that night on its own, so a guest staying on became two
+// bookings: two closings, two invoices, two lines in every list.
+//
+// A stay that grows must stay one booking. The day offers it and applies
+// nothing — the ordinary form opens with the dates already stretched.
+describe('§36 ночь рядом с бронью предлагает продлить, а не заводить вторую', () => {
+  const room = makeUnit({ id: 7, name: '107', status: 'free' })
+  // Nights 14, 15 and 16 are taken: 14 → 17 in half-open dates.
+  const AUGUST = {
+    unit: { id: 7, name: '107', type: 'room' },
+    month: '2026-08',
+    days: Array.from({ length: 31 }, (_, i) => {
+      const date = `2026-08-${String(i + 1).padStart(2, '0')}`
+      const busy = i >= 13 && i <= 15
+      return {
+        date,
+        status: busy ? 'booked' : 'free',
+        booking_id: busy ? 512 : null,
+        guest_name: busy ? 'Продлевающий Гость' : null,
+      }
+    }),
+  }
+  const STAY = {
+    id: 512, unit_id: 7, guest_name: 'Продлевающий Гость', guest_phone: null,
+    date_from: '2026-08-14', date_to: '2026-08-17', status: 'booked',
+  }
+
+  function routes(stay: unknown = STAY) {
+    return {
+      ...baseRoutes('admin', [room]),
+      'GET /api/units/7': room,
+      'GET /api/units/7/calendar': AUGUST,
+      'GET /api/bookings': [stay],
+    }
+  }
+
+  it('предлагает продлить, когда нажата ночь сразу после брони', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/7' })
+
+    await userEvent.click(await screen.findByRole('button', { name: /17 авг.*свободно/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Гость остаётся ещё на ночь?' }))
+      .toBeInTheDocument()
+    expect(screen.getByText('Продлевающий Гость')).toBeInTheDocument()
+    // Offered, not done: no request has gone anywhere yet.
+    expect(screen.getByRole('button', { name: /Продлить до 18 авг/ })).toBeInTheDocument()
+  })
+
+  it('продление открывает ту же бронь с датой выезда на сутки дальше', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/7' })
+
+    await userEvent.click(await screen.findByRole('button', { name: /17 авг.*свободно/ }))
+    await userEvent.click(await screen.findByRole('button', { name: /Продлить до 18 авг/ }))
+
+    // The same booking — its number is in the heading — one night longer.
+    expect(await screen.findByRole('heading', { name: 'Бронь #512' })).toBeInTheDocument()
+    expect((screen.getByLabelText('Заезд') as HTMLInputElement).value).toBe('2026-08-14')
+    expect((screen.getByLabelText('Выезд') as HTMLInputElement).value).toBe('2026-08-18')
+  })
+
+  it('ночь перед бронью предлагает передвинуть заезд, а не делать вторую', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/7' })
+
+    await userEvent.click(await screen.findByRole('button', { name: /13 авг.*свободно/ }))
+    await userEvent.click(await screen.findByRole('button', { name: /Заезд с 13 авг/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Бронь #512' })).toBeInTheDocument()
+    expect((screen.getByLabelText('Заезд') as HTMLInputElement).value).toBe('2026-08-13')
+    expect((screen.getByLabelText('Выезд') as HTMLInputElement).value).toBe('2026-08-17')
+  })
+
+  it('вторая бронь всё равно доступна — это может быть другой гость', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/7' })
+
+    await userEvent.click(await screen.findByRole('button', { name: /17 авг.*свободно/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Отдельная бронь' }))
+
+    expect(await screen.findByRole('heading', { name: 'Новая бронь' })).toBeInTheDocument()
+    expect((screen.getByLabelText('Заезд') as HTMLInputElement).value).toBe('2026-08-17')
+  })
+
+  it('ночь вдали от чужих броней открывает форму сразу, без вопроса', async () => {
+    signIn('admin')
+    mockApi(routes())
+    renderApp(<App />, { route: '/rooms/7' })
+
+    await userEvent.click(await screen.findByRole('button', { name: /29 авг.*свободно/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Новая бронь' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /остаётся ещё на ночь/ })).toBeNull()
+  })
+
+  it('отменённую бронь продлевать не предлагает', async () => {
+    signIn('admin')
+    mockApi(routes({ ...STAY, status: 'free' }))
+    renderApp(<App />, { route: '/rooms/7' })
+
+    await userEvent.click(await screen.findByRole('button', { name: /17 авг.*свободно/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Новая бронь' })).toBeInTheDocument()
+  })
+})

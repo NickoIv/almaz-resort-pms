@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { api } from './api'
+import { api, onDataChanged } from './api'
 import { playChime } from './sound'
 
 export type AlertKind = 'sla' | 'waitlist' | 'booking' | 'upcoming' | 'noshow' | 'migration'
@@ -97,9 +97,14 @@ export function useAlerts() {
     // rest of the interval.
     const onFocus = () => void load()
     window.addEventListener('focus', onFocus)
+    // And neither should acting on an alert. Closing the booking an alert is
+    // about must clear that alert now, not in forty-five seconds — waiting is
+    // indistinguishable from the alert being stuck.
+    const stopListening = onDataChanged(() => void load())
     return () => {
       clearInterval(timer)
       window.removeEventListener('focus', onFocus)
+      stopListening()
     }
   }, [load])
 

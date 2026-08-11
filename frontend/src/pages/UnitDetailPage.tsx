@@ -11,8 +11,8 @@ import PaymentModal from '../components/PaymentModal'
 import PhotoGallery from '../components/PhotoGallery'
 import InvoiceSheet from '../components/InvoiceSheet'
 import UnitSheet from '../components/UnitSheet'
-import { Alert, EmptyState, Spinner, StatusBadge, StatusDot } from '../components/ui'
-import { addDaysIso, almatyMonth, dateRange, money, timeRange, todayIso } from '../format'
+import { Alert, EmptyState, Modal, Spinner, StatusBadge, StatusDot } from '../components/ui'
+import { addDaysIso, almatyMonth, dateRange, money, shortDate, timeRange, todayIso } from '../format'
 import { CANCEL_REASON_LABELS, type CancelReason } from '../cancellation'
 import {
   PAYMENT_METHOD_LABELS,
@@ -78,6 +78,24 @@ export default function UnitDetailPage() {
   const [dayBooking, setDayBooking] = useState<Booking | null>(null)
   const [dayFrom, setDayFrom] = useState<string | null>(null)
   const [dayError, setDayError] = useState<string | null>(null)
+  /**
+   * A free night pressed right up against an existing stay.
+   *
+   * Booking it outright is what the calendar used to do, and it is how one
+   * arrival turned into several bookings: a guest staying an extra night got a
+   * second booking rather than a longer first one. Two bookings then have to be
+   * closed twice, are charged twice, and read as two guests in every list —
+   * which is exactly what the desk was complaining about.
+   *
+   * So the day asks first. «Продлить» is offered, never applied: it opens the
+   * ordinary form on the existing booking with the dates already stretched, and
+   * nothing is written until Сохранить.
+   */
+  const [extend, setExtend] = useState<{
+    day: string
+    booking: Booking
+    side: 'after' | 'before'
+  } | null>(null)
   const [showPayment, setShowPayment] = useState(false)
   const [showCharge, setShowCharge] = useState(false)
   const [showGuest, setShowGuest] = useState(false)
@@ -209,10 +227,51 @@ export default function UnitDetailPage() {
   const doneCount = checklist.filter((item) => item.is_done).length
 
 
+  /**
+   * The stay touching a free day, if there is one: the night before it ends, or
+   * the night after it begins. Rooms only — a gazebo is booked by the hour, and
+   * yesterday's sitting has nothing to do with today's.
+   */
+  async function neighbourStay(
+    day: CalendarDay
+  ): Promise<{ booking: Booking; side: 'after' | 'before' } | null> {
+    if (!isRoom || !calendar) return null
+    const index = calendar.days.findIndex((item) => item.date === day.date)
+    if (index < 0) return null
+
+    const previous = calendar.days[index - 1]
+    const next = calendar.days[index + 1]
+    // The stay that ends on this day comes first: staying on is far commoner
+    // than arriving a day early, and only one choice is worth offering.
+    const touching = previous?.booking_id
+      ? { date: previous.date, id: previous.booking_id, side: 'after' as const }
+      : next?.booking_id
+        ? { date: next.date, id: next.booking_id, side: 'before' as const }
+        : null
+    if (!touching) return null
+
+    const rows = await api<Booking[]>(
+      `/bookings?unit_id=${unit!.id}&from=${touching.date}&to=${touching.date}`
+    )
+    const found = rows.find((row) => row.id === touching.id)
+    // A cancelled stay is not something to extend.
+    if (!found || (found.status !== 'booked' && found.status !== 'occupied')) return null
+    return { booking: found, side: touching.side }
+  }
+
   /** Opening whatever is on a day of the month grid. */
   async function openDay(day: CalendarDay) {
     setDayError(null)
     if (!day.booking_id) {
+      try {
+        const touching = await neighbourStay(day)
+        if (touching) {
+          setExtend({ day: day.date, ...touching })
+          return
+        }
+      } catch {
+        // Only an offer was lost; booking the night still works.
+      }
       setDayFrom(day.date)
       setShowBooking(true)
       return
@@ -568,6 +627,52 @@ export default function UnitDetailPage() {
           )}
         </div>
       </div>
+
+      {/* The night touches a stay: ask before making a second booking of it. */}
+      {extend && (
+        <Modal
+          title={extend.side === 'after' ? 'Гость остаётся ещё на ночь?' : 'Гость заедет раньше?'}
+          onClose={() => setExtend(null)}
+        >
+          <p>
+            {shortDate(extend.day)} свободно, а рядом стоит бронь:{' '}
+            <strong>{extend.booking.guest_name}</strong>,{' '}
+            {dateRange(extend.booking.date_from, extend.booking.date_to)}.
+          </p>
+          <p className="field-hint">
+            Продлить — это та же бронь на ночь длиннее: один счёт, один заезд, закрывать
+            один раз. Отдельная бронь нужна, если это другой гость. Сумму после продления
+            проверьте — она не пересчитывается сама.
+          </p>
+          <div className="modal-actions">
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setDayBooking(
+                  extend.side === 'after'
+                    ? { ...extend.booking, date_to: addDaysIso(extend.day, 1) }
+                    : { ...extend.booking, date_from: extend.day }
+                )
+                setExtend(null)
+              }}
+            >
+              {extend.side === 'after'
+                ? `Продлить до ${shortDate(addDaysIso(extend.day, 1))}`
+                : `Заезд с ${shortDate(extend.day)}`}
+            </button>
+            <button
+              className="btn btn-ghost"
+              onClick={() => {
+                setDayFrom(extend.day)
+                setShowBooking(true)
+                setExtend(null)
+              }}
+            >
+              Отдельная бронь
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {/* A new reservation, even when someone is in the unit today: `booking` is
           null on purpose, and the dates default to the first night after the

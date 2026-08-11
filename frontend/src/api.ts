@@ -36,6 +36,38 @@ export function setToken(token: string | null): void {
   if (!token) localStorage.removeItem(LEGACY_TOKEN_KEY)
 }
 
+/**
+ * Anything that changes data on the server tells the app so.
+ *
+ * The bell polls every 45 seconds, which is right for noticing someone else's
+ * work and wrong for your own: closing a no-show booking left «Гость не заехал»
+ * sitting in the panel — the very panel that sent you to close it — for most of
+ * a minute. It read as the alert being stuck, and the natural next move was to
+ * close the booking again.
+ *
+ * So every successful write announces itself and the bell re-asks. It is one
+ * extra request per action, coalesced across a burst, and it keeps the rule
+ * that alerts are the **server's** answer rather than something the client
+ * guesses at after a mutation it happens to recognise.
+ */
+type Listener = () => void
+const dataListeners = new Set<Listener>()
+let notifyTimer: ReturnType<typeof setTimeout> | null = null
+
+export function onDataChanged(listener: Listener): () => void {
+  dataListeners.add(listener)
+  return () => dataListeners.delete(listener)
+}
+
+/** Coalesced: saving a booking is one action even when it is three requests. */
+function announceDataChanged(): void {
+  if (notifyTimer) clearTimeout(notifyTimer)
+  notifyTimer = setTimeout(() => {
+    notifyTimer = null
+    for (const listener of dataListeners) listener()
+  }, 400)
+}
+
 export class ApiError extends Error {
   readonly status: number
 
@@ -99,6 +131,9 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
       ? { body: isForm ? (options.body as FormData) : JSON.stringify(options.body) }
       : {}),
   })
+
+  const method = (options.method ?? 'GET').toUpperCase()
+  if (response.ok && method !== 'GET') announceDataChanged()
 
   if (response.status === 204) return undefined as T
 

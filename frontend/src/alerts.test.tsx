@@ -353,3 +353,77 @@ describe('§13 alerts — tab title', () => {
     expect(document.title).toBe('Taura PMS')
   })
 })
+// ── §35 ────────────────────────────────────────────────────────────────────
+//
+// Reported from the desk twice: «после отмены брони уведомление всё равно
+// висит». Nothing was stuck — the bell polls every 45 seconds, so acting on an
+// alert left it on screen for most of a minute, which is indistinguishable
+// from the alert being broken and invites doing the same work twice.
+const NOSHOW_ALERT = {
+  id: 'noshow:9:2026-08-10',
+  kind: 'noshow' as const,
+  title: 'Гость не заехал — 101',
+  detail: 'Иван Камранов · заезд был 2026-08-10, вчера — заселить или закрыть бронь',
+  href: '/rooms/1',
+  at: '2026-08-10',
+}
+
+describe('§35 действие по сигналу гасит его сразу, а не через 45 секунд', () => {
+  it('перечитывает сигналы после любой записи на сервер', async () => {
+    signIn('admin')
+    let outstanding: unknown[] = [NOSHOW_ALERT]
+    const calls: string[] = []
+    mockApi({
+      ...routes('admin', [], calls),
+      // Closing the booking is what makes the alert go away — the server stops
+      // reporting it, and the client must ask again to find that out.
+      'GET /api/alerts': (url: string) => {
+        calls.push(url)
+        return { sla_minutes: 60, booking_window_hours: 8, alerts: outstanding }
+      },
+      'PATCH /api/bookings/': () => {
+        outstanding = []
+        return { id: 9, status: 'free' }
+      },
+    })
+    renderApp(<App />, { route: '/rooms' })
+
+    await screen.findByRole('button', { name: /Событий, требующих внимания: 1/ })
+    const polls = calls.length
+
+    const { api } = await import('./api')
+    await act(async () => {
+      await api('/bookings/9', { method: 'PATCH', body: { status: 'free' } })
+    })
+
+    // Gone within a second of the write, not on the next poll.
+    await waitFor(
+      () => expect(screen.queryByRole('button', { name: /Событий/ })).toBeNull(),
+      { timeout: 2000 }
+    )
+    expect(calls.length).toBeGreaterThan(polls)
+  })
+
+  it('не перечитывает их из-за обычного чтения', async () => {
+    signIn('admin')
+    const calls: string[] = []
+    mockApi({
+      ...routes('admin', [SLA_ALERT], calls),
+      'GET /api/units/9': makeUnit({ id: 9 }),
+    })
+    renderApp(<App />, { route: '/rooms' })
+
+    await screen.findByRole('button', { name: /Событий, требующих внимания: 1/ })
+    const polls = calls.length
+
+    const { api } = await import('./api')
+    await act(async () => {
+      await api('/units/9')
+      await new Promise((resolve) => setTimeout(resolve, 600))
+    })
+
+    // A GET changes nothing, so it must not cost a poll — otherwise every page
+    // that loads would re-ask, which is the 45-second rule undone.
+    expect(calls.length).toBe(polls)
+  })
+})
