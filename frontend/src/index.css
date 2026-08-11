@@ -4404,6 +4404,17 @@ button.cal-day:focus-visible {
   color: var(--text-faint);
 }
 
+/* What «прочитано» actually does, under the list rather than in a tooltip
+   nobody opens. Quiet — it is a footnote, not an alert of its own. */
+.alert-panel-foot {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
 .alert-panel-head .btn {
   margin-left: auto;
   height: 26px;

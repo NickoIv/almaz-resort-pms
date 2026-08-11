@@ -120,6 +120,17 @@ export default function AlertCenter({
               </li>
             ))}
           </ul>
+
+          {/* Said outright, because not saying it made the bell look broken.
+              «Прочитано» hides a line on this browser; it does not settle the
+              thing the line is about. A guest who never arrived is still an
+              open booking holding a room, and it comes back — on the phone,
+              after clearing site data, on the next person's screen — until
+              somebody closes it. Which is the point of the alert. */}
+          <div className="alert-panel-foot">
+            «Прочитано» убирает строку только в этом браузере. Пока причина не
+            устранена — незакрытая бронь, грязный номер — сигнал вернётся.
+          </div>
         </div>
       )}
     </div>
