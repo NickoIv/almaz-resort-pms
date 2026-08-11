@@ -870,8 +870,11 @@ describe('§11 grouped navigation and the dashboard', () => {
 
     await screen.findByRole('heading', { name: 'Сводка' })
     const tiles = [...document.querySelectorAll('.tile')]
+    // «Заезды сегодня» led to the board until «Сегодня» existed, where three
+    // arrivals had to be found by reading down a column of fourteen rooms. A
+    // tile that can act on its own number now leads to the list, not the chart.
     expect(tiles.map((tile) => tile.getAttribute('href'))).toEqual([
-      '/rooms', '/cleaning', '/rooms', '/waitlist',
+      '/rooms', '/cleaning', '/today', '/waitlist',
     ])
   })
 
@@ -2290,7 +2293,13 @@ describe('§26 the phone gets its sections under a thumb', () => {
     const labels = [...tabs.querySelectorAll('.mobile-tab-label')].map((e) => e.textContent)
     // «Отдых», not «Зона отдыха»: five labels share 390px, and a tab reading
     // «Зона отд…» looks like a fault rather than a shortening.
-    expect(labels).toEqual(['Сводка', 'Номера', 'Отдых', 'Уборка', 'Ещё'])
+    //
+    // «Сегодня» took the second tab and pushed «Уборка» into «Ещё». The bar
+    // holds four plus «Ещё» — that limit is what keeps the labels readable —
+    // so something had to give, and for an admin "кто заезжает" is asked far
+    // more often than a page that mostly belongs to the housekeeper and is
+    // still one tap away from the summary's own «Требуют уборки» tile.
+    expect(labels).toEqual(['Сводка', 'Сегодня', 'Номера', 'Отдых', 'Ещё'])
   })
 
   it('gives a housekeeper her own page and her own notifications', async () => {

@@ -141,7 +141,9 @@ export default function DashboardPage() {
           </div>
         </Link>
 
-        <Link className="tile glass" to="/rooms">
+        {/* Led to the board until «Сегодня» existed, where three arrivals had
+            to be found by reading down a column of fourteen rooms. */}
+        <Link className="tile glass" to="/today">
           <div className="tile-label">Заезды сегодня</div>
           <div className="tile-value">
             <CountUp value={stats.arrivals} />

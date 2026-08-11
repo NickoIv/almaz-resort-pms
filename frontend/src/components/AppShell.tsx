@@ -28,6 +28,12 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Работа',
     items: [
+      // First, because it is the question the desk asks first. On a phone it
+      // therefore takes a tab, and «Уборка» moves into «Ещё» — the tab bar
+      // holds four plus «Ещё», and for an admin "кто заезжает" beats a page
+      // that mostly belongs to the housekeeper and is still one tap from the
+      // summary's own tile.
+      { to: '/today', label: 'Сегодня', roles: ['admin', 'waiter'] },
       { to: '/rooms', label: 'Номера', roles: ['admin'] },
       { to: '/restaurant', label: 'Зона отдыха', roles: ['admin', 'waiter'] },
       // The waiter cleans too — the recreation units' checklist is clearing

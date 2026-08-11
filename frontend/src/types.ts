@@ -176,6 +176,46 @@ export type Calendar = {
   blocks?: UnitBlock[]
 }
 
+/**
+ * «Сегодня» — one row of the arrivals or departures list.
+ *
+ * Money fields are admin-only, like everywhere else; `is_paid` is the one
+ * exception, because a waiter has to know whether the guest still owes.
+ */
+export type TodayRow = {
+  booking_id: number
+  unit_id: number
+  unit_name: string
+  unit_type: UnitType
+  guest_name: string
+  guest_phone: string | null
+  date_from: string
+  date_to: string
+  nights: number
+  status: UnitStatus
+  verified_at: string | null
+  needs_cleaning: boolean
+  cleaning_pending: number
+  /** Foreign guest, notice not filed — three days from arrival and a fine. */
+  migration_due: boolean
+  is_paid: boolean
+  total_amount?: number
+  prepaid_amount?: number
+  deposit_amount?: number
+  charges_amount?: number
+  remaining_amount?: number
+  currency?: string
+}
+
+export type TodayBoard = {
+  today: string
+  arrivals: TodayRow[]
+  departures: TodayRow[]
+  /** In-house tonight and neither arriving nor leaving today. */
+  staying: number
+  blocked: { id: number; unit_name: string; reason: string; note: string | null; date_to: string }[]
+}
+
 export type ChecklistItem = {
   id: number
   unit_id: number

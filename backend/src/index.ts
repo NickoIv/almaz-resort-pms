@@ -15,6 +15,7 @@ import roomRoutes from './routes/rooms'
 import unitRoutes from './routes/units'
 import bookingRoutes from './routes/bookings'
 import blockRoutes from './routes/blocks'
+import todayRoutes from './routes/today'
 import cleaningRoutes from './routes/cleaning'
 import guestRoutes from './routes/guests'
 import settingsRoutes from './routes/settings'
@@ -63,6 +64,7 @@ app.use('/api/waitlist/*', requireAuth)
 app.use('/api/push/*', requireAuth)
 app.use('/api/rates', requireAuth)
 app.use('/api/rates/*', requireAuth)
+app.use('/api/today', requireAuth)
 app.use('/api/blocks', requireAuth)
 app.use('/api/blocks/*', requireAuth)
 app.use('/api/migration', requireAuth)
@@ -73,6 +75,7 @@ app.route('/api/rooms', roomRoutes)
 app.route('/api/units', unitRoutes)
 app.route('/api/bookings', bookingRoutes)
 app.route('/api/blocks', blockRoutes)
+app.route('/api/today', todayRoutes)
 app.route('/api/cleaning', cleaningRoutes)
 app.route('/api/analytics', analyticsRoutes)
 app.route('/api/settings', settingsRoutes)

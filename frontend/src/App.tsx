@@ -11,6 +11,7 @@ import LoginPage from './pages/LoginPage'
 import NotificationsPage from './pages/NotificationsPage'
 import RestaurantPage from './pages/RestaurantPage'
 import RoomsPage from './pages/RoomsPage'
+import TodayPage from './pages/TodayPage'
 import UnitDetailPage from './pages/UnitDetailPage'
 import SettingsPage from './pages/SettingsPage'
 import StaffPage from './pages/StaffPage'
@@ -42,6 +43,16 @@ export default function App() {
           element={
             <RequireRole roles={['admin']}>
               <DashboardPage />
+            </RequireRole>
+          }
+        />
+        {/* Кто заезжает, кто выезжает. Open to the waiter too: their gazebo
+            sittings for today are on it, scoped by allowedUnitTypes. */}
+        <Route
+          path="/today"
+          element={
+            <RequireRole roles={['admin', 'waiter']}>
+              <TodayPage />
             </RequireRole>
           }
         />

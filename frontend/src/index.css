@@ -3390,6 +3390,69 @@ button.cal-day:focus-visible {
   border-color: rgb(var(--occupied-rgb) / 0.45);
 }
 
+/* ── «Сегодня» ─────────────────────────────────────────────────────────────
+ *
+ * Everything that has to be dealt with before the button is pressed sits on
+ * the row, under the guest — a warning found after check-in is a warning that
+ * arrived too late. The badges wrap rather than truncate: at 390px a row can
+ * carry three of them, and a clipped «миграционный уч…» reads as a fault.
+ */
+.today-flags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+/* The guest's number, sized to be pressed. It sits among the badges rather
+   than inside the caption because on a phone it is a dial button, and a 16px
+   line of text is not one. */
+.today-phone {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  min-height: var(--control-h-sm);
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  color: var(--text-dim);
+}
+
+.today-phone:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* Money sits between the guest and the action, pushed right on a desktop and
+   dropping onto its own line on a phone — where `margin-left: auto` against a
+   wrapped flex row would otherwise strand it alone against the edge. */
+.row-money {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .row-money {
+    margin-left: 0;
+    align-items: flex-start;
+  }
+
+  /* The row's own action is a real tap target, and on a phone the small
+     control size is the normal size — see the token block. */
+  .row-card > .btn {
+    width: 100%;
+  }
+}
+
 .tag-off {
   background: rgb(var(--occupied-rgb) / 0.18);
   border-color: rgb(var(--occupied-rgb) / 0.35);
