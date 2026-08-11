@@ -31,6 +31,10 @@ export type Booking = {
   /** Why the booking ended — set when it moves to 'free'. */
   cancel_reason?: string | null
   cancel_note?: string | null
+  /** Empty means nobody said — deliberately not the same as "Kazakh". */
+  guest_citizenship?: string | null
+  guest_document?: string | null
+  migration_notified_at?: string | null
   cancelled_at?: string | null
   /**
    * When someone read the finished booking back and confirmed it, and who.
@@ -421,4 +425,50 @@ export type KnownGuest = {
   outstanding_debt: number
   lifetime_spend: number
   notes: string
+}
+
+/**
+ * Миграционный учёт — Kazakhstan gives the receiving party three days from a
+ * foreign guest's arrival to notify the migration service, and fines a hotel
+ * that misses it. See backend/src/lib/migration-notice.ts for why an unrecorded
+ * citizenship is deliberately not the same as a foreign one.
+ */
+export const KZ_CITIZENSHIP = 'KZ'
+
+/** The countries reception actually types, in the order they come up here. */
+export const CITIZENSHIPS = [
+  { value: KZ_CITIZENSHIP, label: 'Казахстан' },
+  { value: 'Россия', label: 'Россия' },
+  { value: 'Кыргызстан', label: 'Кыргызстан' },
+  { value: 'Узбекистан', label: 'Узбекистан' },
+  { value: 'Китай', label: 'Китай' },
+  { value: 'Турция', label: 'Турция' },
+] as const
+
+export type MigrationEntry = {
+  booking_id: number
+  guest_name: string
+  guest_phone: string | null
+  guest_citizenship: string | null
+  guest_document: string | null
+  date_from: string
+  date_to: string
+  unit_id: number
+  unit_name: string
+  migration_notified_at: string | null
+  migration_notified_by_name: string | null
+  due_on?: string
+  days_left?: number
+}
+
+export type MigrationRegister = {
+  today: string
+  notice_days: number
+  hotel_name: string
+  hotel_address: string
+  /** Foreign guests who have arrived and have not been filed. */
+  due: MigrationEntry[]
+  /** Arrivals whose citizenship nobody recorded — shown so silence cannot hide one. */
+  unknown: MigrationEntry[]
+  filed: MigrationEntry[]
 }

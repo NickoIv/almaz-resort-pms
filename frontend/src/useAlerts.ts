@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api'
 import { playChime } from './sound'
 
-export type AlertKind = 'sla' | 'waitlist' | 'booking' | 'upcoming' | 'noshow'
+export type AlertKind = 'sla' | 'waitlist' | 'booking' | 'upcoming' | 'noshow' | 'migration'
 
 export type StaffAlert = {
   id: string

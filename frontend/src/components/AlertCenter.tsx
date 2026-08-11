@@ -9,6 +9,7 @@ const KIND_ICON: Record<AlertKind, string> = {
   booking: '🗓',
   upcoming: '⏰',
   noshow: '🚪',
+  migration: '🛂',
 }
 
 const KIND_LABEL: Record<AlertKind, string> = {
@@ -17,6 +18,7 @@ const KIND_LABEL: Record<AlertKind, string> = {
   booking: 'Бронь',
   upcoming: 'Скоро гости',
   noshow: 'Не заехал',
+  migration: 'Миграционный учёт',
 }
 
 /**

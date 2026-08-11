@@ -18,6 +18,9 @@ type BookingRow = {
   unit_id: number
   guest_name: string
   guest_phone: string | null
+  guest_citizenship: string | null
+  guest_document: string | null
+  migration_notified_at: string | null
   date_from: string
   date_to: string
   status: BookingStatus
@@ -54,6 +57,11 @@ function serializeBooking(row: BookingRow, withMoney: boolean) {
     unit_id: row.unit_id,
     guest_name: row.guest_name,
     guest_phone: row.guest_phone,
+    // Кто гость по паспорту. Empty means nobody said — deliberately not the
+    // same as "citizen of Kazakhstan"; see lib/migration-notice.ts.
+    guest_citizenship: row.guest_citizenship,
+    guest_document: row.guest_document,
+    migration_notified_at: row.migration_notified_at,
     date_from: row.date_from,
     date_to: row.date_to,
     status: row.status,
@@ -192,15 +200,18 @@ bookings.post('/', canBook, async (c) => {
 
   const created = await c.env.DB.prepare(
     `INSERT INTO bookings
-       (unit_id, guest_name, guest_phone, date_from, date_to, status,
+       (unit_id, guest_name, guest_phone, guest_citizenship, guest_document,
+        date_from, date_to, status,
         total_amount, prepaid_amount, deposit_amount, currency, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${SQL_NOW})
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${SQL_NOW})
      RETURNING *`
   )
     .bind(
       unitId,
       guestName,
       cleanOptional(body.guest_phone, 40),
+      cleanOptional(body.guest_citizenship, 60),
+      cleanOptional(body.guest_document, 60),
       dateFrom,
       dateTo,
       status,
@@ -535,6 +546,14 @@ bookings.patch('/:id', canBook, async (c) => {
     body.guest_name === undefined ? existing.guest_name : cleanName(body.guest_name)
   const guestPhone =
     body.guest_phone === undefined ? existing.guest_phone : cleanOptional(body.guest_phone, 40)
+  const guestCitizenship =
+    body.guest_citizenship === undefined
+      ? existing.guest_citizenship
+      : cleanOptional(body.guest_citizenship, 60)
+  const guestDocument =
+    body.guest_document === undefined
+      ? existing.guest_document
+      : cleanOptional(body.guest_document, 60)
   const dateFrom = body.date_from === undefined ? existing.date_from : String(body.date_from)
   const dateTo = body.date_to === undefined ? existing.date_to : String(body.date_to)
   const status = (body.status === undefined ? existing.status : body.status) as BookingStatus
@@ -571,7 +590,9 @@ bookings.patch('/:id', canBook, async (c) => {
 
   const updated = await c.env.DB.prepare(
     `UPDATE bookings
-     SET guest_name = ?, guest_phone = ?, date_from = ?, date_to = ?, status = ?,
+     SET guest_name = ?, guest_phone = ?,
+         guest_citizenship = ?, guest_document = ?,
+         date_from = ?, date_to = ?, status = ?,
          cancel_reason = ?, cancel_note = ?,
          cancelled_at = CASE WHEN ? THEN ${SQL_NOW} ELSE cancelled_at END
      WHERE id = ?
@@ -580,6 +601,8 @@ bookings.patch('/:id', canBook, async (c) => {
     .bind(
       guestName,
       guestPhone,
+      guestCitizenship,
+      guestDocument,
       dateFrom,
       dateTo,
       status,

@@ -2687,3 +2687,85 @@ describe('§31 a booking that fell off the end of time can still be closed', () 
     expect(screen.queryByRole('button', { name: 'Открыть бронь' })).not.toBeInTheDocument()
   })
 })
+
+describe('§32 миграционный учёт: иностранцев считаем, казахстанцев не трогаем', () => {
+  const REGISTER = {
+    today: '2026-08-11',
+    notice_days: 3,
+    hotel_name: 'Taura',
+    hotel_address: 'ул. Алма-Арасан, 4а, Алматы',
+    due: [
+      {
+        booking_id: 91, guest_name: 'Wei Zhang', guest_phone: null,
+        guest_citizenship: 'Китай', guest_document: 'E12345678',
+        date_from: '2026-08-10', date_to: '2026-08-13',
+        unit_id: 11, unit_name: '111',
+        migration_notified_at: null, migration_notified_by_name: null,
+        due_on: '2026-08-13', days_left: 2,
+      },
+    ],
+    unknown: [
+      {
+        booking_id: 92, guest_name: 'Гость Без Страны', guest_phone: null,
+        guest_citizenship: null, guest_document: null,
+        date_from: '2026-08-09', date_to: '2026-08-12',
+        unit_id: 13, unit_name: '113',
+        migration_notified_at: null, migration_notified_by_name: null,
+      },
+    ],
+    filed: [],
+  }
+
+  it('shows the deadline and the data the notice asks for', async () => {
+    signIn('admin')
+    mockApi({ ...baseRoutes('admin'), 'GET /api/migration': REGISTER })
+    renderApp(<App />, { route: '/migration' })
+
+    expect(await screen.findByRole('heading', { name: 'Миграционный учёт' })).toBeInTheDocument()
+    expect(await screen.findByText('Wei Zhang')).toBeInTheDocument()
+    // The passport number and the countdown are the two things filing needs.
+    expect(screen.getByText(/E12345678/)).toBeInTheDocument()
+    expect(screen.getByText(/осталось 2 дн/)).toBeInTheDocument()
+    // The receiving party and the address of stay, so nobody has to recall them.
+    expect(screen.getByText(/ул. Алма-Арасан, 4а, Алматы/)).toBeInTheDocument()
+  })
+
+  it('keeps an unrecorded citizenship out of the legal list but on the page', async () => {
+    signIn('admin')
+    mockApi({ ...baseRoutes('admin'), 'GET /api/migration': REGISTER })
+    renderApp(<App />, { route: '/migration' })
+
+    await screen.findByText('Wei Zhang')
+    // Not a deadline — but not silence either: most guests are Kazakh, and a
+    // false deadline on nine in ten would train everyone to ignore the page.
+    const unrecorded = screen.getByText('Гость Без Страны').closest('.row-card')!
+    expect(unrecorded).toBeInTheDocument()
+    expect(within(unrecorded as HTMLElement).queryByText(/осталось/)).not.toBeInTheDocument()
+    expect(within(unrecorded as HTMLElement).queryByRole('button', { name: /подано/i }))
+      .not.toBeInTheDocument()
+  })
+
+  it('asks a room booking for citizenship, and warns only for a foreign one', async () => {
+    const freeRoom = makeUnit({ id: 6, name: '106', status: 'free' })
+    signIn('admin')
+    mockApi({
+      ...baseRoutes('admin', [freeRoom]),
+      'GET /api/units/6': freeRoom,
+      'GET /api/units/6/calendar': CALENDAR,
+    })
+    renderApp(<App />, { route: '/rooms/6' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Новая бронь' }))
+    const select = (await screen.findByLabelText('Гражданство')) as HTMLSelectElement
+
+    // Blank is the default and a real answer — see BookingModal.
+    expect(select.value).toBe('')
+    expect(screen.queryByText(/миграционную службу нужно уведомить/)).not.toBeInTheDocument()
+
+    await userEvent.selectOptions(select, 'KZ')
+    expect(screen.queryByText(/миграционную службу нужно уведомить/)).not.toBeInTheDocument()
+
+    await userEvent.selectOptions(select, 'Китай')
+    expect(await screen.findByText(/миграционную службу нужно уведомить/)).toBeInTheDocument()
+  })
+})

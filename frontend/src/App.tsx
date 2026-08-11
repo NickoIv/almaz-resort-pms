@@ -5,6 +5,7 @@ import { Spinner } from './components/ui'
 import AnalyticsPage from './pages/AnalyticsPage'
 import AuditPage from './pages/AuditPage'
 import CleaningPage from './pages/CleaningPage'
+import MigrationPage from './pages/MigrationPage'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import NotificationsPage from './pages/NotificationsPage'
@@ -67,6 +68,14 @@ export default function App() {
           element={
             <RequireRole roles={['admin', 'waiter']}>
               <UnitDetailPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/migration"
+          element={
+            <RequireRole roles={['admin']}>
+              <MigrationPage />
             </RequireRole>
           }
         />

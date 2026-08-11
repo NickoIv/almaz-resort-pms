@@ -12,6 +12,8 @@ import {
   DEFAULT_CURRENCY,
   type Booking,
   type Currency,
+  CITIZENSHIPS,
+  KZ_CITIZENSHIP,
   type KnownGuest,
   type Quote,
   type StaffMember,
@@ -80,6 +82,25 @@ export default function BookingModal({
   const [dateFrom, setDateFrom] = useState(toInput(booking?.date_from, hourly, defaultFrom))
   const [dateTo, setDateTo] = useState(toInput(booking?.date_to, hourly, defaultTo))
   const [status, setStatus] = useState<UnitStatus>(booking?.status ?? 'booked')
+  /**
+   * Гражданство и документ — only asked for a room, and only because
+   * Kazakhstan requires the hotel to notify the migration service about a
+   * foreign guest within three days of arrival.
+   *
+   * Blank is a real answer and the default one: **most guests here are Kazakh,
+   * and an empty field is not treated as foreign**. Marking someone «Казахстан»
+   * takes one choice and settles it for good; leaving it blank puts the arrival
+   * on the Миграционный учёт page under "не указано", so a foreign guest cannot
+   * be missed by silence either.
+   */
+  const [citizenship, setCitizenship] = useState(booking?.guest_citizenship ?? '')
+  const [otherCountry, setOtherCountry] = useState(
+    booking?.guest_citizenship &&
+      !CITIZENSHIPS.some((item) => item.value === booking.guest_citizenship)
+      ? booking.guest_citizenship
+      : ''
+  )
+  const [document, setDocument] = useState(booking?.guest_document ?? '')
   const [total, setTotal] = useState(String(booking?.total_amount ?? ''))
   const [prepaid, setPrepaid] = useState(String(booking?.prepaid_amount ?? ''))
   const [deposit, setDeposit] = useState(String(booking?.deposit_amount ?? ''))
@@ -218,6 +239,13 @@ export default function BookingModal({
       const payload: Record<string, unknown> = {
         guest_name: guestName,
         guest_phone: guestPhone || null,
+        ...(hourly
+          ? {}
+          : {
+              guest_citizenship:
+                citizenship === 'other' ? otherCountry.trim() || null : citizenship || null,
+              guest_document: document.trim() || null,
+            }),
         date_from: toApi(dateFrom, hourly),
         date_to: toApi(dateTo, hourly),
         status,
@@ -479,6 +507,66 @@ export default function BookingModal({
             />
           </div>
         </div>
+
+        {/* Только для номеров: a gazebo for four hours is not accommodation and
+            owes nobody a notice. Blank stays blank — see the state above. */}
+        {!hourly && (
+          <div className="field-row">
+            <div className="field">
+              <label htmlFor="citizenship">Гражданство</label>
+              <select
+                id="citizenship"
+                value={
+                  citizenship && !CITIZENSHIPS.some((item) => item.value === citizenship)
+                    ? 'other'
+                    : citizenship
+                }
+                onChange={(event) => {
+                  setCitizenship(event.target.value)
+                  if (event.target.value !== 'other') setOtherCountry('')
+                }}
+              >
+                <option value="">— не указано —</option>
+                {CITIZENSHIPS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+                <option value="other">Другая страна…</option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="guest-document">Паспорт / удостоверение</label>
+              <input
+                id="guest-document"
+                value={document}
+                onChange={(event) => setDocument(event.target.value)}
+                placeholder="номер"
+              />
+            </div>
+          </div>
+        )}
+
+        {!hourly && citizenship === 'other' && (
+          <div className="field">
+            <label htmlFor="other-country">Какая страна</label>
+            <input
+              id="other-country"
+              value={otherCountry}
+              onChange={(event) => setOtherCountry(event.target.value)}
+              placeholder="Германия"
+            />
+          </div>
+        )}
+
+        {/* Said once, where the decision is made, rather than left to be
+            discovered on the Миграционный учёт page three days later. */}
+        {!hourly && citizenship && citizenship !== KZ_CITIZENSHIP && (
+          <div className="notice">
+            Гость не из Казахстана — миграционную службу нужно уведомить в течение трёх дней
+            после заезда. Срок и данные для подачи появятся в «Миграционном учёте».
+          </div>
+        )}
 
         <div className="field">
           <label htmlFor="status">Статус</label>

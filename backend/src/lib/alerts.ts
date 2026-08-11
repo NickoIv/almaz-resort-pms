@@ -1,5 +1,6 @@
 import { allowedUnitTypes, placeholders } from './access'
 import { CLEANING_SLA_MINUTES } from './cleaning'
+import { daysLeft, noticeDue } from './migration-notice'
 import { SQL_NOW, SQL_TODAY } from './time'
 import type { Role, UnitType } from '../types'
 
@@ -51,7 +52,7 @@ export const ARRIVAL_WINDOW_MINUTES = 60
 /** Cap per category, so a quiet client cannot be handed a thousand alerts. */
 const MAX_PER_KIND = 25
 
-export type AlertKind = 'sla' | 'waitlist' | 'booking' | 'upcoming' | 'noshow'
+export type AlertKind = 'sla' | 'waitlist' | 'booking' | 'upcoming' | 'noshow' | 'migration'
 
 export type Alert = {
   id: string
@@ -98,6 +99,16 @@ type NoShowRow = {
   unit_name: string
   unit_type: UnitType
   days_late: number
+}
+
+type MigrationDueRow = {
+  id: number
+  guest_name: string
+  guest_citizenship: string
+  date_from: string
+  unit_id: number
+  unit_name: string
+  unit_type: UnitType
 }
 
 type WaitlistRow = {
@@ -163,6 +174,11 @@ export async function computeAlerts(db: D1Database, audience: AlertAudience): Pr
   const types = allowedUnitTypes(audience.role)
   const isAdmin = audience.role === 'admin'
   const out: Alert[] = []
+
+  // Almaty's day, asked of the database so every deadline below is counted from
+  // the same one the rest of the app uses.
+  const todayRow = await db.prepare(`SELECT ${SQL_TODAY} AS today`).first<{ today: string }>()
+  const todayIso = todayRow?.today ?? new Date().toISOString().slice(0, 10)
 
   // ── 1. Cleaning past the SLA ────────────────────────────────────────────
   // Same shape the cleaning page computes, filtered to the breaches only.
@@ -288,7 +304,59 @@ export async function computeAlerts(db: D1Database, audience: AlertAudience): Pr
     }
   }
 
-  // ── 4. Someone on the waitlist can now be placed ────────────────────────
+  // ── 4. A foreign guest the migration service has not been told about ────
+  //
+  // Kazakhstan gives the receiving party three days from arrival to notify,
+  // through eQonaq or the visa-migration portal, and fines a hotel that misses
+  // it. Nothing else in the app watches a legal clock, so this one is worth the
+  // interruption.
+  //
+  // Only rooms, and only where a citizenship was actually recorded and is not
+  // Kazakhstan. **An empty citizenship is not treated as foreign** — most
+  // guests here are Kazakh, and guessing would raise a false deadline on nine
+  // bookings in ten. The Миграционный учёт page lists the unrecorded ones
+  // separately so silence cannot hide a real one either.
+  if (isAdmin) {
+    const { results: dueNotices } = await db
+      .prepare(
+        `SELECT b.id, b.guest_name, b.guest_citizenship, b.date_from,
+                u.id AS unit_id, u.name AS unit_name, u.type AS unit_type
+           FROM bookings b
+           JOIN units u ON u.id = b.unit_id
+          WHERE b.status <> 'free'
+            AND u.type = 'room'
+            AND b.migration_notified_at IS NULL
+            AND b.guest_citizenship IS NOT NULL
+            AND upper(trim(b.guest_citizenship)) <> 'KZ'
+            AND date(b.date_from) <= ${SQL_TODAY}
+            AND date(b.date_from) >= date(${SQL_TODAY}, '-30 days')
+          ORDER BY b.date_from
+          LIMIT ${MAX_PER_KIND}`
+      )
+      .all<MigrationDueRow>()
+
+    for (const row of dueNotices) {
+      const due = noticeDue(row.date_from)
+      const left = daysLeft(row.date_from, todayIso)
+      out.push({
+        // The arrival date is in the id for the same reason as a no-show: moved
+        // dates are a different arrival with a different deadline.
+        id: `migration:${row.id}:${row.date_from.slice(0, 10)}`,
+        kind: 'migration',
+        title:
+          left < 0
+            ? `Миграционный учёт просрочен — ${row.unit_name}`
+            : `Уведомить миграционную службу — ${row.unit_name}`,
+        detail:
+          `${row.guest_name}, ${row.guest_citizenship} · ` +
+          (left < 0 ? `срок истёк ${due}` : left === 0 ? `сегодня последний день (${due})` : `до ${due}`),
+        href: '/migration',
+        at: row.date_from,
+      })
+    }
+  }
+
+  // ── 5. Someone on the waitlist can now be placed ────────────────────────
   if (isAdmin) {
     const { results: matches } = await db
       .prepare(

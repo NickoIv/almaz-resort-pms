@@ -59,6 +59,7 @@ export const BACKUP_TABLES = [
       'id', 'unit_id', 'guest_name', 'guest_phone', 'date_from', 'date_to', 'status',
       'total_amount', 'prepaid_amount', 'deposit_amount', 'currency', 'created_at', 'group_id',
       'cancel_reason', 'cancel_note', 'cancelled_at', 'verified_at', 'verified_by',
+      'guest_citizenship', 'guest_document', 'migration_notified_at', 'migration_notified_by',
     ],
   },
   {

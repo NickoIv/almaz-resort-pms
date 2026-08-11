@@ -42,6 +42,9 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/analytics', label: 'Аналитика', roles: ['admin'] },
       { to: '/audit', label: 'Журнал', roles: ['admin'] },
+      // A legal register with a deadline, so it lives where things are read
+      // rather than among the pages where the day is run.
+      { to: '/migration', label: 'Миграционный учёт', roles: ['admin'] },
     ],
   },
   {
