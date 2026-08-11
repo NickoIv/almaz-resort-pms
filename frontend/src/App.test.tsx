@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { makeUnit, mockApi, renderApp, signIn, STAFF, useCardView } from './test-utils'
+import type { Booking } from './types'
 
 const ROOM_WITH_GUEST = makeUnit({
   id: 5,
@@ -2623,7 +2624,7 @@ describe('§30 the price list fills the amount in, and a person can overrule it'
 })
 
 describe('§31 a booking that fell off the end of time can still be closed', () => {
-  const STALE = {
+  const STALE: Booking = {
     id: 85,
     guest_name: 'Не Заехал Тестовый',
     guest_phone: '+77009998877',
