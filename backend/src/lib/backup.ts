@@ -90,6 +90,15 @@ export const BACKUP_TABLES = [
     columns: ['phone', 'notes', 'updated_at', 'updated_by'],
   },
   { name: 'settings', columns: ['key', 'value', 'updated_at', 'updated_by'] },
+  // The price list. Small, hand-entered and impossible to reconstruct from
+  // anything else — exactly the sort of thing a restore has to bring back.
+  {
+    name: 'rates',
+    columns: [
+      'id', 'unit_type', 'category', 'weekday_price', 'weekend_price',
+      'season_name', 'season_from', 'season_to', 'updated_at', 'updated_by',
+    ],
+  },
   {
     name: 'waitlist',
     columns: [

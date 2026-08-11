@@ -12,11 +12,14 @@ import {
   DEFAULT_CURRENCY,
   type Booking,
   type Currency,
+  type KnownGuest,
+  type Quote,
   type StaffMember,
   type UnitStatus,
   type UnitType,
   type WaitlistEntry,
 } from '../types'
+import { money, pluralRu, shortDate } from '../format'
 
 type Props = {
   unitId: number
@@ -97,6 +100,83 @@ export default function BookingModal({
       .then((rows) => setStaff(rows.filter((member) => member.is_active)))
       .catch(() => setStaff([]))
   }, [canSetPrice])
+
+  /**
+   * What the price list says this stay costs, and whether anyone has overruled
+   * it.
+   *
+   * The amount used to be typed from memory on every booking — the most
+   * repeated action in the app and the one where a Friday quietly gets charged
+   * a Tuesday price. The list fills it in; `priceTouched` makes sure that once
+   * a human has typed a figure, nothing ever moves it again.
+   */
+  const [quote, setQuote] = useState<Quote | null>(null)
+  const [priceTouched, setPriceTouched] = useState(false)
+
+  useEffect(() => {
+    // Only for a booking being made. An existing one has a price that was
+    // already agreed with the guest; re-quoting it would rewrite history.
+    if (!canSetPrice || booking) return
+    const from = toApi(dateFrom, hourly)
+    const to = toApi(dateTo, hourly)
+    if (!from || !to) return
+
+    let abandoned = false
+    api<Quote>(
+      `/rates/quote?unit_id=${unitId}` +
+        `&date_from=${encodeURIComponent(from)}&date_to=${encodeURIComponent(to)}`
+    )
+      .then((result) => {
+        if (!abandoned) setQuote(result.empty ? null : result)
+      })
+      // No price list, or none covering this unit: the field stays as it was.
+      .catch(() => {
+        if (!abandoned) setQuote(null)
+      })
+    return () => {
+      abandoned = true
+    }
+  }, [canSetPrice, booking, unitId, dateFrom, dateTo, hourly])
+
+  useEffect(() => {
+    if (!quote || priceTouched) return
+    setTotal(String(quote.total))
+  }, [quote, priceTouched])
+
+  /**
+   * What is already known about this guest, if the phone has been seen before.
+   *
+   * The data has been there since guest history was built; it was just never
+   * shown at the moment it changes a decision. Someone who owes money from
+   * last time, or has a note saying "не селить у бассейна", should be visible
+   * while the booking is being written — not after.
+   */
+  const [known, setKnown] = useState<KnownGuest | null>(null)
+
+  useEffect(() => {
+    if (!canSetPrice) return
+    const digits = guestPhone.replace(/\D/g, '')
+    if (digits.length < 10) {
+      setKnown(null)
+      return
+    }
+    let abandoned = false
+    const timer = setTimeout(() => {
+      api<KnownGuest>(`/guests/${encodeURIComponent(guestPhone)}`)
+        .then((result) => {
+          // A phone with no stays behind it is not a returning guest.
+          if (!abandoned) setKnown(result.total_stays > 0 || result.notes ? result : null)
+        })
+        .catch(() => {
+          if (!abandoned) setKnown(null)
+        })
+      // Typed, not pasted: without this every digit is a request.
+    }, 500)
+    return () => {
+      abandoned = true
+      clearTimeout(timer)
+    }
+  }, [canSetPrice, guestPhone])
 
   const [cancelReason, setCancelReason] = useState<CancelReason>('checked_out')
   const [cancelNote, setCancelNote] = useState('')
@@ -350,6 +430,33 @@ export default function BookingModal({
           />
         </div>
 
+        {/* Everything already known about this number, at the moment it is
+            being written rather than after. A debt or a note about where not
+            to put someone changes the booking; finding it out later does not.
+
+            No gendered verb in the wording: a name does not tell you how to
+            conjugate it, and «останавливался(ась)» is a worse answer than a
+            noun. */}
+        {known && (
+          <div className={`notice ${known.outstanding_debt > 0 ? 'notice-warn' : ''}`}>
+            <strong>{known.guest_name ?? 'Этот номер'}</strong> — не впервые у нас
+            {known.total_stays > 0 && (
+              <>
+                {': '}
+                {known.total_stays}{' '}
+                {pluralRu(known.total_stays, ['заезд', 'заезда', 'заездов'])}
+              </>
+            )}
+            {known.outstanding_debt > 0 && (
+              <>
+                {' · '}
+                <strong>долг {money(known.outstanding_debt)}</strong>
+              </>
+            )}
+            {known.notes && <div className="field-hint">Заметка: {known.notes}</div>}
+          </div>
+        )}
+
         <div className="field-row">
           <div className="field">
             <label htmlFor="from">{hourly ? 'Начало' : 'Заезд'}</label>
@@ -427,7 +534,12 @@ export default function BookingModal({
                   type="number"
                   min="0"
                   value={total}
-                  onChange={(event) => setTotal(event.target.value)}
+                  onChange={(event) => {
+                    // From here on the figure belongs to whoever typed it: the
+                    // price list never moves it again, however the dates change.
+                    setPriceTouched(true)
+                    setTotal(event.target.value)
+                  }}
                   placeholder="0"
                 />
               </div>
@@ -443,6 +555,41 @@ export default function BookingModal({
                 />
               </div>
             </div>
+
+            {/* Where the figure came from, in the terms the price list is
+                written in — so a wrong amount is spotted here rather than on
+                the invoice. Shown only when there is a list covering this
+                stay; with none, the field behaves exactly as it always did. */}
+            {quote && (
+              <div className="field-hint" style={{ marginTop: -8, marginBottom: 16 }}>
+                По прайсу{' '}
+                {quote.nights.length === 1 && hourly
+                  ? money(quote.nights[0].price)
+                  : quote.nights
+                      .map(
+                        (night) =>
+                          `${shortDate(night.date)} ${night.kind === 'weekend' ? 'вх' : 'бд'} ` +
+                          `${money(night.price)}`
+                      )
+                      .join(' · ')}
+                {quote.nights[0]?.season && ` · сезон «${quote.nights[0].season}»`}
+                {priceTouched && Number(total) !== quote.total && (
+                  <>
+                    {' — '}
+                    <button
+                      type="button"
+                      className="link-button"
+                      onClick={() => {
+                        setPriceTouched(false)
+                        setTotal(String(quote.total))
+                      }}
+                    >
+                      вернуть {money(quote.total)}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Only when there is money to account for. A prepayment lands in
                 the ledger as a real payment, so it needs the same two answers

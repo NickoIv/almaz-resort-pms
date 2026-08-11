@@ -373,3 +373,45 @@ export type RoomTimeline = {
   dates: string[]
   rooms: TimelineRoom[]
 }
+
+/**
+ * The price list — two prices per unit type and category, plus optional
+ * seasons. See backend/src/lib/rates.ts for why it is deliberately this small.
+ */
+export type Rate = {
+  id: number
+  unit_type: UnitType
+  /** null — any category of this type. */
+  category: string | null
+  weekday_price: number
+  weekend_price: number
+  season_name: string | null
+  season_from: string | null
+  season_to: string | null
+}
+
+/** A row as it is being edited, before it has ever been saved. */
+export type RateDraft = Omit<Rate, 'id'> & { id?: number }
+
+export type Quote = {
+  total: number
+  nights: {
+    date: string
+    kind: 'weekday' | 'weekend'
+    season: string | null
+    price: number
+  }[]
+  /** The list had nothing to say about this stay; suggest nothing. */
+  empty: boolean
+}
+
+/** What GET /api/guests/:phone answers — the parts the booking form uses. */
+export type KnownGuest = {
+  phone: string
+  guest_name: string | null
+  total_stays: number
+  past_stays: number
+  outstanding_debt: number
+  lifetime_spend: number
+  notes: string
+}

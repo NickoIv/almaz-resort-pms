@@ -2160,6 +2160,63 @@ button {
   line-height: 1.5;
 }
 
+/* ── Price list ────────────────────────────────────────────────────────────
+   A table of inputs. The cells are tight because six columns of controls have
+   to fit, and the controls keep the app's 40px floor on a phone from the
+   shared `.field input` rule.                                                */
+
+.data-table input,
+.data-table select {
+  width: 100%;
+  min-width: 72px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: rgb(var(--lift-rgb) / 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.data-table input:focus,
+.data-table select:focus {
+  border-color: var(--accent);
+}
+
+/* The season's three fields stay on one line on a desktop and stack on a
+   phone, where the table scrolls sideways anyway. */
+.rate-season {
+  display: flex;
+  gap: 4px;
+  min-width: 260px;
+}
+
+.rate-always {
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* A button that reads as part of a sentence — «вернуть 60 000 ₸» inside the
+   price hint. Not a `.btn`: it sits in running text, and a bordered control
+   there would read as a separate thing to decide about rather than as the way
+   back to the figure the price list gave. Underlined, because colour alone is
+   not a control. */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--accent-light);
+}
+
 /* ── Charges & deposit ─────────────────────────────────────────────────────── */
 
 .charge-row {

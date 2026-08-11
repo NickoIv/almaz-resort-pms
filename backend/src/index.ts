@@ -19,6 +19,7 @@ import guestRoutes from './routes/guests'
 import settingsRoutes from './routes/settings'
 import photoRoutes from './routes/photos'
 import pushRoutes from './routes/push'
+import rateRoutes from './routes/rates'
 import staffRoutes from './routes/staff'
 import waitlistRoutes from './routes/waitlist'
 import { pruneLoginAttempts } from './lib/login-guard'
@@ -58,6 +59,8 @@ app.use('/api/rooms/*', requireAuth)
 app.use('/api/waitlist', requireAuth)
 app.use('/api/waitlist/*', requireAuth)
 app.use('/api/push/*', requireAuth)
+app.use('/api/rates', requireAuth)
+app.use('/api/rates/*', requireAuth)
 
 app.route('/api/alerts', alertRoutes)
 app.route('/api/rooms', roomRoutes)
@@ -73,6 +76,7 @@ app.route('/api/backup', backupRoutes)
 app.route('/api/waitlist', waitlistRoutes)
 app.route('/api/photos', photoRoutes)
 app.route('/api/push', pushRoutes)
+app.route('/api/rates', rateRoutes)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {

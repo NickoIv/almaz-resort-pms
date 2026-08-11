@@ -2553,3 +2553,71 @@ describe('§29 the waiter can answer the cleaning alerts they are sent', () => {
     expect(await screen.findByText('Убрать посуду')).toBeInTheDocument()
   })
 })
+
+describe('§30 the price list fills the amount in, and a person can overrule it', () => {
+  const freeRoom6 = makeUnit({ id: 6, name: '106', status: 'free' })
+
+  const QUOTE = {
+    total: 60000,
+    empty: false,
+    nights: [
+      { date: '2026-08-14', kind: 'weekend', season: null, price: 30000 },
+      { date: '2026-08-15', kind: 'weekend', season: null, price: 30000 },
+    ],
+  }
+
+  function routes(quote: unknown) {
+    return {
+      ...baseRoutes('admin', [freeRoom6]),
+      'GET /api/units/6': freeRoom6,
+      'GET /api/units/6/calendar': CALENDAR,
+      'GET /api/rates/quote': quote,
+      'GET /api/guests/': { total_stays: 0, notes: '', outstanding_debt: 0 },
+    }
+  }
+
+  it('suggests the total and says which nights it is made of', async () => {
+    signIn('admin')
+    mockApi(routes(QUOTE))
+    renderApp(<App />, { route: '/rooms/6' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Новая бронь' }))
+
+    const total = (await screen.findByLabelText('Сумма')) as HTMLInputElement
+    await waitFor(() => expect(total.value).toBe('60000'))
+    // The breakdown is the check: an amount with no explanation is a number to
+    // trust blindly, and this one is about to go on an invoice.
+    expect(screen.getByText(/По прайсу/)).toBeInTheDocument()
+  })
+
+  it('never moves an amount a person has typed', async () => {
+    signIn('admin')
+    mockApi(routes(QUOTE))
+    renderApp(<App />, { route: '/rooms/6' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Новая бронь' }))
+    const total = (await screen.findByLabelText('Сумма')) as HTMLInputElement
+    await waitFor(() => expect(total.value).toBe('60000'))
+
+    await userEvent.clear(total)
+    await userEvent.type(total, '45000')
+
+    // Changing the dates re-quotes; the typed figure has to survive it, and the
+    // way back to the list price is offered rather than taken.
+    fireEvent.change(screen.getByLabelText('Заезд'), { target: { value: '2026-08-20' } })
+    await waitFor(() => expect(screen.getByText(/вернуть/)).toBeInTheDocument())
+    expect((screen.getByLabelText('Сумма') as HTMLInputElement).value).toBe('45000')
+  })
+
+  it('leaves the field alone when the price list has nothing to say', async () => {
+    signIn('admin')
+    mockApi(routes({ total: 0, nights: [], empty: true }))
+    renderApp(<App />, { route: '/rooms/6' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Новая бронь' }))
+    const total = (await screen.findByLabelText('Сумма')) as HTMLInputElement
+    await waitFor(() => expect(screen.getByLabelText('Гость')).toBeInTheDocument())
+    expect(total.value).toBe('')
+    expect(screen.queryByText(/По прайсу/)).not.toBeInTheDocument()
+  })
+})

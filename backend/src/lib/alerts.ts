@@ -28,6 +28,8 @@ import type { Role, UnitType } from '../types'
  *
  *   sla:<unit>:<since>   — a unit dirtied again is a different wait, so the
  *                          timestamp is part of the id
+ *   noshow:<booking>:<date> — an arrival that did not happen; the date is in
+ *                          the id so moving the booking makes it a new arrival
  *   waitlist:<entry>     — one guest waiting, however often a unit frees and
  *                          fills again while they wait
  *   booking:<audit row>  — audit rows are append-only, so the id is unique
@@ -49,7 +51,7 @@ export const ARRIVAL_WINDOW_MINUTES = 60
 /** Cap per category, so a quiet client cannot be handed a thousand alerts. */
 const MAX_PER_KIND = 25
 
-export type AlertKind = 'sla' | 'waitlist' | 'booking' | 'upcoming'
+export type AlertKind = 'sla' | 'waitlist' | 'booking' | 'upcoming' | 'noshow'
 
 export type Alert = {
   id: string
@@ -87,6 +89,17 @@ type ArrivalRow = {
   minutes_away: number
 }
 
+type NoShowRow = {
+  id: number
+  guest_name: string
+  guest_phone: string | null
+  date_from: string
+  unit_id: number
+  unit_name: string
+  unit_type: UnitType
+  days_late: number
+}
+
 type WaitlistRow = {
   id: number
   guest_name: string
@@ -120,6 +133,22 @@ const UNIT_WORDS: Record<UnitType, string> = {
 /** Rooms open at /rooms/:id; everything else at /units/:id. */
 function unitHref(id: number, type: UnitType | null): string {
   return type === 'room' ? `/rooms/${id}` : `/units/${id}`
+}
+
+/**
+ * "вчера" / "3 дня назад".
+ *
+ * `elapsed` counts in minutes and hours, which is right for a cleaning breach
+ * and wrong here: a guest three days late reads as «72 ч назад», which nobody
+ * converts in their head.
+ */
+export function daysAgo(days: number): string {
+  if (days <= 0) return 'сегодня'
+  if (days === 1) return 'вчера'
+  const last = days % 10
+  const teen = days % 100 >= 11 && days % 100 <= 14
+  const word = teen || last === 0 || last >= 5 ? 'дней' : last === 1 ? 'день' : 'дня'
+  return `${days} ${word} назад`
 }
 
 export function elapsed(minutes: number): string {
@@ -210,7 +239,56 @@ export async function computeAlerts(db: D1Database, audience: AlertAudience): Pr
     }
   }
 
-  // ── 3. Someone on the waitlist can now be placed ────────────────────────
+  // ── 3. A guest who never arrived ────────────────────────────────────────
+  //
+  // A chain PMS calls this the night audit and cancels the booking outright.
+  // Fourteen rooms do not want that: a guest whose flight was delayed is not a
+  // row to delete unasked, and the only person who can tell the difference is
+  // the one at the desk. So this says so and leaves the decision alone.
+  //
+  // What it prevents is real: a booking that stays `booked` after its arrival
+  // day holds the room against the calendar, counts in «Начислено по броням»
+  // and quietly turns into a night that was never sold and never released.
+  //
+  // Rooms only — a recreation unit's booking is hours long and is over by the
+  // evening; there is nothing to chase.
+  if (isAdmin) {
+    const { results: noShows } = await db
+      .prepare(
+        `SELECT b.id, b.guest_name, b.guest_phone, b.date_from,
+                u.id AS unit_id, u.name AS unit_name, u.type AS unit_type,
+                CAST(julianday(${SQL_TODAY}) - julianday(date(b.date_from)) AS INTEGER) AS days_late
+           FROM bookings b
+           JOIN units u ON u.id = b.unit_id
+          WHERE b.status = 'booked'
+            AND u.type = 'room'
+            AND date(b.date_from) < ${SQL_TODAY}
+            -- A fortnight back, no further. Without a floor the very first
+            -- sweep after this shipped would announce every booking ever left
+            -- half-finished, which is history, not news.
+            AND date(b.date_from) >= date(${SQL_TODAY}, '-14 days')
+          ORDER BY b.date_from
+          LIMIT ${MAX_PER_KIND}`
+      )
+      .all<NoShowRow>()
+
+    for (const row of noShows) {
+      out.push({
+        // The arrival date is part of the id: moving the booking to new dates
+        // makes it a different arrival, and one that has not been missed yet.
+        id: `noshow:${row.id}:${row.date_from.slice(0, 10)}`,
+        kind: 'noshow',
+        title: `Гость не заехал — ${row.unit_name}`,
+        detail:
+          `${row.guest_name} · заезд был ${row.date_from.slice(0, 10)}, ` +
+          `${daysAgo(row.days_late)} — заселить или закрыть бронь`,
+        href: unitHref(row.unit_id, row.unit_type),
+        at: row.date_from,
+      })
+    }
+  }
+
+  // ── 4. Someone on the waitlist can now be placed ────────────────────────
   if (isAdmin) {
     const { results: matches } = await db
       .prepare(

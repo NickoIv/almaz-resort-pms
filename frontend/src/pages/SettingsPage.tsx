@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, downloadAuthed } from '../api'
+import RatesPanel from '../components/RatesPanel'
 import RestoreModal from '../components/RestoreModal'
 import { Alert, Spinner } from '../components/ui'
 
@@ -305,6 +306,8 @@ export default function SettingsPage() {
           )}
         </div>
       </section>
+
+      <RatesPanel />
 
       <section className="panel glass" style={{ marginBottom: 18 }}>
         <div className="panel-title">
