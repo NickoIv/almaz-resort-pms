@@ -8,12 +8,14 @@ import {
   type ReactNode,
 } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { api, getToken, setToken } from './api'
+import { api, getToken, onSessionLost, setToken } from './api'
 import type { Role, StaffUser } from './types'
 
 type AuthState = {
   user: StaffUser | null
   loading: boolean
+  /** Сессию оборвал сервер, а не человек — экрану входа есть что объяснить. */
+  expired: boolean
   login: (phone: string, pin: string) => Promise<StaffUser>
   logout: () => void
 }
@@ -23,6 +25,24 @@ const AuthContext = createContext<AuthState | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<StaffUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [expired, setExpired] = useState(false)
+
+  /**
+   * Двенадцатичасовой токен переживает смену, но не ночь, а вкладку на стойке
+   * никто не закрывает. Пока это никого не касалось, приложение утром выглядело
+   * сломанным: имя администратора в шапке, работающее меню и «Missing bearer
+   * token» на каждой странице — потому что `user` жил в памяти и после того, как
+   * токен убрали. Теперь конец сессии снимает пользователя, а `RequireRole`
+   * уводит на PIN-код, то есть туда, где это чинится.
+   */
+  useEffect(
+    () =>
+      onSessionLost(() => {
+        setExpired(true)
+        setUser(null)
+      }),
+    []
+  )
 
   // Restore the session from the stored token on a hard refresh.
   useEffect(() => {
@@ -46,15 +66,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     setToken(result.token)
     setUser(result.user)
+    setExpired(false)
     return result.user
   }, [])
 
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
+    // Ушли сами — объяснять на экране входа нечего.
+    setExpired(false)
   }, [])
 
-  const value = useMemo(() => ({ user, loading, login, logout }), [user, loading, login, logout])
+  const value = useMemo(
+    () => ({ user, loading, expired, login, logout }),
+    [user, loading, expired, login, logout]
+  )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

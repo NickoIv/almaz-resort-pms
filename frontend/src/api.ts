@@ -68,6 +68,33 @@ function announceDataChanged(): void {
   }, 400)
 }
 
+/**
+ * Сессия кончилась не потому, что кто-то вышел.
+ *
+ * Токен живёт двенадцать часов — смену и немного сверху. Вкладку на стойке не
+ * закрывают: она стоит ночь, утром опрос отвечает 401, `setToken(null)` убирает
+ * токен — и на этом всё останавливалось. `user` остался в памяти React, поэтому
+ * шапка по-прежнему называла администратора по имени, меню работало, а каждая
+ * страница показывала красное «Missing bearer token»: заголовок без токена — то,
+ * чем становится любой следующий запрос после того, как токен убрали.
+ *
+ * Со стороны это выглядит как поломка приложения, а не как «войдите заново», и
+ * догадаться нажать «Выйти», чтобы починить, — не то, что стойка должна знать.
+ * Поэтому теперь потеря токена — событие: провайдер снимает пользователя, и
+ * охрана маршрута сама уводит на экран PIN-кода.
+ */
+const sessionListeners = new Set<Listener>()
+
+export function onSessionLost(listener: Listener): () => void {
+  sessionListeners.add(listener)
+  return () => sessionListeners.delete(listener)
+}
+
+function endSession(): void {
+  setToken(null)
+  for (const listener of sessionListeners) listener()
+}
+
 export class ApiError extends Error {
   readonly status: number
 
@@ -98,7 +125,7 @@ export async function downloadAuthed(path: string, fallbackName: string): Promis
   if (!response.ok) {
     const payload = await response.json().catch(() => null)
     const message = (payload as { error?: string } | null)?.error ?? `Ошибка (${response.status})`
-    if (response.status === 401) setToken(null)
+    if (response.status === 401) endSession()
     throw new ApiError(message, response.status)
   }
 
@@ -120,6 +147,10 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   // FormData sets its own multipart boundary; forcing a JSON content-type on it
   // would make the body unparseable on the other end.
   const isForm = options.body instanceof FormData
+  // Неверный PIN — тоже 401, но это не потерянная сессия: сессии ещё нет, и
+  // объявлять о её конце значило бы писать «сессия истекла» человеку, который
+  // просто промахнулся по цифре.
+  const isLogin = path.startsWith('/auth/login')
 
   const response = await fetch(`${BASE}/api${path}`, {
     method: options.method ?? 'GET',
@@ -143,7 +174,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     const message =
       (payload as { error?: string } | null)?.error ?? `Ошибка запроса (${response.status})`
     // An expired or revoked token drops the session; the guard sends the user to /login.
-    if (response.status === 401) setToken(null)
+    if (response.status === 401 && !isLogin) endSession()
     throw new ApiError(message, response.status)
   }
 
@@ -162,7 +193,7 @@ export async function authedBlobUrl(path: string): Promise<string> {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
   if (!response.ok) {
-    if (response.status === 401) setToken(null)
+    if (response.status === 401) endSession()
     throw new ApiError(`Не удалось загрузить файл (${response.status})`, response.status)
   }
   return URL.createObjectURL(await response.blob())

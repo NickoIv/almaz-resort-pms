@@ -58,6 +58,10 @@ export function mockApi(routes: Record<string, RouteHandler | unknown>) {
       if (!matches) continue
 
       const body = typeof value === 'function' ? (value as RouteHandler)(url, init) : value
+      // Обработчик может вернуть готовый `Response` — без этого не подделать
+      // отказ сервера, а как приложение ведёт себя при отказе, проверять надо
+      // не меньше, чем как оно показывает удачный ответ.
+      if (body instanceof Response) return body
       return new Response(JSON.stringify(body ?? null), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },

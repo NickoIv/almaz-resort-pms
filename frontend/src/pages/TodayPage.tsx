@@ -23,6 +23,113 @@ import type { TodayBoard, TodayRow } from '../types'
  * that can go wrong at each are said **on the row**, before the button — a
  * warning discovered after check-in is a warning that arrived too late.
  */
+const hourly = (row: TodayRow) => row.unit_type !== 'room'
+
+/**
+ * Одна строка любого из двух списков — форма общая, чтобы глаз не переучивался.
+ *
+ * Живёт снаружи страницы намеренно. Объявленная внутри, она была бы **новым
+ * типом компонента на каждый рендер**, а страница перерисовывается сама по себе:
+ * опрос раз в минуту, чужая запись, возврат в вкладку. React в этом случае не
+ * обновляет строки, а сносит и строит заново — и нажатие, попавшее на этот
+ * момент, уходит в уже удалённую кнопку и не делает ничего. На стойке это
+ * выглядит как «нажал Выселить, ничего не произошло», причём не повторяется.
+ */
+function Row({
+  row,
+  kind,
+  busy,
+  isAdmin,
+  onAct,
+}: {
+  row: TodayRow
+  kind: 'in' | 'out'
+  busy: number | null
+  isAdmin: boolean
+  onAct: (row: TodayRow, kind: 'in' | 'out') => void
+}) {
+  return (
+    <div className={`row-card ${row.needs_cleaning && kind === 'in' ? 'is-overdue' : ''}`}>
+      <div className="row-main">
+        <div className="row-title">
+          <Link to={`/rooms/${row.unit_id}`}>{row.unit_name}</Link> · {row.guest_name}
+        </div>
+        <div className="row-sub">
+          {hourly(row)
+            ? timeRange(row.date_from, row.date_to)
+            : `${dateRange(row.date_from, row.date_to)} · ${row.nights} ${pluralRu(row.nights, [
+                'ночь',
+                'ночи',
+                'ночей',
+              ])}`}
+        </div>
+
+        {/* Everything that has to be dealt with before the button is pressed,
+            said here rather than discovered afterwards. */}
+        <div className="today-flags">
+          <StatusBadge status={row.status} />
+          {/* A phone number at a desk exists to be dialled, so it is a tap
+              target and not a run of characters inside a caption: inline in the
+              subtitle it measured 16px tall against the app's 40px floor. */}
+          {row.guest_phone && (
+            <a className="today-phone" href={`tel:${row.guest_phone.replace(/\s/g, '')}`}>
+              {row.guest_phone}
+            </a>
+          )}
+          {kind === 'in' && row.needs_cleaning && (
+            <StatusBadge status="cleaning" label={`не убран · ${row.cleaning_pending}`} />
+          )}
+          {row.migration_due && (
+            <span
+              className="pill pill-due"
+              title="Уведомить миграционную службу в течение трёх дней с заезда"
+            >
+              миграционный учёт
+            </span>
+          )}
+          {kind === 'in' && !row.verified_at && (
+            <span className="pill" title="Бронь никто не сверил с тем, что просил гость">
+              не проверена
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="row-money">
+        {isAdmin && (
+          <span className={(row.remaining_amount ?? 0) > 0 ? 'money-due' : 'money'}>
+            {(row.remaining_amount ?? 0) > 0
+              ? `долг ${money(row.remaining_amount, row.currency)}`
+              : 'оплачено'}
+          </span>
+        )}
+        {!isAdmin && (
+          <span className={`pill ${row.is_paid ? 'pill-paid' : 'pill-due'}`}>
+            {row.is_paid ? 'оплачено' : 'не оплачено'}
+          </span>
+        )}
+        {isAdmin && kind === 'out' && row.deposit_pending && (
+          <span className="field-hint">залог {money(row.deposit_amount, row.currency)} — вернуть</span>
+        )}
+      </div>
+
+      <button
+        className="btn btn-sm btn-primary"
+        disabled={busy === row.booking_id || (kind === 'in' && row.status === 'occupied')}
+        onClick={() => onAct(row, kind)}
+      >
+        {busy === row.booking_id
+          ? '…'
+          : kind === 'in'
+            ? row.status === 'occupied'
+              ? 'Заселён'
+              : 'Заселить'
+            : 'Выселить'}
+      </button>
+    </div>
+  )
+}
+
 export default function TodayPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
@@ -108,86 +215,8 @@ export default function TodayPage() {
   if (error && !data) return <Alert>{error}</Alert>
   if (!data) return null
 
-  const hourly = (row: TodayRow) => row.unit_type !== 'room'
-
-  /** One row of either list — the same shape, so the eye does not relearn it. */
-  const Row = ({ row, kind }: { row: TodayRow; kind: 'in' | 'out' }) => (
-    <div className={`row-card ${row.needs_cleaning && kind === 'in' ? 'is-overdue' : ''}`}>
-      <div className="row-main">
-        <div className="row-title">
-          <Link to={`/rooms/${row.unit_id}`}>{row.unit_name}</Link> · {row.guest_name}
-        </div>
-        <div className="row-sub">
-          {hourly(row)
-            ? timeRange(row.date_from, row.date_to)
-            : `${dateRange(row.date_from, row.date_to)} · ${row.nights} ${pluralRu(row.nights, [
-                'ночь',
-                'ночи',
-                'ночей',
-              ])}`}
-        </div>
-
-        {/* Everything that has to be dealt with before the button is pressed,
-            said here rather than discovered afterwards. */}
-        <div className="today-flags">
-          <StatusBadge status={row.status} />
-          {/* A phone number at a desk exists to be dialled, so it is a tap
-              target and not a run of characters inside a caption: inline in the
-              subtitle it measured 16px tall against the app's 40px floor. */}
-          {row.guest_phone && (
-            <a className="today-phone" href={`tel:${row.guest_phone.replace(/\s/g, '')}`}>
-              {row.guest_phone}
-            </a>
-          )}
-          {kind === 'in' && row.needs_cleaning && (
-            <StatusBadge status="cleaning" label={`не убран · ${row.cleaning_pending}`} />
-          )}
-          {row.migration_due && (
-            <span className="pill pill-due" title="Уведомить миграционную службу в течение трёх дней с заезда">
-              миграционный учёт
-            </span>
-          )}
-          {kind === 'in' && !row.verified_at && (
-            <span className="pill" title="Бронь никто не сверил с тем, что просил гость">
-              не проверена
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="row-money">
-        {isAdmin && (
-          <span className={(row.remaining_amount ?? 0) > 0 ? 'money-due' : 'money'}>
-            {(row.remaining_amount ?? 0) > 0
-              ? `долг ${money(row.remaining_amount, row.currency)}`
-              : 'оплачено'}
-          </span>
-        )}
-        {!isAdmin && (
-          <span className={`pill ${row.is_paid ? 'pill-paid' : 'pill-due'}`}>
-            {row.is_paid ? 'оплачено' : 'не оплачено'}
-          </span>
-        )}
-        {isAdmin && kind === 'out' && row.deposit_pending && (
-          <span className="field-hint">залог {money(row.deposit_amount, row.currency)} — вернуть</span>
-        )}
-      </div>
-
-      <button
-        className="btn btn-sm btn-primary"
-        disabled={busy === row.booking_id || (kind === 'in' && row.status === 'occupied')}
-        onClick={() => (kind === 'in' ? checkIn(row) : checkOut(row))}
-      >
-        {busy === row.booking_id
-          ? '…'
-          : kind === 'in'
-            ? row.status === 'occupied'
-              ? 'Заселён'
-              : 'Заселить'
-            : 'Выселить'}
-      </button>
-    </div>
-  )
+  const act = (row: TodayRow, kind: 'in' | 'out') =>
+    kind === 'in' ? void checkIn(row) : void checkOut(row)
 
   return (
     <>
@@ -235,7 +264,14 @@ export default function TodayPage() {
           ) : (
             <div className="row-list">
               {data.arrivals.map((row) => (
-                <Row key={row.booking_id} row={row} kind="in" />
+                <Row
+                  key={row.booking_id}
+                  row={row}
+                  kind="in"
+                  busy={busy}
+                  isAdmin={isAdmin}
+                  onAct={act}
+                />
               ))}
             </div>
           )}
@@ -251,7 +287,14 @@ export default function TodayPage() {
           ) : (
             <div className="row-list">
               {data.departures.map((row) => (
-                <Row key={row.booking_id} row={row} kind="out" />
+                <Row
+                  key={row.booking_id}
+                  row={row}
+                  kind="out"
+                  busy={busy}
+                  isAdmin={isAdmin}
+                  onAct={act}
+                />
               ))}
             </div>
           )}
