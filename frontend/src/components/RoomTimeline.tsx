@@ -534,12 +534,17 @@ export default function RoomTimeline({
           </button>
         </div>
 
+        {/* Подпись «Перейти к дате» убрана: поле даты — единственное поле в
+            панели и выглядит ровно тем, чем является, а три слова перед ним
+            занимали столько же места, сколько доска отдаёт под два дня.
+            Название осталось для тех, кто не видит: `aria-label` и `title`. */}
         {scale !== 'year' && (
           <label className="timeline-jump">
-            <span>Перейти к дате</span>
             <input
               type="date"
               value={from}
+              aria-label="Перейти к дате"
+              title="Перейти к дате"
               onChange={(event) => event.target.value && setFrom(event.target.value)}
             />
           </label>
@@ -920,9 +925,8 @@ export default function RoomTimeline({
           something that will not work. */}
       {scale !== 'year' && (
         <div className="field-hint timeline-hint">
-          Протяните по свободным ночам, чтобы создать бронь на этот промежуток; одно нажатие — одна
-          ночь. Нажмите на полосу, чтобы посмотреть или изменить бронь. Выезд утром, поэтому день
-          выезда уже свободен для следующего гостя.
+          Протяните по пустым клеткам, чтобы забронировать; нажмите на полосу, чтобы открыть бронь.
+          День выезда уже свободен — выезжают утром.
         </div>
       )}
     </section>
