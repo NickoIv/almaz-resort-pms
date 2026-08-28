@@ -61,11 +61,13 @@ describe('§44 счётчики считают то, что можно прод�
       'GET /api/staff': [],
     })
     signIn('admin')
-    useCardView()
     renderApp(<RoomsPage />)
   }
 
   it('объект на реставрации не входит в «сколько у нас номеров»', async () => {
+    // Не внутри `grid`: oxlint считает `useCardView` хуком по имени и требует,
+    // чтобы его звали из компонента или из другого хука.
+    useCardView()
     grid([
       makeUnit({ id: 1, name: '101' }),
       makeUnit({ id: 2, name: '102' }),
