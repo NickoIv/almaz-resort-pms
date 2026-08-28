@@ -29,6 +29,8 @@ const ACTION_LABELS: Record<string, string> = {
   'booking.payment': 'Внесена оплата',
   'booking.verify': 'Бронь проверена',
   'booking.deposit:returned': 'Залог возвращён',
+  'unit.renovation:on': 'Отправлен на реставрацию',
+  'unit.renovation:off': 'Реставрация закончена',
   'booking.deposit:withheld': 'Залог возвращён частично',
   'booking.group.create': 'Создана групповая бронь',
   'booking.group.payment': 'Оплата по группе',
@@ -107,6 +109,7 @@ export const GROUP_LABELS: Record<string, string> = {
   backup: 'Резервные копии',
   staff: 'Персонал',
   block: 'Снятие с продажи',
+  unit: 'Объекты',
 }
 
 export function describeAudit(entry: AuditEntry): string {

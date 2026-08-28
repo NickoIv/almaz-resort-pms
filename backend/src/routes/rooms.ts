@@ -25,6 +25,8 @@ type TimelineRow = {
   unit_name: string
   category: string | null
   capacity: number
+  renovation_since: string | null
+  renovation_note: string | null
   booking_id: number | null
   guest_name: string | null
   guest_phone: string | null
@@ -86,6 +88,7 @@ rooms.get('/timeline', async (c) => {
        SELECT ${startExpr}, date(${startExpr}, '+' || ? || ' days')
      )
      SELECT u.id AS unit_id, u.name AS unit_name, u.category, u.capacity,
+            u.renovation_since, u.renovation_note,
             b.id AS booking_id, b.guest_name, b.guest_phone, b.status,
             b.date_from, b.date_to,
             b.total_amount, b.prepaid_amount, b.deposit_amount, b.currency,
@@ -137,6 +140,7 @@ rooms.get('/timeline', async (c) => {
     unit_name: string
     category: string | null
     capacity: number
+    renovation: { since: string; note: string | null } | null
     blocks: {
       id: number
       date_from: string
@@ -167,6 +171,12 @@ rooms.get('/timeline', async (c) => {
         unit_name: row.unit_name,
         category: row.category,
         capacity: row.capacity,
+        // Строка остаётся на доске, но помеченной. Спрятать объект на
+        // реставрации было бы удобнее глазу и хуже по делу: инвентарь, тихо
+        // исчезнувший с главного экрана, — это инвентарь, про который забыли.
+        renovation: row.renovation_since
+          ? { since: row.renovation_since, note: row.renovation_note }
+          : null,
         blocks: [],
         bookings: [],
       })
@@ -276,7 +286,7 @@ rooms.get('/year', async (c) => {
       AND b.status <> 'free'
       AND date(b.date_from) < date(?)
       AND date(b.date_to)   > date(?)
-     WHERE u.type = 'room'
+     WHERE u.type = 'room' AND u.renovation_since IS NULL
      ORDER BY u.name, b.date_from`
   )
     .bind(yearEnd, yearStart)

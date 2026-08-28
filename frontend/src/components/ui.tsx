@@ -36,25 +36,43 @@ export function StatusDot({ status }: { status: UnitStatus | 'cleaning' }) {
  * readable pair for each state in both themes — `-ink` exists precisely for
  * text on a tinted chip.
  */
-const STATUS_GLYPH: Record<UnitStatus | 'cleaning', string> = {
+/**
+ * Реставрация выпадает из прогрессии колец намеренно.
+ *
+ * ○ ◔ ● — это «пусто, частично, полностью», состояния одной и той же стоянки.
+ * Объекта на реставрации нет вообще, поэтому у него не кольцо той же семьи, а
+ * штриховка — та же текстура, которой на доске помечено «продать нельзя».
+ */
+const STATUS_GLYPH: Record<BadgeState, string> = {
   free: '○',
   booked: '◔',
   occupied: '●',
   cleaning: '✦',
+  renovation: '▨',
 }
 
-const STATUS_WORD: Record<UnitStatus | 'cleaning', string> = {
+const STATUS_WORD: Record<BadgeState, string> = {
   free: 'Свободен',
   booked: 'Забронирован',
   occupied: 'Занят',
   cleaning: 'Уборка',
+  renovation: 'На реставрации',
 }
+
+/**
+ * Что плашка умеет показать — шире, чем `UnitStatus`.
+ *
+ * `UnitStatus` это состояние **брони**, и добавлять в него реставрацию нельзя:
+ * тогда каждый `switch` по броням обязан был бы придумать случай для объекта,
+ * у которого брони нет. Плашка же — про то, что видит человек, и ей нужны обе.
+ */
+export type BadgeState = UnitStatus | 'cleaning' | 'renovation'
 
 export function StatusBadge({
   status,
   label,
 }: {
-  status: UnitStatus | 'cleaning'
+  status: BadgeState
   /** Overrides the word — for «осталось 3 из 8» and the like. */
   label?: string
 }) {

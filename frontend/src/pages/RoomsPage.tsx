@@ -136,7 +136,10 @@ export default function RoomsPage() {
   const counts = useMemo(
     () => ({
       all: units.length,
-      free: units.filter((u) => u.status === 'free').length,
+      // Объекты на реставрации не входят в «сколько у нас номеров»: их пока нет.
+      sellable: units.filter((u) => !u.renovation).length,
+      renovating: units.filter((u) => u.renovation).length,
+      free: units.filter((u) => u.status === 'free' && !u.renovation).length,
       booked: units.filter((u) => u.status === 'booked').length,
       occupied: units.filter((u) => u.status === 'occupied').length,
       cleaning: units.filter((u) => u.needs_cleaning).length,
@@ -152,7 +155,13 @@ export default function RoomsPage() {
             ? true
             : status === 'cleaning'
               ? unit.needs_cleaning
-              : unit.status === status
+              // «Свободен» значит «можно продать». Объект на реставрации по
+              // данным свободен — брони на нём нет и быть не может, — и без
+              // этой строки он попадал бы ровно в тот список, который читают,
+              // чтобы кому-то его продать.
+              : status === 'free'
+                ? unit.status === 'free' && !unit.renovation
+                : unit.status === status
         )
         .filter((unit) => matchesQuery(unit, query)),
     [units, status, query]
@@ -166,7 +175,8 @@ export default function RoomsPage() {
         <div>
           <h1>Номера</h1>
           <div className="page-sub">
-            {units.length} номеров · {counts.occupied} занято · {counts.booked} забронировано
+            {counts.sellable} номеров · {counts.occupied} занято · {counts.booked} забронировано
+            {counts.renovating > 0 && ` · ${counts.renovating} на реставрации`}
           </div>
         </div>
         <div className="page-head-actions">

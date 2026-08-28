@@ -145,6 +145,13 @@ function span(dateFrom: string, dateTo: string, from: string, days: number) {
  */
 function occupiedNights(room: TimelineRoom, from: string, days: number): Set<number> {
   const taken = new Set<number>()
+  // На реставрации — целиком: объекта нет ни на одну ночь окна. Через ту же
+  // функцию, что и брони с блокировками, потому что её читают трое — строка
+  // «Свободно», проверка при протяжке и заливка ячейки, — и разойтись им нельзя.
+  if (room.renovation) {
+    for (let i = 0; i < days; i++) taken.add(i)
+    return taken
+  }
   for (const booking of room.bookings) {
     const bar = place(booking, from, days)
     if (!bar) continue
@@ -727,9 +734,14 @@ export default function RoomTimeline({
               return (
                 <div className="tl-row" key={room.unit_id} style={columns}>
                   <button
-                    className="tl-name tl-room"
+                    className={`tl-name tl-room ${room.renovation ? 'is-renovating' : ''}`}
                     onClick={() => onOpenRoom(room.unit_id)}
-                    title={`${room.category ?? '—'} · до ${room.capacity} чел.`}
+                    title={
+                      room.renovation
+                        ? `${room.unit_name} на реставрации с ${room.renovation.since.slice(0, 10)}` +
+                          (room.renovation.note ? ` — ${room.renovation.note}` : '')
+                        : `${room.category ?? '—'} · до ${room.capacity} чел.`
+                    }
                   >
                     {room.unit_name}
                   </button>
@@ -743,6 +755,20 @@ export default function RoomTimeline({
                     // a bar, because a block is not a stay and must not look
                     // like one — a hatched night reads as "not for sale", a bar
                     // reads as "somebody is in there".
+                    if (room.renovation) {
+                      const why =
+                        `${room.unit_name} — на реставрации с ${room.renovation.since.slice(0, 10)}` +
+                        (room.renovation.note ? `: ${room.renovation.note}` : '')
+                      return (
+                        <div
+                          key={date}
+                          className={`tl-cell is-renovating ${date === today ? 'is-today' : ''}`}
+                          style={{ gridColumn: index + 2, gridRow: 1 }}
+                          title={why}
+                          aria-label={why}
+                        />
+                      )
+                    }
                     const block = blockAt(room, index, data.from, data.days)
                     if (block) {
                       const why = `${room.unit_name} · ${shortDate(date)} — снят с продажи (${

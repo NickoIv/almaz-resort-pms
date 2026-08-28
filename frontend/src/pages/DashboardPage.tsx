@@ -65,7 +65,12 @@ export default function DashboardPage() {
 
   const stats = useMemo(() => {
     if (!data) return null
-    const rooms = data.units.filter((unit) => unit.type === 'room')
+    // «из 14» должно означать «из четырнадцати, которые можно продать».
+    // Корпус на реставрации в знаменателе давал бы вечные 40% загрузки и
+    // отвечал бы на вопрос, которого никто не задавал.
+    const all = data.units.filter((unit) => unit.type === 'room')
+    const renovating = all.filter((unit) => unit.renovation).length
+    const rooms = all.filter((unit) => !unit.renovation)
     const busy = rooms.filter((unit) => unit.status === 'occupied').length
     const booked = rooms.filter((unit) => unit.status === 'booked').length
 
@@ -77,6 +82,7 @@ export default function DashboardPage() {
 
     return {
       rooms: rooms.length,
+      renovating,
       busy,
       booked,
       rate: rooms.length > 0 ? busy / rooms.length : 0,
@@ -122,6 +128,7 @@ export default function DashboardPage() {
           </div>
           <div className="tile-foot">
             {percent(stats.rate)} загрузки · {stats.booked} забронировано
+            {stats.renovating > 0 && ` · ${stats.renovating} на реставрации`}
           </div>
         </Link>
 

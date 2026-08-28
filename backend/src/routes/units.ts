@@ -1,8 +1,12 @@
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { assertUnitTypeAllowed, canSeeMoney, placeholders, resolveTypeFilter } from '../lib/access'
+import { requireRole } from '../lib/auth'
+import { writeAudit } from '../lib/audit'
+import { SQL_NOW } from '../lib/time'
 import { chargesSumSql, remainingOf } from '../lib/money'
 import { SQL_COVERS_NOW, SQL_STARTS_LATER, SQL_TODAY } from '../lib/time'
+import { SQL_NOT_UNDER_RENOVATION } from '../lib/renovation'
 import type { AppEnv, BookingStatus, UnitType } from '../types'
 
 type UnitRow = {
@@ -11,6 +15,9 @@ type UnitRow = {
   name: string
   category: string | null
   capacity: number
+  renovation_since: string | null
+  renovation_note: string | null
+  renovation_by_name: string | null
   cleaning_pending: number
   cleaning_total: number
   booking_id: number | null
@@ -45,6 +52,7 @@ type UnitRow = {
 const UNIT_SELECT = `
   SELECT
     u.id, u.type, u.name, u.category, u.capacity,
+    u.renovation_since, u.renovation_note, rs.name AS renovation_by_name,
     (SELECT COUNT(*) FROM cleaning_checklist cc WHERE cc.unit_id = u.id AND cc.is_done = 0) AS cleaning_pending,
     (SELECT COUNT(*) FROM cleaning_checklist cc WHERE cc.unit_id = u.id) AS cleaning_total,
     b.id AS booking_id, b.guest_name, b.guest_phone, b.date_from, b.date_to,
@@ -58,6 +66,7 @@ const UNIT_SELECT = `
     bl.id AS block_id, bl.date_from AS block_from, bl.date_to AS block_to,
     bl.reason AS block_reason, bl.note AS block_note
   FROM units u
+  LEFT JOIN staff_users rs ON rs.id = u.renovation_by
   LEFT JOIN bookings b ON b.id = (
     SELECT id FROM bookings
     WHERE unit_id = u.id AND status <> 'free' AND ${SQL_COVERS_NOW}
@@ -160,6 +169,20 @@ function serializeUnit(row: UnitRow, withMoney: boolean) {
      * cannot be sold, which is a different sentence from «занят» and sends
      * someone looking for a different thing.
      */
+    /**
+     * На реставрации — объекта физически ещё нет.
+     *
+     * Рядом со статусом, а не внутри него: `free/booked/occupied` описывают
+     * стоянку гостя, а здесь стоянки нет и быть не может. Карточка, сказавшая
+     * «свободен», отправила бы человека продавать номер без крыши.
+     */
+    renovation: row.renovation_since
+      ? {
+          since: row.renovation_since,
+          note: row.renovation_note,
+          by_name: row.renovation_by_name,
+        }
+      : null,
     block: row.block_id
       ? {
           id: row.block_id,
@@ -215,7 +238,8 @@ units.get('/forecast', async (c) => {
   const days = Math.min(Math.max(Number.isFinite(requested) ? requested : 14, 1), 60)
 
   const totalRow = await c.env.DB.prepare(
-    `SELECT COUNT(*) AS count FROM units WHERE type IN (${placeholders(types.length)})`
+    `SELECT COUNT(*) AS count FROM units
+       WHERE type IN (${placeholders(types.length)}) AND ${SQL_NOT_UNDER_RENOVATION}`
   )
     .bind(...types)
     .first<{ count: number }>()
@@ -410,5 +434,110 @@ units.get('/:id/calendar', async (c) => {
     })),
   })
 })
+
+/**
+ * PUT /api/units/:id/renovation — поставить объект на реставрацию.
+ * DELETE — снять.
+ *
+ * Только админ: это заявление о том, что объекта нет, и оно убирает его из
+ * продажи целиком. Официант, снимающий беседку с продажи на день, для этого
+ * пользуется блокировкой — у неё есть конец.
+ *
+ * **Нельзя поставить поверх живой брони.** Иначе гость, который уже въехал,
+ * оказался бы в номере, которого по данным не существует: он не в списках
+ * заездов, не в уборке, не в занятости. Ставить надо после того, как разобрались
+ * с людьми внутри, и отказ прямо говорит, что мешает.
+ */
+units.put('/:id/renovation', requireRole('admin'), async (c) => {
+  const staff = c.get('staff')
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) throw new HTTPException(400, { message: 'Некорректный объект' })
+
+  const unit = await c.env.DB.prepare('SELECT id, name, renovation_since FROM units WHERE id = ?')
+    .bind(id)
+    .first<{ id: number; name: string; renovation_since: string | null }>()
+  if (!unit) throw new HTTPException(404, { message: 'Объект не найден' })
+
+  const body = await c.req.json<{ note?: string | null }>().catch(() => ({}) as { note?: string })
+  const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim() : null
+
+  const live = await c.env.DB.prepare(
+    `SELECT id, guest_name, date_to FROM bookings
+      WHERE unit_id = ? AND status <> 'free' AND datetime(date_to) > ${SQL_NOW}
+      ORDER BY date_from LIMIT 1`
+  )
+    .bind(id)
+    .first<{ id: number; guest_name: string; date_to: string }>()
+
+  if (live) {
+    throw new HTTPException(409, {
+      message:
+        `На объекте есть бронь #${live.id} (${live.guest_name}) до ` +
+        `${live.date_to.slice(0, 10)}. Сначала закройте или переселите её.`,
+    })
+  }
+
+  // Первая отметка и остаётся, как у проверки брони и возврата залога: повторное
+  // нажатие не должно переписывать, с какого числа объекта нет.
+  if (!unit.renovation_since) {
+    await c.env.DB.prepare(
+      `UPDATE units SET renovation_since = ${SQL_TODAY}, renovation_note = ?, renovation_by = ?
+        WHERE id = ?`
+    )
+      .bind(note, staff.sub, id)
+      .run()
+    await writeAudit(c.env.DB, staff.sub, 'unit.renovation:on', 'units', id)
+  } else if (note !== null) {
+    // Пояснение уточнить можно — это единственное здесь, что меняется со временем.
+    await c.env.DB.prepare('UPDATE units SET renovation_note = ? WHERE id = ?').bind(note, id).run()
+  }
+
+  return c.json(await readRenovation(c.env.DB, id))
+})
+
+units.delete('/:id/renovation', requireRole('admin'), async (c) => {
+  const staff = c.get('staff')
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) throw new HTTPException(400, { message: 'Некорректный объект' })
+
+  const unit = await c.env.DB.prepare('SELECT id, renovation_since FROM units WHERE id = ?')
+    .bind(id)
+    .first<{ id: number; renovation_since: string | null }>()
+  if (!unit) throw new HTTPException(404, { message: 'Объект не найден' })
+
+  if (unit.renovation_since) {
+    await c.env.DB.prepare(
+      'UPDATE units SET renovation_since = NULL, renovation_note = NULL, renovation_by = NULL WHERE id = ?'
+    )
+      .bind(id)
+      .run()
+    await writeAudit(c.env.DB, staff.sub, 'unit.renovation:off', 'units', id)
+  }
+
+  return c.json(await readRenovation(c.env.DB, id))
+})
+
+async function readRenovation(db: D1Database, id: number) {
+  const row = await db
+    .prepare(
+      `SELECT u.id, u.renovation_since, u.renovation_note, rs.name AS renovation_by_name
+         FROM units u LEFT JOIN staff_users rs ON rs.id = u.renovation_by
+        WHERE u.id = ?`
+    )
+    .bind(id)
+    .first<{
+      id: number
+      renovation_since: string | null
+      renovation_note: string | null
+      renovation_by_name: string | null
+    }>()
+
+  return {
+    unit_id: id,
+    renovation: row?.renovation_since
+      ? { since: row.renovation_since, note: row.renovation_note, by_name: row.renovation_by_name }
+      : null,
+  }
+}
 
 export default units

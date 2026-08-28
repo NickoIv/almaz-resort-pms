@@ -10,6 +10,7 @@ import { ADJUSTMENT_METHOD, assertPaymentMethod, resolveReceivedBy } from '../li
 import { cleanName, cleanOptional } from '../lib/text'
 import { CANCEL_REASONS, isCancelReason, TRANSFER_REASON } from '../lib/cancellation'
 import { assertNotBlocked } from '../lib/blocks'
+import { assertNotUnderRenovation } from '../lib/renovation'
 import { carryOver, nightsBetween, prorate } from '../lib/transfer'
 import { quoteStay } from '../lib/rates'
 import { loadRates } from './rates'
@@ -162,6 +163,8 @@ async function assertSellable(
   }
 
   await assertNotBlocked(db, unitId, dateFrom, dateTo)
+  // Реставрация не про даты: объекта нет вообще, поэтому проверяется без окна.
+  await assertNotUnderRenovation(db, unitId)
 }
 
 const bookings = new Hono<AppEnv>()

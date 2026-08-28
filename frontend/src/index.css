@@ -48,6 +48,12 @@
   --occupied-ink: #f2ab9c;
   --cleaning: #6ea8bd;
   --cleaning-ink: #a9d6e6;
+  /* Реставрация — намеренно вне цветовой тройки состояний. Зелёный, янтарный и
+     красный отвечают на «что с гостем»; здесь гостя нет и быть не может, и
+     четвёртый насыщенный цвет в том же ряду читался бы как ещё одно состояние
+     стоянки. Тёплый серый говорит «вне игры», а не «ещё один вид занятости». */
+  --renovation: #948e82;
+  --renovation-ink: #d6d0c4;
 
   /* Tints behind status chips and rows */
   --tint-free: rgba(95, 167, 119, 0.16);
@@ -85,6 +91,7 @@
   --booked-rgb: 216 164 65;
   --occupied-rgb: 207 106 90;
   --cleaning-rgb: 110 168 189;
+  --renovation-rgb: 148 142 130;
   /* The wash that lifts a surface off its background: white on a dark theme,
      ink on a light one, so "slightly raised" means the same thing in both. */
   --lift-rgb: 255 255 255;
@@ -123,6 +130,8 @@
   --occupied-ink: #8c3527;
   --cleaning: #3f7a92;
   --cleaning-ink: #2c5a6d;
+  --renovation: #7a7468;
+  --renovation-ink: #423e37;
 
   --tint-free: rgba(63, 125, 85, 0.12);
   --tint-booked: rgba(169, 122, 28, 0.14);
@@ -154,6 +163,7 @@
   --booked-rgb: 169 122 28;
   --occupied-rgb: 176 77 61;
   --cleaning-rgb: 63 122 146;
+  --renovation-rgb: 122 116 104;
   --lift-rgb: 35 40 31;
 
   --topbar-bg: rgb(246 243 236 / 0.85);
@@ -899,6 +909,22 @@ button {
   --stripe: var(--occupied);
 }
 
+/* Объект на реставрации: полоса нейтральная, а сама карточка получает ту же
+   диагональную штриховку, которой на доске помечено «продать нельзя». Текстура,
+   а не только цвет, — то же правило, по которому у StatusBadge есть глифы:
+   разница, существующая лишь в оттенке, для части читателей не существует. */
+.unit-card[data-status='renovation'] {
+  --stripe: var(--renovation);
+}
+
+.unit-card.is-renovating {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgb(var(--renovation-rgb) / 0.1) 0 3px,
+    transparent 3px 9px
+  );
+}
+
 .unit-card-top {
   display: flex;
   align-items: flex-start;
@@ -977,6 +1003,12 @@ button {
   background: rgb(var(--cleaning-rgb) / var(--status-tint));
   border-color: rgb(var(--cleaning-rgb) / var(--status-edge));
   color: var(--cleaning-ink);
+}
+
+.status-renovation {
+  background: rgb(var(--renovation-rgb) / var(--status-tint));
+  border-color: rgb(var(--renovation-rgb) / var(--status-edge));
+  color: var(--renovation-ink);
 }
 
 .unit-guest {
@@ -4512,6 +4544,26 @@ button.cal-day:focus-visible {
   background-color: rgb(var(--lift-rgb) / 0.02);
 }
 
+/* Реставрация на доске — та же штриховка, что и снятие с продажи, но плотнее и
+   на всю строку: разница между «эти ночи не продаём» и «этого объекта нет».
+   Ячейка не кнопка вовсе — тянуть по ней нечего. */
+.tl-cell.is-renovating {
+  cursor: not-allowed;
+  background-color: rgb(var(--renovation-rgb) / 0.08);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgb(var(--renovation-rgb) / 0.3) 0 2px,
+    transparent 2px 5px
+  );
+}
+
+/* И номер слева гасится, чтобы строку было видно, не считая ячеек. */
+.tl-name.is-renovating {
+  color: var(--text-faint);
+  text-decoration: line-through;
+  text-decoration-color: rgb(var(--renovation-rgb) / 0.7);
+}
+
 .tl-cell:focus-visible,
 .tl-bar:focus-visible {
   outline: 2px solid var(--accent);
@@ -4522,15 +4574,22 @@ button.cal-day:focus-visible {
    тонуло; на пустом поле та же заливка читается как занятость — коричневая
    пятница рядом с коричневой бронью. Теперь 0.07: столбец отличается, но не
    притворяется бронью. Число в шапке у выходных и так покрашено. */
+/* `background-color`, а не сокращённое `background`. Сокращение сбрасывает и
+   `background-image`, то есть стирает штриховку — а штриховка здесь не
+   украшение, а единственное, чем «снят с продажи» и «на реставрации» отличаются
+   от обычной пустой клетки для тех, кто не разбирает оттенки. Выходные и
+   сегодня — это подкраска, и трогать текстуру они не должны.
+   Поймано глазами: у номера на реставрации первая колонка (она же «сегодня»)
+   оказалась без штриховки, хотя правило было написано. */
 .tl-cell.is-weekend {
-  background: rgb(var(--booked-rgb) / 0.07);
+  background-color: rgb(var(--booked-rgb) / 0.07);
 }
 
 /* Today is marked in the header, where it is read once. A full outline on
    every row turned it into a stripe down the whole board competing with the
    bookings, which are the thing to look at. */
 .tl-cell.is-today {
-  background: rgb(var(--accent-rgb) / 0.07);
+  background-color: rgb(var(--accent-rgb) / 0.07);
 }
 
 /* One booking, one bar — placed in the same grid area as the cells it covers,

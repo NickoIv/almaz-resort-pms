@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception'
 import { requireRole } from '../lib/auth'
 import { chargesSumSql } from '../lib/money'
 import { SQL_TODAY } from '../lib/time'
+import { SQL_NOT_UNDER_RENOVATION } from '../lib/renovation'
 import type { AppEnv, UnitType } from '../types'
 
 const analytics = new Hono<AppEnv>()
@@ -128,7 +129,7 @@ analytics.get('/summary', async (c) => {
     .first<{ nights: number }>()
 
   const roomCount = await c.env.DB.prepare(
-    "SELECT COUNT(*) AS count FROM units WHERE type = 'room'"
+    `SELECT COUNT(*) AS count FROM units WHERE type = 'room' AND ${SQL_NOT_UNDER_RENOVATION}`
   ).first<{ count: number }>()
 
   // Nights the hotel could not have sold: a room off for repair was never on
@@ -206,7 +207,7 @@ analytics.get('/summary', async (c) => {
   const revenueByDow = new Map(weekdayRevenue.map((row) => [row.dow, row]))
   const occupancyByDow = new Map(weekdayOccupancy.map((row) => [row.dow, row]))
   const roomTotal = await c.env.DB.prepare(
-    "SELECT COUNT(*) AS count FROM units WHERE type = 'room'"
+    `SELECT COUNT(*) AS count FROM units WHERE type = 'room' AND ${SQL_NOT_UNDER_RENOVATION}`
   ).first<{ count: number }>()
   const rooms = roomTotal?.count ?? 0
 

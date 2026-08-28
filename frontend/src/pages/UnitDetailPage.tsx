@@ -12,6 +12,7 @@ import PaymentModal from '../components/PaymentModal'
 import PhotoGallery from '../components/PhotoGallery'
 import TransferModal from '../components/TransferModal'
 import BlockModal from '../components/BlockModal'
+import RenovationModal from '../components/RenovationModal'
 import DepositModal from '../components/DepositModal'
 import InvoiceSheet from '../components/InvoiceSheet'
 import UnitSheet from '../components/UnitSheet'
@@ -116,6 +117,9 @@ export default function UnitDetailPage() {
   /** Возврат залога — до сих пор сумма висела на броне вечно. */
   const [showDeposit, setShowDeposit] = useState(false)
   const [unblocking, setUnblocking] = useState(false)
+  /** На реставрации — свойство объекта, а не отрезок календаря. */
+  const [showRenovation, setShowRenovation] = useState(false)
+  const [renovating, setRenovating] = useState(false)
   const [showInvoice, setShowInvoice] = useState(false)
   const [showUnitSheet, setShowUnitSheet] = useState(false)
   const [sendingToCleaning, setSendingToCleaning] = useState(false)
@@ -367,9 +371,17 @@ export default function UnitDetailPage() {
               and not inside the booking form. Only offered when the object is
               not already off — «Вернуть в продажу» lives on the notice below,
               beside the reason it is answering. */}
-          {isAdmin && !unit.block && (
+          {isAdmin && !unit.block && !unit.renovation && (
             <button className="btn btn-sm" onClick={() => setShowBlock(true)}>
               Снять с продажи
+            </button>
+          )}
+          {/* Отправить на реставрацию — рядом со снятием с продажи, потому что
+              вопрос один и тот же («это нельзя продавать»), а ответы разные:
+              снятие знает свой конец, реставрация — нет. */}
+          {isAdmin && !unit.renovation && (
+            <button className="btn btn-sm" onClick={() => setShowRenovation(true)}>
+              На реставрацию
             </button>
           )}
           {/*
@@ -388,6 +400,39 @@ export default function UnitDetailPage() {
           )}
         </div>
       </div>
+
+      {/* На реставрации. Своя полоса, а не статус: объекта нет вообще, и это
+          другое предложение, чем «занят» или «снят с продажи на эти даты». */}
+      {unit.renovation && (
+        <div className="notice notice-warn">
+          <strong>На реставрации</strong> — с {unit.renovation.since.slice(0, 10)}
+          {unit.renovation.by_name && `, отметил ${unit.renovation.by_name}`}
+          {unit.renovation.note && <span className="cancel-note">{unit.renovation.note}</span>}.
+          Бронировать нельзя; объект не считается ни в занятости, ни в прогнозе.
+          {isAdmin && (
+            <div style={{ marginTop: 10 }}>
+              <button
+                className="btn btn-sm btn-primary"
+                disabled={renovating}
+                onClick={async () => {
+                  setRenovating(true)
+                  setError(null)
+                  try {
+                    await api(`/units/${unit.id}/renovation`, { method: 'DELETE' })
+                    await refreshAll()
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Не удалось вернуть в строй')
+                  } finally {
+                    setRenovating(false)
+                  }
+                }}
+              >
+                {renovating ? 'Возвращаем…' : 'Реставрация закончена'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Off sale. Deliberately its own notice rather than a unit status: the
           room is empty and clean and simply cannot be sold, and «занят» would
@@ -862,6 +907,13 @@ export default function UnitDetailPage() {
           unitId={unit.id}
           unitName={unit.name}
           onClose={() => setShowBlock(false)}
+          onSaved={refreshAll}
+        />
+      )}
+      {showRenovation && (
+        <RenovationModal
+          unit={unit}
+          onClose={() => setShowRenovation(false)}
           onSaved={refreshAll}
         />
       )}

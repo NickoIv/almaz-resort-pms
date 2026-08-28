@@ -151,6 +151,21 @@ export type Unit = {
    * be sold. «Занят» would send someone looking for a guest who is not there.
    */
   block?: UnitBlock | null
+  /**
+   * На реставрации — объекта физически ещё нет.
+   *
+   * Не `status` и не `block`. Статус описывает стоянку гостя, а тут стоянки
+   * быть не может; блокировка — это отрезок календаря с концом, а здесь конца
+   * никто не знает. `null` — обычный объект, и такими остаются все, пока
+   * человек не отметит обратное.
+   */
+  renovation?: Renovation | null
+}
+
+export type Renovation = {
+  since: string
+  note: string | null
+  by_name?: string | null
 }
 
 /** Объект, снятый с продажи. Half-open dates, like everything else here. */
@@ -432,6 +447,8 @@ export type TimelineRoom = {
    * check and the cell shading cannot disagree about what is sellable.
    */
   blocks?: UnitBlock[]
+  /** Строка остаётся на доске, но помеченной: спрятанный инвентарь забывают. */
+  renovation?: { since: string; note: string | null } | null
 }
 
 /**

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { StatusBadge } from './ui'
 import { blockReasonWord } from '../blocks'
-import { dateRange, money, timeRange } from '../format'
+import { dateRange, money, shortDate, timeRange } from '../format'
 import { STATUS_LABELS, type Unit } from '../types'
 
 /**
@@ -45,8 +45,10 @@ export default function UnitCard({
 
   return (
     <div
-      className={`unit-card glass ${open ? 'is-peeking' : ''}`}
-      data-status={unit.status}
+      className={`unit-card glass ${open ? 'is-peeking' : ''} ${
+        unit.renovation ? 'is-renovating' : ''
+      }`}
+      data-status={unit.renovation ? 'renovation' : unit.status}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => {
         setHovered(false)
@@ -62,7 +64,9 @@ export default function UnitCard({
             </div>
           </div>
           <span className="unit-status">
-            <StatusBadge status={unit.status} />
+            {/* Реставрация вытесняет статус, а не встаёт рядом: «свободен»
+                на объекте, которого нет, — приглашение его продать. */}
+            <StatusBadge status={unit.renovation ? 'renovation' : unit.status} />
           </span>
         </div>
 
@@ -75,6 +79,17 @@ export default function UnitCard({
                 ? timeRange(booking.date_from, booking.date_to)
                 : dateRange(booking.date_from, booking.date_to)}
             </div>
+          </div>
+        ) : unit.renovation ? (
+          // Там же, где стоял бы гость: карточку читают, чтобы ответить «это
+          // можно продать?», и «Нет брони» здесь сказало бы правду и обмануло.
+          // Само слово «На реставрации» уже стоит на плашке выше — тут только
+          // то, чего плашка не знает: почему и с каких пор.
+          <div className="unit-guest">
+            <div className="unit-guest-name">
+              {unit.renovation.note ?? 'Открытие не назначено'}
+            </div>
+            <div className="unit-dates">с {shortDate(unit.renovation.since)}</div>
           </div>
         ) : unit.block ? (
           // Off sale reads where the guest would be, because it answers the
