@@ -11,6 +11,10 @@ const TABS: { type: UnitType; label: string }[] = [
   { type: 'sunbed', label: 'Топчаны' },
   { type: 'gazebo', label: 'Беседки' },
   { type: 'vip_gazebo', label: 'VIP-беседки' },
+  // Пакет, а не четвёртый вид мебели: костровая зона сдаётся целиком под одно
+  // событие. Вкладкой — потому что вопрос «что у нас с зоной на субботу»
+  // задают так же, как про беседки, и ответ должен лежать там же.
+  { type: 'banquet_zone', label: 'Костровая зона' },
 ]
 
 /**
@@ -29,7 +33,7 @@ export default function RestaurantPage() {
 
   const load = useCallback((background = false) => {
     if (!background) setLoading(true)
-    api<Unit[]>('/units?type=sunbed,gazebo,vip_gazebo')
+    api<Unit[]>('/units?type=sunbed,gazebo,vip_gazebo,banquet_zone')
       .then(setUnits)
       .catch((err) => setError(err instanceof Error ? err.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
@@ -40,7 +44,10 @@ export default function RestaurantPage() {
   useLiveData(load, { poll: true })
 
   const visible = units.filter((unit) => unit.type === tab)
-  const busy = visible.filter((unit) => unit.status !== 'free').length
+  // Объект внутри идущего события занят, хотя своей брони на нём нет: событие —
+  // одна бронь на всю зону. Без этого счётчик отвечал бы «0 занято» над тремя
+  // беседками, на которых сидит юбилей.
+  const busy = visible.filter((unit) => unit.status !== 'free' || unit.zone?.booking).length
 
   function countFor(type: UnitType) {
     return units.filter((unit) => unit.type === type).length
@@ -98,7 +105,10 @@ export default function RestaurantPage() {
               // breakdown, guest) — the same one the rooms grid opens.
               onOpen={(selected) => navigate(`/units/${selected.id}`)}
               action={
-                unit.status === 'free' ? (
+                // «Занять сейчас» не предлагается там, где сервер всё равно
+                // откажет: внутри идущего события и на объекте, которого нет.
+                // Кнопка, ведущая в отказ, учит не доверять кнопкам.
+                unit.status === 'free' && !unit.zone?.booking && !unit.renovation ? (
                   <button
                     className="btn btn-sm btn-primary card-action"
                     onClick={() => setQuickUnit(unit)}

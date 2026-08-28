@@ -47,8 +47,10 @@ export default function UnitCard({
     <div
       className={`unit-card glass ${open ? 'is-peeking' : ''} ${
         unit.renovation ? 'is-renovating' : ''
-      }`}
-      data-status={unit.renovation ? 'renovation' : unit.status}
+      } ${unit.zone?.booking ? 'is-in-event' : ''}`}
+      data-status={
+        unit.renovation ? 'renovation' : unit.zone?.booking ? 'occupied' : unit.status
+      }
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => {
         setHovered(false)
@@ -66,7 +68,10 @@ export default function UnitCard({
           <span className="unit-status">
             {/* Реставрация вытесняет статус, а не встаёт рядом: «свободен»
                 на объекте, которого нет, — приглашение его продать. */}
-            <StatusBadge status={unit.renovation ? 'renovation' : unit.status} />
+            <StatusBadge
+              status={unit.renovation ? 'renovation' : unit.zone?.booking ? 'occupied' : unit.status}
+              label={unit.zone?.booking ? 'Событие' : undefined}
+            />
           </span>
         </div>
 
@@ -78,6 +83,20 @@ export default function UnitCard({
               {hourly
                 ? timeRange(booking.date_from, booking.date_to)
                 : dateRange(booking.date_from, booking.date_to)}
+              {/* На сколько человек накрывать — то, что о событии спрашивают
+                  первым, ещё до времени. */}
+              {booking.guests_count ? ` · ${booking.guests_count} гостей` : ''}
+            </div>
+          </div>
+        ) : unit.zone?.booking ? (
+          // Отдельной брони на этой беседке нет и не будет: событие — одна
+          // бронь на всю зону. Без этой строки она выглядела бы свободной ровно
+          // в тот вечер, когда её продавать нельзя.
+          <div className="unit-guest">
+            <div className="unit-guest-name">{unit.zone.booking.guest_name ?? 'Событие'}</div>
+            <div className="unit-dates">
+              вся {unit.zone.name?.toLowerCase() ?? 'зона'} ·{' '}
+              {timeRange(unit.zone.booking.date_from, unit.zone.booking.date_to)}
             </div>
           </div>
         ) : unit.renovation ? (

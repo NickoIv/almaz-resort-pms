@@ -13,6 +13,7 @@ import PhotoGallery from '../components/PhotoGallery'
 import TransferModal from '../components/TransferModal'
 import BlockModal from '../components/BlockModal'
 import RenovationModal from '../components/RenovationModal'
+import ZoneMembersModal from '../components/ZoneMembersModal'
 import DepositModal from '../components/DepositModal'
 import InvoiceSheet from '../components/InvoiceSheet'
 import UnitSheet from '../components/UnitSheet'
@@ -119,6 +120,8 @@ export default function UnitDetailPage() {
   const [unblocking, setUnblocking] = useState(false)
   /** На реставрации — свойство объекта, а не отрезок календаря. */
   const [showRenovation, setShowRenovation] = useState(false)
+  /** Состав пакета — только у костровой зоны. */
+  const [showMembers, setShowMembers] = useState(false)
   const [renovating, setRenovating] = useState(false)
   const [showInvoice, setShowInvoice] = useState(false)
   const [showUnitSheet, setShowUnitSheet] = useState(false)
@@ -376,6 +379,13 @@ export default function UnitDetailPage() {
               Снять с продажи
             </button>
           )}
+          {/* Состав пакета правится там же, где он и виден. Кнопка есть только
+              у зоны: у беседки состава не бывает. */}
+          {isAdmin && unit.type === 'banquet_zone' && (
+            <button className="btn btn-sm" onClick={() => setShowMembers(true)}>
+              Состав зоны
+            </button>
+          )}
           {/* Отправить на реставрацию — рядом со снятием с продажи, потому что
               вопрос один и тот же («это нельзя продавать»), а ответы разные:
               снятие знает свой конец, реставрация — нет. */}
@@ -400,6 +410,26 @@ export default function UnitDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Из чего состоит зона и что это значит. Полоса, а не мелкий текст:
+          пустой состав — это выключенный запрет двойной продажи, и знать об
+          этом надо до того, как беседку продадут поверх события. */}
+      {unit.type === 'banquet_zone' && (
+        <div className={`notice ${(unit.members?.length ?? 0) === 0 ? 'notice-warn' : ''}`}>
+          <strong>Состав зоны:</strong>{' '}
+          {unit.members && unit.members.length > 0 ? (
+            <>
+              {unit.members.map((member) => member.name).join(', ')}. Пока в зоне идёт событие, эти
+              объекты нельзя продать отдельно — и наоборот.
+            </>
+          ) : (
+            <>
+              пока не отмечен. Зона продаётся, но беседки и топчаны внутри неё можно продать поверх
+              события — отметьте, что в неё входит.
+            </>
+          )}
+        </div>
+      )}
 
       {/* На реставрации. Своя полоса, а не статус: объекта нет вообще, и это
           другое предложение, чем «занят» или «снят с продажи на эти даты». */}
@@ -597,6 +627,19 @@ export default function UnitDetailPage() {
                       : timeRange(booking.date_from, booking.date_to)}
                   </span>
                 </div>
+                {/* Событие: на сколько человек накрывать. Видно всем ролям —
+                    официанту это нужнее, чем администратору. */}
+                {booking.guests_count ? (
+                  <div className="info-row">
+                    <span>Гостей</span>
+                    <span>
+                      {booking.guests_count}
+                      {booking.price_per_person
+                        ? ` · по ${money(booking.price_per_person, booking.currency)}`
+                        : ''}
+                    </span>
+                  </div>
+                ) : null}
                 <div className="info-row">
                   <span>Статус</span>
                   <span>{STATUS_LABELS[booking.status ?? 'booked']}</span>
@@ -909,6 +952,9 @@ export default function UnitDetailPage() {
           onClose={() => setShowBlock(false)}
           onSaved={refreshAll}
         />
+      )}
+      {showMembers && (
+        <ZoneMembersModal unit={unit} onClose={() => setShowMembers(false)} onSaved={refreshAll} />
       )}
       {showRenovation && (
         <RenovationModal

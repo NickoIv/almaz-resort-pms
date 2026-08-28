@@ -141,6 +141,8 @@ const UNIT_WORDS: Record<UnitType, string> = {
   sunbed: 'Топчан',
   gazebo: 'Беседка',
   vip_gazebo: 'VIP-беседка',
+  banquet_zone: 'Костровая зона',
+  sauna: 'Баня',
 }
 
 /** Rooms open at /rooms/:id; everything else at /units/:id. */

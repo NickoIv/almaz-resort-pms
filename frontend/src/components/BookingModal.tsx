@@ -101,6 +101,14 @@ export default function BookingModal({
       : ''
   )
   const [document, setDocument] = useState(booking?.guest_document ?? '')
+  /**
+   * Событие в костровой зоне считается от числа гостей, а не от числа часов:
+   * банкетное меню от 17 000 ₸ с человека. Итог можно поставить руками —
+   * администратор торгуется, — и тогда он побеждает расчёт.
+   */
+  const isBanquet = unitType === 'banquet_zone'
+  const [guests, setGuests] = useState(String(booking?.guests_count ?? ''))
+  const [perPerson, setPerPerson] = useState(String(booking?.price_per_person ?? ''))
   const [total, setTotal] = useState(String(booking?.total_amount ?? ''))
   const [prepaid, setPrepaid] = useState(String(booking?.prepaid_amount ?? ''))
   const [deposit, setDeposit] = useState(String(booking?.deposit_amount ?? ''))
@@ -273,6 +281,12 @@ export default function BookingModal({
               total_amount: Number(total || 0),
               prepaid_amount: Number(prepaid || 0),
               deposit_amount: Number(deposit || 0),
+              ...(isBanquet
+                ? {
+                    guests_count: Number(guests || 0),
+                    price_per_person: Number(perPerson || 0),
+                  }
+                : {}),
               currency,
             },
           })
@@ -624,6 +638,50 @@ export default function BookingModal({
           </div>
         )}
 
+        {/* Событие: сколько человек и почём. Стоит перед суммой, потому что
+            сумма из них и получается — и потому что «на сколько человек»
+            спрашивают первым, ещё до цены. Число гостей нужно и официанту,
+            который будет накрывать, поэтому оно не за `canSetPrice`. */}
+        {isBanquet && (
+          <div className="field-row">
+            <div className="field">
+              <label htmlFor="guests">Гостей</label>
+              <input
+                id="guests"
+                type="number"
+                min="1"
+                max="100"
+                value={guests}
+                onChange={(event) => setGuests(event.target.value)}
+                placeholder="40"
+              />
+              <div className="field-hint">Зона рассчитана до 100 человек.</div>
+            </div>
+            {canSetPrice && (
+              <div className="field">
+                <label htmlFor="per-person">Цена с человека</label>
+                <input
+                  id="per-person"
+                  type="number"
+                  min="0"
+                  value={perPerson}
+                  onChange={(event) => {
+                    setPerPerson(event.target.value)
+                    // Пересчёт, пока сумму не тронули руками: тронутая сумма —
+                    // это то, о чём договорились с гостем, и её нельзя менять
+                    // молча под ним.
+                    if (!priceTouched) {
+                      setTotal(String(Number(event.target.value || 0) * Number(guests || 0)))
+                    }
+                  }}
+                  placeholder="17000"
+                />
+                <div className="field-hint">Банкетное меню — от 17 000 ₸.</div>
+              </div>
+            )}
+          </div>
+        )}
+
         {canSetPrice && (
           <>
             <div className="field-row">
@@ -655,6 +713,27 @@ export default function BookingModal({
                 />
               </div>
             </div>
+
+            {isBanquet && Number(guests) > 0 && Number(perPerson) > 0 && (
+              <div className="field-hint" style={{ marginTop: -8, marginBottom: 16 }}>
+                {guests} × {money(Number(perPerson))} = {money(Number(guests) * Number(perPerson))}
+                {priceTouched && Number(total) !== Number(guests) * Number(perPerson) && (
+                  <>
+                    {' — '}
+                    <button
+                      type="button"
+                      className="link-button"
+                      onClick={() => {
+                        setPriceTouched(false)
+                        setTotal(String(Number(guests) * Number(perPerson)))
+                      }}
+                    >
+                      вернуть расчёт
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Where the figure came from, in the terms the price list is
                 written in — so a wrong amount is spotted here rather than on

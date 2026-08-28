@@ -1,6 +1,6 @@
 export type Role = 'admin' | 'housekeeper' | 'waiter'
 
-export type UnitType = 'room' | 'sunbed' | 'gazebo' | 'vip_gazebo'
+export type UnitType = 'room' | 'sunbed' | 'gazebo' | 'vip_gazebo' | 'banquet_zone' | 'sauna'
 
 export type UnitStatus = 'free' | 'booked' | 'occupied'
 
@@ -43,6 +43,14 @@ export type Booking = {
    */
   verified_at?: string | null
   verified_by_name?: string | null
+  /**
+   * Событие в костровой зоне: сколько гостей и почём с человека.
+   *
+   * Число гостей видно всем — официант накрывает на сорок человек и должен это
+   * знать; цена с человека едет только тем, кто вообще видит деньги.
+   */
+  guests_count?: number | null
+  price_per_person?: number | null
   /**
    * Переселение: the booking this one continues, and the unit it came out of.
    * A stay that begins in the middle of a week reads as a data-entry error
@@ -160,6 +168,27 @@ export type Unit = {
    * человек не отметит обратное.
    */
   renovation?: Renovation | null
+  /**
+   * Пакет, в который входит объект, и идёт ли в нём событие прямо сейчас.
+   *
+   * Отдельной брони на беседке внутри проданной костровой зоны нет — событие
+   * это одна бронь на зону, — поэтому без этого поля беседка выглядела бы
+   * свободной ровно в тот вечер, когда её продавать нельзя.
+   */
+  zone?: UnitZone | null
+  /** Состав пакета. Приходит только со страницей самой зоны. */
+  members?: { id: number; type: UnitType; name: string; capacity: number }[]
+}
+
+export type UnitZone = {
+  id: number
+  name: string | null
+  booking: {
+    id: number
+    guest_name: string | null
+    date_from: string | null
+    date_to: string | null
+  } | null
 }
 
 export type Renovation = {
@@ -357,6 +386,8 @@ export const UNIT_TYPE_LABELS: Record<UnitType, string> = {
   sunbed: 'Топчан',
   gazebo: 'Беседка',
   vip_gazebo: 'VIP-беседка',
+  banquet_zone: 'Костровая зона',
+  sauna: 'Баня',
 }
 
 export const ROLE_LABELS: Record<Role, string> = {

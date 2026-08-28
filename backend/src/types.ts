@@ -1,6 +1,13 @@
 export type Role = 'admin' | 'housekeeper' | 'waiter'
 
-export type UnitType = 'room' | 'sunbed' | 'gazebo' | 'vip_gazebo'
+/**
+ * `banquet_zone` — костровая зона целиком: беседки, топчаны и сцена, сдаваемые
+ * под одно событие. Не «ещё одна беседка»: продаётся за человека по банкетному
+ * меню, и на время события внутри не должно быть посторонних.
+ *
+ * `sauna` — баня. Тип заведён заранее, объектов этого типа пока нет ни одного.
+ */
+export type UnitType = 'room' | 'sunbed' | 'gazebo' | 'vip_gazebo' | 'banquet_zone' | 'sauna'
 
 export type BookingStatus = 'free' | 'booked' | 'occupied'
 
@@ -60,4 +67,4 @@ export type Variables = {
 export type AppEnv = { Bindings: Bindings; Variables: Variables }
 
 /** Unit types a waiter is allowed to touch. */
-export const RESTAURANT_UNIT_TYPES: UnitType[] = ['sunbed', 'gazebo', 'vip_gazebo']
+export const RESTAURANT_UNIT_TYPES: UnitType[] = ['sunbed', 'gazebo', 'vip_gazebo', 'banquet_zone']

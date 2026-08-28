@@ -7,7 +7,7 @@ import { SQL_NOW } from '../lib/time'
 import { chargesSumSql, remainingOf } from '../lib/money'
 import { SQL_COVERS_NOW, SQL_STARTS_LATER, SQL_TODAY } from '../lib/time'
 import { SQL_NOT_UNDER_RENOVATION } from '../lib/renovation'
-import type { AppEnv, BookingStatus, UnitType } from '../types'
+import { RESTAURANT_UNIT_TYPES, type AppEnv, type BookingStatus, type UnitType } from '../types'
 
 type UnitRow = {
   id: number
@@ -18,6 +18,12 @@ type UnitRow = {
   renovation_since: string | null
   renovation_note: string | null
   renovation_by_name: string | null
+  part_of_unit_id: number | null
+  zone_name: string | null
+  zone_booking_id: number | null
+  zone_guest_name: string | null
+  zone_from: string | null
+  zone_to: string | null
   cleaning_pending: number
   cleaning_total: number
   booking_id: number | null
@@ -31,6 +37,8 @@ type UnitRow = {
   deposit_amount: number | null
   currency: string | null
   group_id: number | null
+  guests_count: number | null
+  price_per_person: number | null
   charges_total: number | null
   next_booking_id: number | null
   next_date_from: string | null
@@ -53,10 +61,14 @@ const UNIT_SELECT = `
   SELECT
     u.id, u.type, u.name, u.category, u.capacity,
     u.renovation_since, u.renovation_note, rs.name AS renovation_by_name,
+    u.part_of_unit_id, z.name AS zone_name,
+    zb.id AS zone_booking_id, zb.guest_name AS zone_guest_name,
+    zb.date_from AS zone_from, zb.date_to AS zone_to,
     (SELECT COUNT(*) FROM cleaning_checklist cc WHERE cc.unit_id = u.id AND cc.is_done = 0) AS cleaning_pending,
     (SELECT COUNT(*) FROM cleaning_checklist cc WHERE cc.unit_id = u.id) AS cleaning_total,
     b.id AS booking_id, b.guest_name, b.guest_phone, b.date_from, b.date_to,
     b.status AS booking_status, b.total_amount, b.prepaid_amount, b.deposit_amount, b.currency,
+    b.guests_count, b.price_per_person,
     b.group_id, ${chargesSumSql('b')} AS charges_total,
     nb.id AS next_booking_id, nb.date_from AS next_date_from, nb.date_to AS next_date_to,
     nb.guest_name AS next_guest_name,
@@ -67,6 +79,16 @@ const UNIT_SELECT = `
     bl.reason AS block_reason, bl.note AS block_note
   FROM units u
   LEFT JOIN staff_users rs ON rs.id = u.renovation_by
+  -- Пакет, в который входит объект, и идущее сейчас событие в нём. Нужно,
+  -- чтобы беседка внутри проданной костровой зоны не выглядела свободной:
+  -- отдельной брони на ней нет и не будет, а продать её всё равно нельзя.
+  LEFT JOIN units z ON z.id = u.part_of_unit_id
+  LEFT JOIN bookings zb ON zb.id = (
+    SELECT id FROM bookings
+    WHERE unit_id = u.part_of_unit_id AND status <> 'free' AND ${SQL_COVERS_NOW}
+    ORDER BY date_from DESC
+    LIMIT 1
+  )
   LEFT JOIN bookings b ON b.id = (
     SELECT id FROM bookings
     WHERE unit_id = u.id AND status <> 'free' AND ${SQL_COVERS_NOW}
@@ -118,6 +140,9 @@ function serializeUnit(row: UnitRow, withMoney: boolean) {
         date_to: row.date_to,
         status: row.booking_status,
         group_id: row.group_id,
+        // На сколько человек накрывать. Едет всем ролям: официанту это нужнее,
+        // чем администратору, а деньгами число гостей не является.
+        guests_count: row.guests_count,
         is_paid:
           remainingOf(row.total_amount ?? 0, row.charges_total ?? 0, row.prepaid_amount ?? 0) <= 0,
         ...(withMoney
@@ -133,6 +158,7 @@ function serializeUnit(row: UnitRow, withMoney: boolean) {
                 row.prepaid_amount ?? 0
               ),
               currency: row.currency ?? 'KZT',
+              price_per_person: row.price_per_person,
             }
           : {}),
       }
@@ -176,6 +202,27 @@ function serializeUnit(row: UnitRow, withMoney: boolean) {
      * стоянку гостя, а здесь стоянки нет и быть не может. Карточка, сказавшая
      * «свободен», отправила бы человека продавать номер без крыши.
      */
+    /**
+     * Пакет, в который объект входит, и идёт ли в нём событие прямо сейчас.
+     *
+     * Отдельной брони на беседке внутри проданной костровой зоны нет — событие
+     * это одна бронь на зону, — поэтому без этого поля беседка выглядела бы
+     * свободной ровно в тот вечер, когда её продавать нельзя.
+     */
+    zone: row.part_of_unit_id
+      ? {
+          id: row.part_of_unit_id,
+          name: row.zone_name,
+          booking: row.zone_booking_id
+            ? {
+                id: row.zone_booking_id,
+                guest_name: row.zone_guest_name,
+                date_from: row.zone_from,
+                date_to: row.zone_to,
+              }
+            : null,
+        }
+      : null,
     renovation: row.renovation_since
       ? {
           since: row.renovation_since,
@@ -296,7 +343,16 @@ units.get('/:id', async (c) => {
   if (!row) throw new HTTPException(404, { message: 'Unit not found' })
   assertUnitTypeAllowed(staff.role, row.type)
 
-  return c.json(serializeUnit(row, canSeeMoney(staff.role)))
+  const unit = serializeUnit(row, canSeeMoney(staff.role))
+
+  // Состав пакета едет только со страницей самой зоны: в списке из двадцати
+  // объектов он никому не нужен, а здесь на нём стоит редактор.
+  if (row.type === 'banquet_zone') {
+    const { members } = await readMembers(c.env.DB, id)
+    return c.json({ ...unit, members })
+  }
+
+  return c.json(unit)
 })
 
 type CalendarBookingRow = {
@@ -538,6 +594,84 @@ async function readRenovation(db: D1Database, id: number) {
       ? { since: row.renovation_since, note: row.renovation_note, by_name: row.renovation_by_name }
       : null,
   }
+}
+
+/**
+ * PUT /api/units/:id/members — из чего состоит пакет.
+ *
+ * Какие именно беседки и топчаны входят в костровую зону, знает гостиница, а не
+ * миграция: в маркетинге «5 беседок и 2 топчана», а в базе четыре беседки, две
+ * VIP-беседки и шесть топчанов. Угадать это значило бы записать неправду в
+ * данные, от которых зависит запрет двойной продажи, — поэтому состав пустой,
+ * пока его не отметит человек.
+ *
+ * Только админ, и только объекты зоны отдыха: номер внутри костровой зоны — это
+ * не состав пакета, а ошибка ввода.
+ */
+units.put('/:id/members', requireRole('admin'), async (c) => {
+  const staff = c.get('staff')
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) throw new HTTPException(400, { message: 'Некорректный объект' })
+
+  const zone = await c.env.DB.prepare('SELECT id, type, name FROM units WHERE id = ?')
+    .bind(id)
+    .first<{ id: number; type: UnitType; name: string }>()
+  if (!zone) throw new HTTPException(404, { message: 'Объект не найден' })
+  if (zone.type !== 'banquet_zone') {
+    throw new HTTPException(400, { message: 'Состав есть только у пакета — костровой зоны' })
+  }
+
+  const body = await c.req
+    .json<{ unit_ids?: unknown }>()
+    .catch(() => ({}) as { unit_ids?: unknown })
+  const ids = Array.isArray(body.unit_ids) ? body.unit_ids.map(Number).filter(Number.isInteger) : []
+
+  if (ids.includes(id)) {
+    throw new HTTPException(400, { message: 'Зона не может входить сама в себя' })
+  }
+
+  if (ids.length > 0) {
+    const { results } = await c.env.DB.prepare(
+      `SELECT id, type, name FROM units WHERE id IN (${placeholders(ids.length)})`
+    )
+      .bind(...ids)
+      .all<{ id: number; type: UnitType; name: string }>()
+
+    if (results.length !== ids.length) {
+      throw new HTTPException(400, { message: 'Какого-то из объектов не существует' })
+    }
+    const wrong = results.find((row) => !RESTAURANT_UNIT_TYPES.includes(row.type) || row.type === 'banquet_zone')
+    if (wrong) {
+      throw new HTTPException(400, {
+        message: `${wrong.name} нельзя включить в зону: туда входят только беседки и топчаны`,
+      })
+    }
+  }
+
+  // Сначала снимаем всех, потом ставим отмеченных: список приходит целиком, и
+  // выборочная правка оставила бы отвязанным то, что человек снял.
+  await c.env.DB.prepare('UPDATE units SET part_of_unit_id = NULL WHERE part_of_unit_id = ?')
+    .bind(id)
+    .run()
+
+  if (ids.length > 0) {
+    await c.env.DB.prepare(
+      `UPDATE units SET part_of_unit_id = ? WHERE id IN (${placeholders(ids.length)})`
+    )
+      .bind(id, ...ids)
+      .run()
+  }
+
+  await writeAudit(c.env.DB, staff.sub, `unit.members:${ids.length}`, 'units', id)
+  return c.json(await readMembers(c.env.DB, id))
+})
+
+async function readMembers(db: D1Database, zoneId: number) {
+  const { results } = await db
+    .prepare('SELECT id, type, name, capacity FROM units WHERE part_of_unit_id = ? ORDER BY type, name')
+    .bind(zoneId)
+    .all<{ id: number; type: UnitType; name: string; capacity: number }>()
+  return { unit_id: zoneId, members: results }
 }
 
 export default units

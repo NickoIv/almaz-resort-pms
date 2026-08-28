@@ -1016,6 +1016,42 @@ button {
   line-height: 1.5;
 }
 
+/* ── Строка с флажком ───────────────────────────────────────────────────────
+ *
+ * Первый чекбокс в приложении — до сих пор ни одна форма их не просила.
+ * Нажимается вся строка, а не квадратик 13×13: `label` оборачивает `input`,
+ * поэтому попадание в любое место строки переключает флажок, и высота сразу
+ * взята не меньше сорока — того же порога, что и у всех остальных целей. */
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.check-row:hover {
+  border-color: var(--border-strong);
+}
+
+.check-row input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex: none;
+}
+
+.check-row:has(input:checked) {
+  border-color: rgb(var(--accent-rgb) / 0.6);
+  background: rgb(var(--accent-rgb) / 0.08);
+}
+
 .unit-guest-name {
   font-weight: 500;
 }

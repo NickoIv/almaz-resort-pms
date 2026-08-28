@@ -11,6 +11,7 @@ import { cleanName, cleanOptional } from '../lib/text'
 import { CANCEL_REASONS, isCancelReason, TRANSFER_REASON } from '../lib/cancellation'
 import { assertNotBlocked } from '../lib/blocks'
 import { assertNotUnderRenovation } from '../lib/renovation'
+import { assertZoneExclusivity, banquetTotal } from '../lib/banquet'
 import { carryOver, nightsBetween, prorate } from '../lib/transfer'
 import { quoteStay } from '../lib/rates'
 import { loadRates } from './rates'
@@ -49,6 +50,9 @@ type BookingRow = {
   deposit_returned: number | null
   deposit_returned_at: string | null
   deposit_returned_by: number | null
+  /** Событие: сколько гостей и почём с человека. NULL у обычных броней. */
+  guests_count: number | null
+  price_per_person: number | null
   deposit_note: string | null
   deposit_returned_by_name?: string | null
 }
@@ -100,6 +104,12 @@ function serializeBooking(row: BookingRow, withMoney: boolean) {
     moved_from_unit_name: row.moved_from_unit_name ?? null,
     /** The day the guest arrived, when this row is not where they started. */
     arrived_on: row.arrived_on,
+    /**
+     * Событие в костровой зоне. Число гостей видно всем — официант накрывает на
+     * сорок человек и должен это знать; цена с человека едет только к тому, кто
+     * вообще видит деньги.
+     */
+    guests_count: row.guests_count,
     is_paid: remainingOf(row.total_amount, row.charges_total ?? 0, row.prepaid_amount) <= 0,
     ...(withMoney
       ? {
@@ -116,6 +126,7 @@ function serializeBooking(row: BookingRow, withMoney: boolean) {
           charges_amount: row.charges_total ?? 0,
           remaining_amount: remainingOf(row.total_amount, row.charges_total ?? 0, row.prepaid_amount),
           currency: row.currency,
+          price_per_person: row.price_per_person,
         }
       : {}),
   }
@@ -144,7 +155,9 @@ async function assertSellable(
   unitId: number,
   dateFrom: string,
   dateTo: string,
-  ignoreBookingId: number | null
+  ignoreBookingId: number | null,
+  /** Тип нужен, чтобы отличить продажу зоны от продажи объекта внутри неё. */
+  unitType?: string
 ): Promise<void> {
   const clash = await db
     .prepare(
@@ -165,6 +178,15 @@ async function assertSellable(
   await assertNotBlocked(db, unitId, dateFrom, dateTo)
   // Реставрация не про даты: объекта нет вообще, поэтому проверяется без окна.
   await assertNotUnderRenovation(db, unitId)
+  // Костровая зона продаётся целиком: занята зона — нельзя её беседку, занята
+  // беседка — нельзя зону. Тип узнаём сами, если вызывающий его не передал:
+  // забыть аргумент легче, чем заметить, что запрет перестал работать.
+  const type =
+    unitType ??
+    (await db.prepare('SELECT type FROM units WHERE id = ?').bind(unitId).first<{ type: string }>())
+      ?.type ??
+    ''
+  await assertZoneExclusivity(db, unitId, type, dateFrom, dateTo)
 }
 
 const bookings = new Hono<AppEnv>()
@@ -233,7 +255,16 @@ bookings.post('/', canBook, async (c) => {
 
   // Waiters take bookings but do not set prices; admins may.
   const money = canSeeMoney(staff.role)
-  const total = money ? Number(body.total_amount ?? 0) : 0
+  // Событие считается от числа гостей: 40 человек по 17 000. Итог можно
+  // поставить руками — администратор торгуется, — и тогда он побеждает, иначе
+  // цифра, о которой договорились, тихо пересчиталась бы при сохранении.
+  const guests = body.guests_count === undefined ? null : Number(body.guests_count)
+  const perPerson = body.price_per_person === undefined ? null : Number(body.price_per_person)
+  const total = money
+    ? perPerson !== null || guests !== null
+      ? banquetTotal(guests, perPerson, Number(body.total_amount ?? 0))
+      : Number(body.total_amount ?? 0)
+    : 0
   const prepaid = money ? Number(body.prepaid_amount ?? 0) : 0
   const deposit = money ? Number(body.deposit_amount ?? 0) : 0
 
@@ -250,8 +281,9 @@ bookings.post('/', canBook, async (c) => {
     `INSERT INTO bookings
        (unit_id, guest_name, guest_phone, guest_citizenship, guest_document,
         date_from, date_to, status,
-        total_amount, prepaid_amount, deposit_amount, currency, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${SQL_NOW})
+        total_amount, prepaid_amount, deposit_amount, currency,
+        guests_count, price_per_person, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${SQL_NOW})
      RETURNING *`
   )
     .bind(
@@ -266,7 +298,9 @@ bookings.post('/', canBook, async (c) => {
       total,
       prepaid,
       deposit,
-      String(body.currency ?? 'KZT')
+      String(body.currency ?? 'KZT'),
+      guests,
+      perPerson
     )
     .first<BookingRow>()
 
