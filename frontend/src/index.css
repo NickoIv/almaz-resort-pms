@@ -3758,6 +3758,26 @@ button.cal-day:focus-visible {
     --action-height: 40px;
   }
 
+  /* ── Ссылка внутри фразы — это тоже палец ────────────────────────────────
+     Номер комнаты в «Миграционном учёте» стоит посреди предложения — «101 ·
+     10 — 13 авг · паспорт» — и мерился в 16px против сорока. Кнопкой его не
+     сделать: кнопка разорвёт фразу. Поэтому растёт только область нажатия —
+     `padding` поднимает её до 40px, а отрицательный `margin` ровно на столько
+     же возвращает текст на место, и строка не разъезжается.
+
+     Не псевдоэлементом во всю высоту, хотя так тоже можно: у него собственный
+     прямоугольник ссылки остаётся прежним, и `audit-mobile.mjs`, который
+     меряет `getBoundingClientRect`, продолжал бы считать её промахом. Замер и
+     правда должны говорить одно и то же — иначе следующий, кто прогонит
+     аудит, пойдёт чинить уже починенное. */
+  .unit-link {
+    display: inline-block;
+    padding: 12px 8px;
+    margin: -12px -8px;
+    min-width: 40px;
+    text-align: center;
+  }
+
   /* The planning board is a grid, not a list of buttons, so its cells are
      sized to fit a week across rather than to be tapped comfortably — 38px a
      row, which leaves a 30px cell. Forty-six gives a 38px cell: the difference

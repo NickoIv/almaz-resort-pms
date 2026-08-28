@@ -94,7 +94,9 @@ export default function MigrationPage() {
           {entry.guest_citizenship && <span className="tag">{entry.guest_citizenship}</span>}
         </div>
         <div className="row-sub">
-          <Link to={`/rooms/${entry.unit_id}`}>{entry.unit_name}</Link> ·{' '}
+          <Link className="unit-link" to={`/rooms/${entry.unit_id}`}>
+            {entry.unit_name}
+          </Link>{' · '}
           {dateRange(entry.date_from, entry.date_to)}
           {entry.guest_document && ` · ${entry.guest_document}`}
           {entry.guest_phone && ` · ${entry.guest_phone}`}

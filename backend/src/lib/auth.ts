@@ -19,8 +19,8 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
     throw new HTTPException(401, { message: 'Invalid or expired token' })
   }
 
-  // Tokens live 12 hours, so checking the flag only at login would leave a
-  // disabled account working for the rest of the shift — which is not what
+  // Tokens live a day, so checking the flag only at login would leave a
+  // disabled account working until this time tomorrow — which is not what
   // "disable" means to the admin who clicked it. One indexed lookup per
   // request is a fair price for revocation taking effect immediately.
   const account = await c.env.DB.prepare('SELECT is_active, role FROM staff_users WHERE id = ?')
@@ -48,5 +48,18 @@ export function requireRole(...roles: Role[]): MiddlewareHandler<AppEnv> {
   }
 }
 
-/** Token lifetime: one working shift plus slack. */
-export const TOKEN_TTL_SECONDS = 12 * 60 * 60
+/**
+ * Token lifetime: a day.
+ *
+ * Twelve hours was «смена плюс запас», and it was the запас that was wrong: a
+ * tab opened at the desk in the morning was dead by the evening shift, and one
+ * left overnight met the next morning with an error rather than a PIN screen.
+ * A day means one login per day at a fixed-ish hour instead of a second one
+ * arriving mid-evening for no reason a person can see.
+ *
+ * It is not a security downgrade in the way a longer session usually is:
+ * `requireAuth` re-reads `is_active` and the role from the database on **every**
+ * request, so disabling an account or demoting someone takes effect at once and
+ * does not wait for the token to lapse.
+ */
+export const TOKEN_TTL_SECONDS = 24 * 60 * 60
