@@ -27,8 +27,29 @@ export const OUTDOOR_CHECKLIST_TEMPLATE = [
   'Подмести площадку',
 ]
 
+/**
+ * Баня. Своя уборка, а не «номер» и не «беседка».
+ *
+ * Ни одной бани пока не заведено — она откроется позже, — но шаблон нужен
+ * заранее: `checklistTemplate` иначе выдала бы ей уличный список, и первая же
+ * баня получила бы «заменить скатерть» вместо котла и слива. Список короткий и
+ * про то, что в бане действительно делают между гостями.
+ */
+export const SAUNA_CHECKLIST_TEMPLATE = [
+  'Слить и промыть купель',
+  'Помыть полки и пол в парной',
+  'Проветрить и просушить парную',
+  'Сменить простыни и полотенца',
+  'Помыть душевую и санузел',
+  'Вынести мусор',
+  'Проверить котёл и воду',
+  'Комната отдыха: стол и посуда',
+]
+
 export function checklistTemplate(type: UnitType): string[] {
-  return type === 'room' ? ROOM_CHECKLIST_TEMPLATE : OUTDOOR_CHECKLIST_TEMPLATE
+  if (type === 'room') return ROOM_CHECKLIST_TEMPLATE
+  if (type === 'sauna') return SAUNA_CHECKLIST_TEMPLATE
+  return OUTDOOR_CHECKLIST_TEMPLATE
 }
 
 /**

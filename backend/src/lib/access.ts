@@ -3,16 +3,27 @@ import { RESTAURANT_UNIT_TYPES, type Role, type UnitType } from '../types'
 
 /**
  * Which unit types each role may touch:
- *  - admin        — everything
- *  - housekeeper  — rooms only (cleaning checklists)
+ *  - admin        — everything, including a banya if one is ever created
+ *  - housekeeper  — rooms and the banya (cleaning checklists)
  *  - waiter       — restaurant / recreation units only
+ *
+ * **`sauna` появляется здесь до того, как появится хоть одна баня.** Она
+ * откроется когда-нибудь позже; объектов этого типа пока нет ни одного, и ни
+ * один экран о нём не знает. Права заведены заранее ровно затем, чтобы в день,
+ * когда баню действительно заведут, она просто заработала: без этой строки
+ * `resolveTypeFilter` ответил бы администратору 403 на его собственный объект.
+ *
+ * Горничная получает баню вместе с номерами: у бани своя уборка, и правило
+ * «горничная убирает только номера» сделало бы её единственным объектом, к
+ * которому не подойти. Ничего нового это не открывает — все запросы там и так
+ * отфильтрованы по `allowedUnitTypes`.
  */
 export function allowedUnitTypes(role: Role): UnitType[] {
   switch (role) {
     case 'admin':
-      return ['room', ...RESTAURANT_UNIT_TYPES]
+      return ['room', 'sauna', ...RESTAURANT_UNIT_TYPES]
     case 'housekeeper':
-      return ['room']
+      return ['room', 'sauna']
     case 'waiter':
       return [...RESTAURANT_UNIT_TYPES]
   }
